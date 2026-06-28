@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lux"
+version = "0.1"
+dependencies = [
+	"jinja2==3.1.*",
+	"werkzeug==3.1.*",
+]
