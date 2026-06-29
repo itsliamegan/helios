@@ -10,12 +10,12 @@ from lux.http import Request, Response
 from . import types
 
 class Component(Component):
-	def __init__(self, file: Path, model_types: "ModelTypes"):
+	def __init__(self, file: Path, schema: Schema):
 		self.file = file
-		self.model_types = model_types
+		self.schema = schema
 
 	def before(self, req: Request, ctx: Context):
-		ctx.store = load(self.file, self.model_types)
+		ctx.store = load(self.file, self.schema)
 
 	def after(self, res: Response, ctx: Context):
 		save(self.file, ctx.store)
@@ -82,14 +82,14 @@ class Model:
 	def __repr__(self) -> str:
 		return f"{type(self).__name__}({repr(self.id)})"
 
-class ModelTypes:
+class Schema:
 	def __init__(self, raw_model_types: list[type[Model]]):
 		model_types = {}
 		for model_type in raw_model_types:
 			model_types[model_type.__name__] = model_type
 		self.model_types = model_types
 
-	def get(self, name: str) -> type[Model]:
+	def get_model_type(self, name: str) -> type[Model]:
 		return self.model_types[name]
 
 class Store:
@@ -124,10 +124,10 @@ class Store:
 		self.models[id] = model
 		return model
 
-def load(path: Path, model_types: ModelTypes) -> Store:
+def load(path: Path, schema: Schema) -> Store:
 	with open(path, "r") as file:
 		data = json.load(file)
-		store = decode(data, model_types)
+		store = decode(data, schema)
 		return store
 
 def save(path: Path, store: Store):
@@ -153,10 +153,10 @@ def encode(store: Store) -> dict[str, Any]:
 		data[str(id)] = model_data
 	return data
 
-def decode(data: dict[str, Any], model_types: ModelTypes) -> Store:
+def decode(data: dict[str, Any], schema: Schema) -> Store:
 	models = {}
 	for raw_model_data in data.values():
-		model_type = model_types.get(raw_model_data["_type"])
+		model_type = schema.get_model_type(raw_model_data["_type"])
 		id = types.UUID().decode(raw_model_data["id"])
 		created_at = types.Date().decode(raw_model_data["created_at"])
 		del raw_model_data["_type"]

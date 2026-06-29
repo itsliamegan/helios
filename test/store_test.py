@@ -1,4 +1,4 @@
-from lux.store import decode, encode, types, Attribute, Model, ModelError, ModelTypes, Store
+from lux.store import decode, encode, types, Attribute, Model, ModelError, Schema, Store
 
 from uuid import uuid4
 
@@ -135,7 +135,7 @@ def test_encodes_and_decodes_store():
 	created = store.create(Post)
 
 	encoded = encode(store)
-	decoded = decode(encoded, ModelTypes([Post]))
+	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
 	assert found.id == created.id
@@ -150,7 +150,7 @@ def test_encodes_and_decodes_attrs_with_simple_types():
 	created = store.create(Post, title = "Intro")
 
 	encoded = encode(store)
-	decoded = decode(encoded, ModelTypes([Post]))
+	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
 	assert found.id == created.id
@@ -167,7 +167,7 @@ def test_encodes_and_decodes_attrs_with_complex_types():
 	created = store.create(Post, author_id = uuid4())
 
 	encoded = encode(store)
-	decoded = decode(encoded, ModelTypes([Post]))
+	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
 	assert found.author_id == created.author_id
@@ -182,7 +182,7 @@ def test_encodes_and_decodes_attrs_with_compound_types():
 	created = store.create(Post, backlink_ids = [uuid4()])
 
 	encoded = encode(store)
-	decoded = decode(encoded, ModelTypes([Post]))
+	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
 	assert found.backlink_ids == created.backlink_ids
@@ -197,7 +197,7 @@ def test_encodes_and_decodes_nullable_attrs_when_present():
 	created = store.create(Post, author_id = uuid4())
 
 	encoded = encode(store)
-	decoded = decode(encoded, ModelTypes([Post]))
+	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
 	assert found.author_id == created.author_id
@@ -212,7 +212,7 @@ def test_encodes_and_decodes_nullable_attrs_when_absent():
 	created = store.create(Post)
 
 	encoded = encode(store)
-	decoded = decode(encoded, ModelTypes([Post]))
+	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
 	assert found.author_id == None
