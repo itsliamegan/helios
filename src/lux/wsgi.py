@@ -10,7 +10,6 @@ class Application(Application, WSGIApplication):
 	def __call__(self, env: WSGIEnvironment, start_res: StartResponse) -> Iterable[bytes]:
 		req = adapt_env(env)
 		res = self.handle(req)
-
 		return adapt_res(res, start_res)
 
 def adapt_env(env: WSGIEnvironment) -> Request:
@@ -39,6 +38,8 @@ def adapt_method(env: WSGIEnvironment) -> Method:
 		return Method.PATCH
 	elif raw == "DELETE":
 		return Method.DELETE
+	else:
+		raise RuntimeError(f"Unsupported HTTP method '{raw}'")
 
 def adapt_url(env: WSGIEnvironment) -> URL:
 	raw = get_current_url(env)

@@ -32,7 +32,7 @@ class TestNameFilter(Filter):
 	def __init__(self, name: str):
 		self.name = name
 
-	def match(self, case: Case) -> Bool:
+	def match(self, case: Case) -> bool:
 		return case.test.name == self.name
 
 class Case:

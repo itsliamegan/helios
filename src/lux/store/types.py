@@ -1,11 +1,17 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeVar
 
-class Type:
-	pass
+T = TypeVar("T")
 
-class Str(Type):
+class Type[T]:
+	def encode(self, val: T) -> Any:
+		raise NotImplementedError
+
+	def decode(self, val: Any) -> T:
+		raise NotImplementedError
+
+class Str(Type[str]):
 	def encode(self, val: str) -> Any:
 		return val
 
@@ -15,7 +21,7 @@ class Str(Type):
 		else:
 			return str(val)
 
-class Bool(Type):
+class Bool(Type[bool]):
 	def encode(self, val: bool) -> Any:
 		return val
 
@@ -25,7 +31,7 @@ class Bool(Type):
 		else:
 			return bool(val)
 
-class List(Type):
+class List(Type[list[Any]]):
 	def __init__(self, item: Type):
 		self.item = item
 
@@ -41,7 +47,7 @@ class List(Type):
 			decoded.append(self.item.decode(item))
 		return decoded
 
-class UUID(Type):
+class UUID(Type[uuid.UUID]):
 	def encode(self, val: uuid.UUID) -> Any:
 		return str(val)
 
@@ -51,7 +57,7 @@ class UUID(Type):
 		else:
 			return uuid.UUID(val)
 
-class Date(Type):
+class Date(Type[datetime]):
 	def encode(self, val: datetime) -> Any:
 		return val.isoformat()
 

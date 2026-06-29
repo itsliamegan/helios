@@ -3,7 +3,7 @@ from datetime import datetime, UTC
 def date(date: datetime) -> str:
 	return date.strftime("%b %-d, %Y")
 
-def elapsed(then: datetime, now: datetime = None) -> str:
+def elapsed(then: datetime, now: datetime | None = None) -> str:
 	if now is None:
 		now = datetime.now(UTC)
 	diff = now - then

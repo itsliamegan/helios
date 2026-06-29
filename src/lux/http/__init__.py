@@ -56,7 +56,7 @@ class Body:
 		self.content = content
 
 	def __str__(self) -> str:
-		return self.content
+		return str(self.content)
 
 	def __repr__(self) -> str:
 		return f"Body({repr(self.content)})"
@@ -94,9 +94,6 @@ class Response:
 	@classmethod
 	def redirect(cls, url: URL) -> "Response":
 		return cls(Status.FOUND, Headers({"Location": str(url)}), Cookies(), Body())
-
-	def __str__(self) -> str:
-		pass
 
 	def __repr__(self) -> str:
 		return f"Response({repr(self.status)}, {repr(self.headers)}, {repr(self.body)})"

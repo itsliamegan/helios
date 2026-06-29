@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from inspect import signature
 import re
-from typing import Any
+from typing import Any, Protocol
 
 from lux.http import Body, Headers, Method, Request, Response, Status, URL
 
@@ -33,8 +33,12 @@ class Pattern:
 	def __repr__(self) -> str:
 		return f"Pattern({repr(self.raw)})"
 
+class Handler(Protocol):
+	def __call__(self, req: Request, ctx: Any, params: dict[str, str] | None = None):
+		...
+
 class Route:
-	def __init__(self, method: Method, pattern: Pattern, handler: Callable[[Request], Response]):
+	def __init__(self, method: Method, pattern: Pattern, handler: Handler):
 		self.method = method
 		self.pattern = pattern
 		self.handler = handler
@@ -50,14 +54,14 @@ class Route:
 	def __repr__(self) -> str:
 		return f"Route({repr(self.method)}, {repr(self.pattern)}, {repr(self.handler)})"
 
-Next = Callable[[Request, Any], Response]
-Middleware = Callable[[Request, Any, Next], Response]
+type Next = Callable[[Request, Any], Response]
+type Middleware = Callable[[Request, Any, Next], Response]
 
 class Router:
 	def __init__(self, routes: list[Route]):
 		self.routes = routes
 
-	def match(self, req: Request) -> tuple[Callable[[Request], Response], dict[str, str]] | None:
+	def match(self, req: Request) -> tuple[Handler, dict[str, str]] | None:
 		for route in self.routes:
 			params = route.match(req)
 			if params is not None:
@@ -66,15 +70,14 @@ class Router:
 
 	def __call__(self, req: Request, ctx: Any, next: Next) -> Response:
 		match = self.match(req)
-		if match:
-			handler, params = match
-			sig = signature(handler)
-			if len(sig.parameters) == 2:
-				return handler(req, ctx)
-			elif len(sig.parameters) == 3:
-				return handler(req, ctx, params)
-		else:
+		if not match:
 			raise NotFoundError()
+		handler, params = match
+		sig = signature(handler)
+		if len(sig.parameters) == 2:
+			return handler(req, ctx)
+		elif len(sig.parameters) == 3:
+			return handler(req, ctx, params)
 
 class Thread:
 	def __init__(self, middleware: Middleware, next: Next | None = None):
@@ -82,7 +85,7 @@ class Thread:
 		self.next = next
 
 	@classmethod
-	def build(cls, middlewares: list[Middleware]) -> "Thread":
+	def build(cls, middlewares: list[Middleware]) -> Thread:
 		head = None
 		tail = None
 		for middleware in middlewares:
