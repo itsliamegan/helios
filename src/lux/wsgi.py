@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from urllib.parse import parse_qs as parse_query, urlparse as parse_url
+from werkzeug.http import parse_options_header
 from werkzeug.wsgi import get_current_url, get_input_stream
 from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
 
@@ -67,15 +68,17 @@ def adapt_headers(env: WSGIEnvironment) -> Headers:
 def adapt_input(env: WSGIEnvironment) -> Input:
 	if "CONTENT_TYPE" not in env:
 		return Input()
-	elif env["CONTENT_TYPE"] == "application/x-www-form-urlencoded":
-		stream = get_input_stream(env)
-		raw = stream.read().decode("latin_1")
-		items = {}
-		for name, vals in parse_query(raw, True).items():
-			if isinstance(vals, list) and len(vals) == 1:
-				items[name] = vals[0]
-			else:
-				items[name] = vals
-		return Input(items)
 	else:
-		return Input()
+		mime_type, _ = parse_options_header(env["CONTENT_TYPE"])
+		if mime_type == "application/x-www-form-urlencoded":
+			stream = get_input_stream(env)
+			raw = stream.read().decode("latin_1")
+			items = {}
+			for name, vals in parse_query(raw, True).items():
+				if isinstance(vals, list) and len(vals) == 1:
+					items[name] = vals[0]
+				else:
+					items[name] = vals
+			return Input(items)
+		else:
+			return Input()
