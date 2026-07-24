@@ -42,11 +42,12 @@ def test_encodes_cookies():
 
 def test_adapts_cookies_from_headers():
 	headers = Headers()
-	headers["Cookie"] = "session_id=51d0d53a-11dd-47a5-b438-5eb1b84e1432"
+	headers["Cookie"] = "session_id=51d0d53a-11dd-47a5-b438-5eb1b84e1432; csrf_token=fd3e6aff6360af4d6ba905d4299cff81"
 
 	cookies = Cookies.from_headers(headers)
 
 	assert cookies["session_id"].val == "51d0d53a-11dd-47a5-b438-5eb1b84e1432"
+	assert cookies["csrf_token"].val == "fd3e6aff6360af4d6ba905d4299cff81"
 
 def test_adapts_cookies_to_headers():
 	cookies = Cookies()

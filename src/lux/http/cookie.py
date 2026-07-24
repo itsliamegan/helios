@@ -44,7 +44,7 @@ class Cookies:
 		cookies = cls()
 		if "Cookie" not in headers:
 			return cookies
-		cookie_pairs = str(headers["Cookie"]).split(", ")
+		cookie_pairs = str(headers["Cookie"]).split("; ")
 		for cookie_pair in cookie_pairs:
 			name, val = cookie_pair.split("=", 1)
 			cookies[name] = val
