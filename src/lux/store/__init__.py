@@ -135,8 +135,8 @@ def save(path: Path, store: Store):
 		data = encode(store)
 		json.dump(data, file)
 
-def encode(store: Store) -> dict[str, Any]:
-	data = {}
+def encode(store: Store) -> list[dict[str, Any]]:
+	data = []
 	for id, model in store.models.items():
 		model_data = {}
 		model_data["_type"] = type(model).__name__
@@ -150,12 +150,12 @@ def encode(store: Store) -> dict[str, Any]:
 			else:
 				attr_val = attr.type.encode(raw_attr_val)
 			model_data[attr.name] = attr_val
-		data[str(id)] = model_data
+		data.append(model_data)
 	return data
 
-def decode(data: dict[str, Any], schema: Schema) -> Store:
+def decode(data: list[dict[str, Any]], schema: Schema) -> Store:
 	models = {}
-	for raw_model_data in data.values():
+	for raw_model_data in data:
 		model_type = schema.get_model_type(raw_model_data["_type"])
 		id = types.UUID().decode(raw_model_data["id"])
 		created_at = types.Date().decode(raw_model_data["created_at"])
