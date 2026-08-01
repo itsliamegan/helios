@@ -124,6 +124,9 @@ class Store:
 		self.models[id] = model
 		return model
 
+	def delete(self, model_type: type[Model], id: UUID):
+		del self.models[id]
+
 def load(path: Path, schema: Schema) -> Store:
 	with open(path, "r") as file:
 		data = json.load(file)

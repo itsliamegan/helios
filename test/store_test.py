@@ -127,6 +127,18 @@ def test_finds_model_by_attrs():
 
 	assert len(found) == 2
 
+def test_deletes_model():
+	class Post(Model):
+		pass
+
+	store = Store()
+	created = store.create(Post)
+
+	store.delete(Post, created.id)
+	found = store.find_all(Post)
+
+	assert len(found) == 0
+
 def test_encodes_and_decodes_store():
 	class Post(Model):
 		pass
