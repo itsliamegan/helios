@@ -1,4 +1,4 @@
-from lux.forms import rules, Field, Form
+from helios.forms import rules, Field, Form
 
 def test_validates_required_when_provided():
 	form = Form([

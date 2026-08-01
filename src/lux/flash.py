@@ -1,7 +1,7 @@
 from typing import Any
 
-from lux.app import Component, Context
-from lux.http import Request, Response
+from helios.app import Component, Context
+from helios.http import Request, Response
 
 class Component(Component):
 	def before(self, req: Request, ctx: Context):

@@ -1,6 +1,6 @@
-from lux.app import Application, Component
-from lux.http import Headers, Input, Method, Request, Response, Status, URL
-from lux.routing import Pattern, Route
+from helios.app import Application, Component
+from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.routing import Pattern, Route
 
 def test_boots_components():
 	class ExampleComponent(Component):

@@ -1,4 +1,4 @@
-from lux.store import decode, encode, types, Attribute, Model, ModelError, Schema, Store
+from helios.store import decode, encode, types, Attribute, Model, ModelError, Schema, Store
 
 from uuid import uuid4
 

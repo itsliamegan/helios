@@ -3,8 +3,8 @@ from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
-from lux.app import Component, Context
-from lux.http import Request
+from helios.app import Component, Context
+from helios.http import Request
 from . import helpers
 
 class Component(Component):

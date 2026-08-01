@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lux"
+name = "helios"
 version = "0.1"
 dependencies = [
 	"jinja2==3.1.*",

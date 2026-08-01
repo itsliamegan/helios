@@ -1,7 +1,7 @@
 from datetime import datetime, UTC
 from markupsafe import Markup, escape
 
-from lux.http import URL
+from helios.http import URL
 
 def date(date: datetime) -> str:
 	return date.strftime("%b %-d, %Y")

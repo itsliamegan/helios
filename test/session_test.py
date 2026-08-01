@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from lux.session import decode, encode, Session, Sessions
+from helios.session import decode, encode, Session, Sessions
 
 def test_finds_session_by_id():
 	id = uuid4()

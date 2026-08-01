@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from lux.http import URL
-from lux.views import helpers, Views
+from helios.http import URL
+from helios.views import helpers, Views
 
 def test_renders_simple():
 	views = Views({"index": "<h1>{{ title }}</h1>"})

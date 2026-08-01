@@ -1,4 +1,4 @@
-from lux.http import Cookies, Headers, URL
+from helios.http import Cookies, Headers, URL
 
 def test_encodes_url_path():
 	url = URL("/about")

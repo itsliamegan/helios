@@ -1,5 +1,5 @@
-from lux.http import Body, Headers, Input, Method, Request, Response, Status, URL
-from lux.routing import Kernel, Pattern, Route, Router
+from helios.http import Body, Headers, Input, Method, Request, Response, Status, URL
+from helios.routing import Kernel, Pattern, Route, Router
 
 def test_calls_middlewares():
 	def middleware(req, ctx, next):

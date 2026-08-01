@@ -3,7 +3,7 @@ from inspect import signature
 import re
 from typing import Any, Protocol
 
-from lux.http import Body, Headers, Method, Request, Response, Status, URL
+from helios.http import Body, Headers, Method, Request, Response, Status, URL
 
 class NotFoundError(Exception):
 	pass

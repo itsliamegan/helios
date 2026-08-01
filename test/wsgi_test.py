@@ -1,7 +1,7 @@
 from werkzeug.test import EnvironBuilder
 
-from lux.http import Body, Cookies, Headers, Method, Response, Status
-from lux.wsgi import adapt_env, adapt_res
+from helios.http import Body, Cookies, Headers, Method, Response, Status
+from helios.wsgi import adapt_env, adapt_res
 
 def test_adapts_method():
 	env = EnvironBuilder(method="GET").get_environ()

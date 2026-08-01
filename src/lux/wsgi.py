@@ -4,8 +4,8 @@ from werkzeug.http import parse_options_header
 from werkzeug.wsgi import get_current_url, get_input_stream
 from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
 
-from lux.app import Application
-from lux.http import Body, Headers, Input, Method, Request, Response, URL
+from helios.app import Application
+from helios.http import Body, Headers, Input, Method, Request, Response, URL
 
 class Application(Application, WSGIApplication):
 	def __call__(self, env: WSGIEnvironment, start_res: StartResponse) -> Iterable[bytes]:

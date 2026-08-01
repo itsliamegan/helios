@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4, UUID
 
-from lux.app import Component, Context
-from lux.http import Request, Response
+from helios.app import Component, Context
+from helios.http import Request, Response
 from . import types
 
 class Component(Component):
