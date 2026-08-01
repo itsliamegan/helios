@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from lux.http import URL
 from lux.views import helpers, Views
 
 def test_renders_simple():
@@ -53,3 +54,8 @@ def test_formats_date():
 	date = datetime(year = 2026, month = 4, day = 7)
 
 	assert helpers.date(date) == "Apr 7, 2026"
+
+def test_formats_url_with_breaks():
+	url = URL("/posts/1354")
+
+	assert str(helpers.url(url)) == "/<wbr>posts/<wbr>1354"

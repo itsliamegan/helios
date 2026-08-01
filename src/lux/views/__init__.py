@@ -27,6 +27,7 @@ class Views:
 			autoescape = select_autoescape
 		)
 		self.jinja.filters["date"] = helpers.date
+		self.jinja.filters["url"] = helpers.url
 		self.jinja.filters["elapsed"] = helpers.elapsed
 
 	def render(self, name: str, assigns: dict[str, Any] | None = None) -> str:

@@ -1,7 +1,18 @@
 from datetime import datetime, UTC
+from markupsafe import Markup, escape
+
+from lux.http import URL
 
 def date(date: datetime) -> str:
 	return date.strftime("%b %-d, %Y")
+
+def url(url: URL) -> str:
+	# escape returns a Markup object which will always escape further
+	# transformations. Convert it to a str to add unescaped line break
+	# suggestions, then mark it as escaped.
+	escaped = str(escape(url))
+	broken = escaped.replace("/", "/<wbr>")
+	return Markup(broken)
 
 def elapsed(then: datetime, now: datetime | None = None) -> str:
 	if now is None:
