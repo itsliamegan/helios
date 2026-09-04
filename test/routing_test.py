@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from helios.http import Body, Headers, Input, Method, Request, Response, Status, URL
 from helios.routing import Kernel, Pattern, Route, Router
 
@@ -64,6 +66,38 @@ def test_routes_with_params():
 	match = router.match(Request(Method.GET, URL("/articles/intro"), Headers(), Input()))
 
 	assert match == (handler, {"slug": "intro"})
+
+
+def test_routes_with_explicit_str_converter():
+	handler = object()
+	router = Router([
+		Route(Method.GET, Pattern("/articles/{slug:str}"), handler)
+	])
+
+	match = router.match(Request(Method.GET, URL("/articles/intro"), Headers(), Input()))
+
+	assert match == (handler, {"slug": "intro"})
+
+
+def test_routes_with_uuid_converter():
+	handler = object()
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+	router = Router([
+		Route(Method.GET, Pattern("/articles/{id:uuid}"), handler)
+	])
+
+	match = router.match(Request(Method.GET, URL(f"/articles/{id}"), Headers(), Input()))
+
+	assert match == (handler, {"id": id})
+
+
+def test_uuid_converter_doesnt_match_invalid_uuid():
+	pattern = Pattern("/boards/{id:uuid}")
+
+	match = pattern.match(URL("/boards/not-a-uuid"))
+
+	assert match is None
+
 
 def test_routes_instead_of_param():
 	new = object()

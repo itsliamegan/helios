@@ -5,17 +5,29 @@ from typing import Any, Protocol
 
 from helios.http import Body, Headers, Method, Request, Response, Status, URL
 
+from . import convert
+
 class NotFoundError(Exception):
 	pass
 
 class MethodNotAllowedError(Exception):
 	pass
 
-class Pattern:
-	PARAM_REGEX = re.compile(r"{(\w+)}")
+PARAM_REGEX = re.compile(r"{(\w+)(?::(\w+))?}")
+PARAM_VALUE_REGEX = r"[\w-]+"
 
+class Pattern:
 	def __init__(self, raw: str):
-		lit = self.PARAM_REGEX.sub(r"(?P<\1>(\\w|-|_)+)", raw)
+		self.converters: dict[str, convert.Converter] = {}
+		lit = raw
+		for param in PARAM_REGEX.finditer(raw):
+			name, converter_name = param.groups()
+			converter_name = converter_name or "str"
+			if converter_name not in convert.CONVERTERS:
+				raise ValueError(f"Unknown pattern converter: {converter_name}")
+			self.converters[name] = convert.CONVERTERS[converter_name]
+			lit = lit.replace(param.group(), f"(?P<{name}>{PARAM_VALUE_REGEX})")
+
 		if lit.endswith("/"):
 			lit += "?$"
 		else:
@@ -23,18 +35,27 @@ class Pattern:
 		self.raw = raw
 		self.regex = re.compile(lit)
 
-	def match(self, url: URL) -> dict[str, str] | None:
+	def match(self, url: URL) -> dict[str, Any] | None:
 		match = self.regex.match(url.path)
 		if match:
-			return match.groupdict()
+			return self.convert(match.groupdict())
 		else:
+			return None
+
+	def convert(self, raw_params: dict[str, str]) -> dict[str, Any] | None:
+		try:
+			params = {}
+			for name, value in raw_params.items():
+				params[name] = self.converters[name](value)
+			return params
+		except ValueError:
 			return None
 
 	def __repr__(self) -> str:
 		return f"Pattern({repr(self.raw)})"
 
 class Handler(Protocol):
-	def __call__(self, req: Request, ctx: Any, params: dict[str, str] | None = None):
+	def __call__(self, req: Request, ctx: Any, params: dict[str, Any] | None = None):
 		...
 
 class Route:
@@ -43,7 +64,7 @@ class Route:
 		self.pattern = pattern
 		self.handler = handler
 
-	def match(self, req: Request) -> dict[str, str] | None:
+	def match(self, req: Request) -> dict[str, Any] | None:
 		if req.method is not self.method:
 			return None
 		params = self.pattern.match(req.url)
@@ -61,7 +82,7 @@ class Router:
 	def __init__(self, routes: list[Route]):
 		self.routes = routes
 
-	def match(self, req: Request) -> tuple[Handler, dict[str, str]] | None:
+	def match(self, req: Request) -> tuple[Handler, dict[str, Any]] | None:
 		for route in self.routes:
 			params = route.match(req)
 			if params is not None:
