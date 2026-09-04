@@ -1,6 +1,19 @@
 from collections.abc import Callable
+from enum import Enum
 from io import StringIO
 import sys
+
+class ANSI(Enum):
+	RED = "\033[31m"
+	GREEN = "\033[32m"
+	YELLOW = "\033[33m"
+	RESET = "\033[0m"
+
+	def __init__(self, escape: str):
+		self.escape = escape
+
+	def __str__(self) -> str:
+		return self.escape
 
 class Result:
 	def __init__(self, test: "Test", case: "Case"):
@@ -88,14 +101,17 @@ class Suite:
 	def __repr__(self) -> str:
 		return f"Suite(tests={repr(self.tests)})"
 
-def report(results: list[Result]):
+def report(results: list[Result]) -> bool:
+	passed = True
 	for result in results:
 		if isinstance(result, Pass):
-			desc = "PASS"
+			desc = f"{ANSI.GREEN}PASS{ANSI.RESET}"
 		elif isinstance(result, Fail):
-			desc = "FAIL"
+			desc = f"{ANSI.RED}FAIL{ANSI.RESET}"
+			passed = False
 		elif isinstance(result, Error):
-			desc = "ERROR"
+			desc = f"{ANSI.YELLOW}ERROR{ANSI.RESET}"
+			passed = False
 
 		print(f"{desc}\t{result.test.name}:{result.case.name}")
 
@@ -106,6 +122,7 @@ def report(results: list[Result]):
 			print(f"\t{frame.line}")
 			if isinstance(result, Error):
 				traceback.print_exception(result.err)
+	return passed
 
 
 def main():
@@ -142,4 +159,6 @@ def main():
 	suite = Suite(tests)
 	results = suite.run(filter)
 
-	report(results)
+	passed = report(results)
+	if not passed:
+		sys.exit(1)
