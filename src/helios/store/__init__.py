@@ -6,6 +6,7 @@ from typing import Any
 from uuid import uuid4, UUID
 
 from helios.app import Component, Context
+from helios.errors import NotFoundError as BaseNotFoundError
 from helios.http import Request, Response
 from . import types
 
@@ -22,6 +23,12 @@ class Component(Component):
 
 class ModelError(RuntimeError):
 	pass
+
+class NotFoundError(BaseNotFoundError):
+	def __init__(self, model_type: type["Model"], id: UUID):
+		self.model_type = model_type
+		self.id = id
+		super().__init__(f"{model_type.__name__} {id} not found")
 
 class Attribute:
 	def __init__(
@@ -105,12 +112,11 @@ class Store:
 				models.append(model)
 		return models
 
-	def find_one(self, model_type: type[Model], id: UUID) -> Model | None:
+	def find_one(self, model_type: type[Model], id: UUID) -> Model:
 		model = self.models.get(id, None)
 		if type(model) is model_type:
 			return model
-		else:
-			return None
+		raise NotFoundError(model_type, id)
 
 	def find_by(self, model_type: type[Model], **attrs: dict[str, Any]) -> list[Model]:
 		models = []

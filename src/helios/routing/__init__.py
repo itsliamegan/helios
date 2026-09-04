@@ -3,11 +3,12 @@ from inspect import signature
 import re
 from typing import Any, Protocol
 
+from helios.errors import NotFoundError as BaseNotFoundError
 from helios.http import Body, Headers, Method, Request, Response, Status, URL
 
 from . import convert
 
-class NotFoundError(Exception):
+class NotFoundError(BaseNotFoundError):
 	pass
 
 class MethodNotAllowedError(Exception):

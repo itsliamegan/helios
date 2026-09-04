@@ -1,6 +1,9 @@
 from helios.app import Application, Component
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
 from helios.routing import Pattern, Route
+from helios.store import Model, Store
+
+from uuid import uuid4
 
 def test_boots_components():
 	class ExampleComponent(Component):
@@ -47,9 +50,23 @@ def test_captures_errors():
 
 	assert res.status == Status.INTERNAL_SERVER_ERROR
 
-def test_handles_not_found():
+def test_handles_route_not_found():
 	app = Application([], [])
 	req = Request(Method.GET, URL("/"), Headers(), Input())
+
+	res = app.handle(req)
+
+	assert res.status == Status.NOT_FOUND
+
+def test_handles_model_not_found():
+	class Post(Model):
+		pass
+
+	def show(req, ctx):
+		Store().find_one(Post, uuid4())
+
+	app = Application([Route(Method.GET, Pattern("/posts/missing"), show)], [])
+	req = Request(Method.GET, URL("/posts/missing"), Headers(), Input())
 
 	res = app.handle(req)
 

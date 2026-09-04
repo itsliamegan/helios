@@ -3,7 +3,7 @@ from uuid import UUID
 from helios.app import Component, Context
 from helios.http import Request
 from helios.session import Session
-from helios.store import Model
+from helios.store import Model, NotFoundError
 
 SESSION_KEY = "_user_id"
 
@@ -19,7 +19,10 @@ class Component(Component):
 			except ValueError:
 				id = None
 			if id is not None:
-				user = ctx.store.find_one(self.user_type, id)
+				try:
+					user = ctx.store.find_one(self.user_type, id)
+				except NotFoundError:
+					user = None
 			else:
 				user = None
 		else:

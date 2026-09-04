@@ -1,8 +1,9 @@
 from collections.abc import Callable
 from typing import Any
 
+from helios.errors import NotFoundError
 from helios.http import Method, Request, Response, Status
-from helios.routing import Kernel, Next, NotFoundError, Route
+from helios.routing import Kernel, Next, Route
 
 class Context:
 	def __init__(self):

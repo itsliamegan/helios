@@ -1,4 +1,4 @@
-from helios.store import decode, encode, types, Attribute, Model, ModelError, Schema, Store
+from helios.store import decode, encode, types, Attribute, Model, ModelError, NotFoundError, Schema, Store
 
 from uuid import uuid4
 
@@ -112,7 +112,21 @@ def test_finds_one_model():
 
 	assert found.id == created.id
 
-def test_doesnt_one_model_of_wrong_type():
+def test_find_one_raises_when_model_doesnt_exist():
+	class Post(Model):
+		pass
+
+	store = Store()
+	id = uuid4()
+
+	try:
+		store.find_one(Post, id)
+		assert False, "should throw NotFoundError"
+	except NotFoundError as err:
+		assert err.model_type is Post
+		assert err.id == id
+
+def test_find_one_raises_when_model_has_wrong_type():
 	class User(Model):
 		pass
 
@@ -120,12 +134,13 @@ def test_doesnt_one_model_of_wrong_type():
 		pass
 
 	store = Store()
-	right = store.create(User)
-	wrong = store.create(Post)
+	user = store.create(User)
 
-	found = store.find_one(Post, right.id)
-
-	assert found is None
+	try:
+		store.find_one(Post, user.id)
+		assert False, "should throw NotFoundError"
+	except NotFoundError:
+		assert True
 
 def test_finds_model_by_attrs():
 	class User(Model):
