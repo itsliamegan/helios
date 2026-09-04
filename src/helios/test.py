@@ -108,7 +108,7 @@ def report(results: list[Result]):
 				traceback.print_exception(result.err)
 
 
-if __name__ == "__main__":
+def main():
 	from importlib.util import spec_from_file_location, module_from_spec
 	from pathlib import Path
 	import sys
