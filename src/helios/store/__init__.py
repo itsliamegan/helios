@@ -116,9 +116,12 @@ class Store:
 		models = []
 		for model in self.models.values():
 			if type(model) == model_type:
+				matches = True
 				for attr in attrs:
-					if getattr(model, attr) == attrs[attr]:
-						models.append(model)
+					if getattr(model, attr) != attrs[attr]:
+						matches = False
+				if matches:
+					models.append(model)
 		return models
 
 	def create(self, model_type: type[Model], **attrs: dict[str, Any]) -> Model:

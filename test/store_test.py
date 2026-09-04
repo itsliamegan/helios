@@ -142,6 +142,22 @@ def test_finds_model_by_attrs():
 
 	assert len(found) == 2
 
+def test_finds_model_by_conjunction():
+	class User(Model):
+		attrs = [
+			Attribute("name", types.Str()),
+			Attribute("admin", types.Bool()),
+		]
+
+	store = Store()
+	store.create(User, name = "Alice", admin = False)
+	store.create(User, name = "Bob", admin = False)
+	store.create(User, name = "Clyde", admin = True)
+
+	found = store.find_by(User, name = "Clyde", admin = True)
+
+	assert len(found) == 1
+
 def test_deletes_model():
 	class Post(Model):
 		pass
