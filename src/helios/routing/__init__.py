@@ -1,7 +1,6 @@
 from collections.abc import Callable
-from inspect import signature
 import re
-from typing import Any, Protocol
+from typing import Any, Concatenate
 
 from helios.errors import NotFoundError as BaseNotFoundError
 from helios.http import Body, Headers, Method, Request, Response, Status, URL
@@ -55,12 +54,10 @@ class Pattern:
 	def __repr__(self) -> str:
 		return f"Pattern({repr(self.raw)})"
 
-class Handler(Protocol):
-	def __call__(self, req: Request, ctx: Any, params: dict[str, Any] | None = None):
-		...
+type Handler[**P] = Callable[Concatenate[Request, Any, P], Response]
 
 class Route:
-	def __init__(self, method: Method, pattern: Pattern, handler: Handler):
+	def __init__(self, method: Method, pattern: Pattern, handler: Handler[...]):
 		self.method = method
 		self.pattern = pattern
 		self.handler = handler
@@ -83,7 +80,7 @@ class Router:
 	def __init__(self, routes: list[Route]):
 		self.routes = routes
 
-	def match(self, req: Request) -> tuple[Handler, dict[str, Any]] | None:
+	def match(self, req: Request) -> tuple[Handler[...], dict[str, Any]] | None:
 		for route in self.routes:
 			params = route.match(req)
 			if params is not None:
@@ -95,11 +92,7 @@ class Router:
 		if not match:
 			raise NotFoundError()
 		handler, params = match
-		sig = signature(handler)
-		if len(sig.parameters) == 2:
-			return handler(req, ctx)
-		elif len(sig.parameters) == 3:
-			return handler(req, ctx, params)
+		return handler(req, ctx, **params)
 
 class Thread:
 	def __init__(self, middleware: Middleware, next: Next | None = None):

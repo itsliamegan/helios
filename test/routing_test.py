@@ -67,7 +67,6 @@ def test_routes_with_params():
 
 	assert match == (handler, {"slug": "intro"})
 
-
 def test_routes_with_explicit_str_converter():
 	handler = object()
 	router = Router([
@@ -77,7 +76,6 @@ def test_routes_with_explicit_str_converter():
 	match = router.match(Request(Method.GET, URL("/articles/intro"), Headers(), Input()))
 
 	assert match == (handler, {"slug": "intro"})
-
 
 def test_routes_with_uuid_converter():
 	handler = object()
@@ -90,6 +88,21 @@ def test_routes_with_uuid_converter():
 
 	assert match == (handler, {"id": id})
 
+def test_passes_converted_params_to_handler_by_name():
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+	called_with = []
+
+	def handler(req, ctx, slug: str, id: UUID):
+		called_with.append((slug, id))
+		return Response.empty(Status.OK)
+
+	kernel = Kernel([
+		Route(Method.GET, Pattern("/articles/{id:uuid}/{slug}"), handler)
+	], [])
+
+	kernel.handle(Request(Method.GET, URL(f"/articles/{id}/intro"), Headers(), Input()), None)
+
+	assert called_with == [("intro", id)]
 
 def test_uuid_converter_doesnt_match_invalid_uuid():
 	pattern = Pattern("/boards/{id:uuid}")
@@ -97,7 +110,6 @@ def test_uuid_converter_doesnt_match_invalid_uuid():
 	match = pattern.match(URL("/boards/not-a-uuid"))
 
 	assert match is None
-
 
 def test_routes_instead_of_param():
 	new = object()
