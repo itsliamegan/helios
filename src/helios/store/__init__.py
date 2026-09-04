@@ -106,7 +106,11 @@ class Store:
 		return models
 
 	def find_one(self, model_type: type[Model], id: UUID) -> Model | None:
-		return self.models.get(id, None)
+		model = self.models.get(id, None)
+		if type(model) is model_type:
+			return model
+		else:
+			return None
 
 	def find_by(self, model_type: type[Model], **attrs: dict[str, Any]) -> list[Model]:
 		models = []

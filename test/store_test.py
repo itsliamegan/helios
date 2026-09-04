@@ -112,6 +112,21 @@ def test_finds_one_model():
 
 	assert found.id == created.id
 
+def test_doesnt_one_model_of_wrong_type():
+	class User(Model):
+		pass
+
+	class Post(Model):
+		pass
+
+	store = Store()
+	right = store.create(User)
+	wrong = store.create(Post)
+
+	found = store.find_one(Post, right.id)
+
+	assert found is None
+
 def test_finds_model_by_attrs():
 	class User(Model):
 		attrs = [
