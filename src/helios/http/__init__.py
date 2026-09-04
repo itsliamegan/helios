@@ -1,21 +1,28 @@
+from enum import Enum
+
 from .cookie import Cookies
 from .headers import Headers
 from .url import URL
 
-class Method:
-	def __init__(self, name: str):
-		self.name = name
+class Method(Enum):
+	GET = "GET"
+	POST = "POST"
+	PUT = "PUT"
+	PATCH = "PATCH"
+	DELETE = "DELETE"
 
-	def __repr__(self):
+	def __repr__(self) -> str:
 		return f"Method({repr(self.name)})"
 
-Method.GET = Method("GET")
-Method.POST = Method("POST")
-Method.PUT = Method("PUT")
-Method.PATCH = Method("PATCH")
-Method.DELETE = Method("DELETE")
+class Status(Enum):
+	OK = 200, "OK"
+	NO_CONTENT = 204, "No Content"
+	FOUND = 302, "Found"
+	BAD_REQUEST = 400, "Bad Request"
+	FORBIDDEN = 403, "Forbidden"
+	NOT_FOUND = 404, "Not Found"
+	INTERNAL_SERVER_ERROR = 500, "Internal Server Error"
 
-class Status:
 	def __init__(self, code: int, reason: str):
 		self.code = code
 		self.reason = reason
@@ -25,13 +32,6 @@ class Status:
 
 	def __repr__(self) -> str:
 		return f"Status({repr(self.code)}, {repr(self.reason)})"
-
-Status.OK = Status(200, "OK")
-Status.NO_CONTENT = Status(204, "No Content")
-Status.FOUND = Status(302, "Found")
-Status.BAD_REQUEST = Status(400, "Bad Request")
-Status.NOT_FOUND = Status(404, "Not Found")
-Status.INTERNAL_SERVER_ERROR = Status(500, "Internal Server Error")
 
 class Input:
 	def __init__(self, items: dict[str, str | list[str]] | None = None):
@@ -80,7 +80,7 @@ class Response:
 		self.body = body
 
 	@classmethod
-	def empty(cls, status = Status.NO_CONTENT) -> "Response":
+	def empty(cls, status: Status = Status.NO_CONTENT) -> "Response":
 		return cls(status, Headers(), Cookies(), Body())
 
 	@classmethod
