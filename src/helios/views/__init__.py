@@ -38,9 +38,13 @@ class Views:
 
 def load(views_dir: Path) -> Views:
 	tmpls = {}
-	for (dir, dirs, files) in views_dir.walk():
+	for (dir, _, files) in views_dir.walk():
+		if dir.name.startswith("."):
+			continue
 		parts = dir.relative_to(views_dir).parts
 		for file in files:
+			if file.startswith("."):
+				continue
 			path = dir.joinpath(file)
 			if path.suffix == ".html":
 				name = ".".join(parts + (path.stem,))

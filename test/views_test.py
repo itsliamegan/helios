@@ -1,7 +1,9 @@
 from datetime import datetime
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from helios.http import URL
-from helios.views import helpers, Views
+from helios.views import helpers, load, Views
 
 def test_renders_simple():
 	views = Views({"index": "<h1>{{ title }}</h1>"})
@@ -19,6 +21,28 @@ def test_renders_inherited():
 	html = views.render("show", {"title": "Intro"})
 
 	assert html == "<h1>Intro</h1><p>An article.</p>"
+
+def test_load_ignores_hidden_files():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("index.html").write_text("<h1>Index</h1>")
+		views_dir.joinpath(".#index.html").write_bytes(b"\xff")
+
+		views = load(views_dir)
+
+		assert views.render("index") == "<h1>Index</h1>"
+
+def test_load_ignores_hidden_directories():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("index.html").write_text("<h1>Index</h1>")
+		hidden_dir = views_dir.joinpath(".drafts")
+		hidden_dir.mkdir()
+		hidden_dir.joinpath("show.html").write_bytes(b"\xff")
+
+		views = load(views_dir)
+
+		assert views.render("index") == "<h1>Index</h1>"
 
 def test_formats_elapsed_seconds():
 	then = datetime(year = 2025, month = 9, day = 1, hour = 12, minute = 0, second = 0)
