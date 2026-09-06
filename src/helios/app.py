@@ -3,7 +3,10 @@ from typing import Any
 
 from helios.http import Method, Request, Response, Status
 from helios.http.error import HTTPError
-from helios.routing import Kernel, Next, Route
+from helios.routing import Router
+
+type Next = Callable[[Request, Any], Response]
+type Middleware = Callable[[Request, Any, Next], Response]
 
 class Context:
 	def __init__(self):
@@ -39,15 +42,30 @@ class Component:
 		self.after(res, ctx)
 		return res
 
+class Thread:
+	def __init__(self, middleware: Middleware, next: Next):
+		self.middleware = middleware
+		self.next = next
+
+	@classmethod
+	def build(cls, middlewares: list[Middleware], last: Next) -> Next:
+		next = last
+		for middleware in reversed(middlewares):
+			next = cls(middleware, next)
+		return next
+
+	def __call__(self, req: Request, ctx: Any) -> Response:
+		return self.middleware(req, ctx, self.next)
+
 class Application:
-	def __init__(self, routes: list[Route], components: list[Component]):
-		self.kernel = Kernel(routes, [
+	def __init__(self, router: Router, components: list[Component]):
+		self.thread = Thread.build([
 			ensure_content_length,
 			capture_errors,
 			adapt_artificial_method,
 			*components,
 			handle_http_errors,
-		])
+		], router)
 		self.components = components
 
 	def boot(self):
@@ -56,7 +74,7 @@ class Application:
 
 	def handle(self, req: Request) -> Response:
 		ctx = Context()
-		return self.kernel.handle(req, ctx)
+		return self.thread(req, ctx)
 
 def ensure_content_length(req: Request, ctx: Context, next: Next) -> Response:
 	res = next(req, ctx)

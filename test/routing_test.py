@@ -1,41 +1,30 @@
 from uuid import UUID
 
-from helios.http import Body, Headers, Input, Method, Request, Response, Status, URL
-from helios.routing import Kernel, Pattern, Route, Router
+from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.routing import Group, Pattern, Route, Router
 
-def test_calls_middlewares():
-	def middleware(req, ctx, next):
-		res = next(req, ctx)
-		res.headers["Content-Type"] = "text/plain"
-		return res
-
+def test_dispatches_directly():
 	def handler(req, ctx):
 		return Response.empty(Status.OK)
 
-	kernel = Kernel([Route(Method.GET, Pattern("/"), handler)], [middleware])
+	router = Router([Route(Method.GET, Pattern("/"), handler)])
+	res = router(Request(Method.GET, URL("/"), Headers(), Input()), None)
 
-	res = kernel.handle(Request(Method.GET, URL("/"), Headers(), Input()), None)
-
-	assert str(res.headers["Content-Type"]) == "text/plain"
-
+	assert res.status == Status.OK
 
 def test_routes_to_root():
 	handler = object()
-	router = Router([
-		Route(Method.GET, Pattern("/"), handler)
-	])
+	route = Route(Method.GET, Pattern("/"), handler)
+	router = Router([route])
 
 	match = router.match(Request(Method.GET, URL("/"), Headers(), Input()))
 
-	assert match == (handler, {})
+	assert match == (route, {})
 
 def test_routes_by_path():
-	articles = object()
-	comments = object()
-	router = Router([
-		Route(Method.GET, Pattern("/articles/"), articles),
-		Route(Method.GET, Pattern("/comments/"), comments)
-	])
+	articles = Route(Method.GET, Pattern("/articles/"), object())
+	comments = Route(Method.GET, Pattern("/comments/"), object())
+	router = Router([articles, comments])
 
 	articles_match = router.match(Request(Method.GET, URL("/articles/"), Headers(), Input()))
 	comments_match = router.match(Request(Method.GET, URL("/comments/"), Headers(), Input()))
@@ -44,12 +33,9 @@ def test_routes_by_path():
 	assert comments_match == (comments, {})
 
 def test_routes_by_method():
-	index = object()
-	store = object()
-	router = Router([
-		Route(Method.GET, Pattern("/articles/"), index),
-		Route(Method.POST, Pattern("/articles/"), store)
-	])
+	index = Route(Method.GET, Pattern("/articles/"), object())
+	store = Route(Method.POST, Pattern("/articles/"), object())
+	router = Router([index, store])
 
 	index_match = router.match(Request(Method.GET, URL("/articles/"), Headers(), Input()))
 	store_match = router.match(Request(Method.POST, URL("/articles/"), Headers(), Input()))
@@ -58,35 +44,29 @@ def test_routes_by_method():
 	assert store_match == (store, {})
 
 def test_routes_with_params():
-	handler = object()
-	router = Router([
-		Route(Method.GET, Pattern("/articles/{slug}"), handler)
-	])
+	route = Route(Method.GET, Pattern("/articles/{slug}"), object())
+	router = Router([route])
 
 	match = router.match(Request(Method.GET, URL("/articles/intro"), Headers(), Input()))
 
-	assert match == (handler, {"slug": "intro"})
+	assert match == (route, {"slug": "intro"})
 
 def test_routes_with_explicit_str_converter():
-	handler = object()
-	router = Router([
-		Route(Method.GET, Pattern("/articles/{slug:str}"), handler)
-	])
+	route = Route(Method.GET, Pattern("/articles/{slug:str}"), object())
+	router = Router([route])
 
 	match = router.match(Request(Method.GET, URL("/articles/intro"), Headers(), Input()))
 
-	assert match == (handler, {"slug": "intro"})
+	assert match == (route, {"slug": "intro"})
 
 def test_routes_with_uuid_converter():
-	handler = object()
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
-	router = Router([
-		Route(Method.GET, Pattern("/articles/{id:uuid}"), handler)
-	])
+	route = Route(Method.GET, Pattern("/articles/{id:uuid}"), object())
+	router = Router([route])
 
 	match = router.match(Request(Method.GET, URL(f"/articles/{id}"), Headers(), Input()))
 
-	assert match == (handler, {"id": id})
+	assert match == (route, {"id": id})
 
 def test_passes_converted_params_to_handler_by_name():
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
@@ -96,11 +76,11 @@ def test_passes_converted_params_to_handler_by_name():
 		called_with.append((slug, id))
 		return Response.empty(Status.OK)
 
-	kernel = Kernel([
+	router = Router([
 		Route(Method.GET, Pattern("/articles/{id:uuid}/{slug}"), handler)
-	], [])
+	])
 
-	kernel.handle(Request(Method.GET, URL(f"/articles/{id}/intro"), Headers(), Input()), None)
+	router(Request(Method.GET, URL(f"/articles/{id}/intro"), Headers(), Input()), None)
 
 	assert called_with == [("intro", id)]
 
@@ -112,23 +92,245 @@ def test_uuid_converter_doesnt_match_invalid_uuid():
 	assert match is None
 
 def test_routes_instead_of_param():
-	new = object()
-	show = object()
-	router = Router([
-		Route(Method.GET, Pattern("/articles/new"), new),
-		Route(Method.GET, Pattern("/articles/{slug}"), show)
-	])
+	new = Route(Method.GET, Pattern("/articles/new"), object())
+	show = Route(Method.GET, Pattern("/articles/{slug}"), object())
+	router = Router([new, show])
 
 	match = router.match(Request(Method.GET, URL("/articles/new"), Headers(), Input()))
 
 	assert match == (new, {})
 
 def test_routes_with_param_to_subroute():
-	handler = object()
-	router = Router([
-		Route(Method.POST, Pattern("/articles/{slug}/read"), handler)
-	])
+	route = Route(Method.POST, Pattern("/articles/{slug}/read"), object())
+	router = Router([route])
 
 	match = router.match(Request(Method.POST, URL("/articles/intro/read"), Headers(), Input()))
 
-	assert match == (handler, {"slug": "intro"})
+	assert match == (route, {"slug": "intro"})
+
+def test_runs_route_guards_in_order_before_handler():
+	calls = []
+
+	def first(req, ctx):
+		calls.append("first")
+
+	def second(req, ctx):
+		calls.append("second")
+		return None
+
+	def handler(req, ctx):
+		calls.append("handler")
+		return Response.empty(Status.OK)
+
+	router = Router([
+		Route(Method.GET, Pattern("/"), handler, guards=[first, second])
+	])
+	router(Request(Method.GET, URL("/"), Headers(), Input()), None)
+
+	assert calls == ["first", "second", "handler"]
+
+def test_guard_response_stops_dispatch():
+	calls = []
+
+	def stop(req, ctx):
+		calls.append("stop")
+		return Response.text("Stopped", Status.FORBIDDEN)
+
+	def later(req, ctx):
+		calls.append("later")
+
+	def handler(req, ctx):
+		calls.append("handler")
+		return Response.empty(Status.OK)
+
+	router = Router([
+		Route(Method.GET, Pattern("/"), handler, guards=[stop, later])
+	])
+	res = router(Request(Method.GET, URL("/"), Headers(), Input()), None)
+
+	assert res.status == Status.FORBIDDEN
+	assert calls == ["stop"]
+
+def test_passes_converted_params_to_guards_by_name():
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+	called_with = []
+
+	def guard(req, ctx, id: UUID):
+		called_with.append(id)
+
+	def handler(req, ctx, id: UUID):
+		return Response.empty(Status.OK)
+
+	router = Router([
+		Route(Method.GET, Pattern("/articles/{id:uuid}"), handler, guards=[guard])
+	])
+	router(Request(Method.GET, URL(f"/articles/{id}"), Headers(), Input()), None)
+
+	assert called_with == [id]
+
+def test_doesnt_run_guards_for_unmatched_routes():
+	calls = []
+
+	def guard(req, ctx):
+		calls.append("guard")
+
+	router = Router([
+		Route(Method.GET, Pattern("/articles"), object(), guards=[guard])
+	])
+	match = router.match(Request(Method.GET, URL("/missing"), Headers(), Input()))
+
+	assert match is None
+	assert calls == []
+
+def test_group_without_prefix_or_guards_preserves_route_configuration():
+	handler = object()
+	route = Route(Method.GET, Pattern("/articles"), handler)
+
+	effective = Router([Group(routes=[route])]).routes[0]
+
+	assert effective is route
+	assert effective.method is Method.GET
+	assert effective.pattern.raw == "/articles"
+	assert effective.handler is handler
+	assert effective.guards == []
+
+def test_applies_group_prefix_to_direct_routes():
+	router = Router([Group(prefix="/articles", routes=[
+		Route(Method.GET, Pattern("/"), object()),
+		Route(Method.GET, Pattern("/new"), object()),
+	])])
+
+	assert [route.pattern.raw for route in router.routes] == [
+		"/articles/",
+		"/articles/new",
+	]
+
+def test_composes_nested_group_prefixes_and_trailing_slashes():
+	router = Router([Group(prefix="/articles/", routes=[
+		Group(prefix="/comments", routes=[
+			Route(Method.GET, Pattern("/"), object()),
+			Route(Method.GET, Pattern("/{id:uuid}/"), object()),
+		]),
+	])])
+
+	assert [route.pattern.raw for route in router.routes] == [
+		"/articles/comments/",
+		"/articles/comments/{id:uuid}/",
+	]
+
+def test_converts_params_in_grouped_patterns():
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+	called_with = []
+
+	def handler(req, ctx, id):
+		called_with.append(id)
+		return Response.empty(Status.OK)
+
+	router = Router([Group(prefix="/articles", routes=[
+		Route(Method.GET, Pattern("/{id:uuid}"), handler),
+	])])
+	router(Request(Method.GET, URL(f"/articles/{id}"), Headers(), Input()), None)
+
+	assert called_with == [id]
+
+def test_inherits_group_guards_into_every_descendant():
+	def guard(req, ctx):
+		pass
+
+	router = Router([Group(guards=[guard], routes=[
+		Route(Method.GET, Pattern("/one"), object()),
+		Group(routes=[Route(Method.GET, Pattern("/two"), object())]),
+	])])
+
+	assert [route.guards for route in router.routes] == [[guard], [guard]]
+	assert router.routes[0].guards is not router.routes[1].guards
+
+def test_runs_nested_and_route_guards_outermost_first():
+	calls = []
+
+	def outer(req, ctx):
+		calls.append("outer")
+
+	def inner(req, ctx):
+		calls.append("inner")
+
+	def route_guard(req, ctx):
+		calls.append("route")
+
+	def handler(req, ctx):
+		calls.append("handler")
+		return Response.empty(Status.OK)
+
+	router = Router([Group(guards=[outer], routes=[
+		Group(guards=[inner], routes=[
+			Route(Method.GET, Pattern("/"), handler, guards=[route_guard]),
+		]),
+	])])
+	router(Request(Method.GET, URL("/"), Headers(), Input()), None)
+
+	assert calls == ["outer", "inner", "route", "handler"]
+
+def test_inherited_guard_response_stops_dispatch():
+	calls = []
+
+	def outer(req, ctx):
+		calls.append("outer")
+		return Response.text("Forbidden", Status.FORBIDDEN)
+
+	def inner(req, ctx):
+		calls.append("inner")
+
+	def handler(req, ctx):
+		calls.append("handler")
+		return Response.empty(Status.OK)
+
+	router = Router([Group(guards=[outer], routes=[
+		Route(Method.GET, Pattern("/"), handler, guards=[inner]),
+	])])
+	res = router(Request(Method.GET, URL("/"), Headers(), Input()), None)
+
+	assert res.status == Status.FORBIDDEN
+	assert calls == ["outer"]
+
+def test_group_flattening_preserves_declaration_and_matching_order():
+	first = object()
+	second = object()
+	third = object()
+	router = Router([
+		Group(routes=[
+			Route(Method.GET, Pattern("/{slug}"), first),
+			Route(Method.GET, Pattern("/new"), second),
+		]),
+		Route(Method.GET, Pattern("/{slug}"), third),
+	])
+
+	assert [route.handler for route in router.routes] == [first, second, third]
+	match = router.match(Request(Method.GET, URL("/new"), Headers(), Input()))
+	assert match[0].handler is first
+
+def test_reusing_group_configuration_doesnt_mutate_sources():
+	def group_guard(req, ctx):
+		pass
+
+	def route_guard(req, ctx):
+		pass
+
+	route = Route(Method.GET, Pattern("/{id:uuid}/"), object(), guards=[route_guard])
+	shared = Group(prefix="/items", guards=[group_guard], routes=[route])
+	router = Router([
+		Group(prefix="/one", routes=[shared]),
+		Group(prefix="/two", routes=[shared]),
+	])
+
+	assert route.pattern.raw == "/{id:uuid}/"
+	assert route.guards == [route_guard]
+	assert shared.prefix == "/items"
+	assert shared.guards == [group_guard]
+	assert shared.routes == [route]
+	assert [effective.pattern.raw for effective in router.routes] == [
+		"/one/items/{id:uuid}/",
+		"/two/items/{id:uuid}/",
+	]
+	assert router.routes[0].guards == [group_guard, route_guard]
+	assert router.routes[1].guards == [group_guard, route_guard]
+	assert router.routes[0].guards is not router.routes[1].guards
