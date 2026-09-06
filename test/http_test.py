@@ -1,4 +1,4 @@
-from helios.http import Cookies, Headers, URL
+from helios.http import Cookies, Headers, Input, Method, Request, URL
 
 def test_encodes_url_path():
 	url = URL("/about")
@@ -9,6 +9,21 @@ def test_encodes_url_query():
 	url = URL("/search", {"q": "today", "tags": ["news", "politics"]})
 
 	assert str(url) == "/search?q=today&tags=news&tags=politics"
+
+def test_gets_request_referrer():
+	request = Request(
+		Method.GET,
+		URL("/boards/123456/edit"),
+		Headers({"Referer": "/boards/"}),
+		Input()
+	)
+
+	assert request.referrer == "/boards/"
+
+def test_doesnt_get_empty_referrer():
+	request = Request(Method.GET, URL("/boards/example/edit"), Headers(), Input())
+
+	assert request.referrer is None
 
 def test_queries_headers_without_case():
 	headers = Headers()

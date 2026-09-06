@@ -69,6 +69,13 @@ class Request:
 		self.input = input
 		self.cookies = Cookies.from_headers(headers)
 
+	@property
+	def referrer(self) -> str | None:
+		if "Referer" in self.headers:
+			return str(self.headers["Referer"])
+		else:
+			return None
+
 	def __repr__(self) -> str:
 		return f"Request({repr(self.method)}, {repr(self.url)}, {repr(self.headers)}, {repr(self.input)})"
 
