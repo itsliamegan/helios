@@ -71,3 +71,33 @@ def test_handles_model_not_found():
 	res = app.handle(req)
 
 	assert res.status == Status.NOT_FOUND
+
+def test_runs_component_after_hooks_for_http_errors():
+	class Post(Model):
+		pass
+
+	class RecordingComponent(Component):
+		def __init__(self):
+			self.statuses = []
+
+		def after(self, res, ctx):
+			self.statuses.append(res.status)
+			res.headers["X-After"] = "ran"
+
+	component = RecordingComponent()
+	unmatched_app = Application([], [component])
+	unmatched_res = unmatched_app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
+
+	def show(req, ctx):
+		Store().find_one(Post, uuid4())
+
+	missing_model_app = Application([
+		Route(Method.GET, Pattern("/posts/missing"), show)
+	], [component])
+	missing_model_res = missing_model_app.handle(
+		Request(Method.GET, URL("/posts/missing"), Headers(), Input())
+	)
+
+	assert component.statuses == [Status.NOT_FOUND, Status.NOT_FOUND]
+	assert str(unmatched_res.headers["X-After"]) == "ran"
+	assert str(missing_model_res.headers["X-After"]) == "ran"

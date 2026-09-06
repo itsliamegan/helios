@@ -1,8 +1,8 @@
 from collections.abc import Callable
 from typing import Any
 
-from helios.errors import NotFoundError
 from helios.http import Method, Request, Response, Status
+from helios.http.error import HTTPError
 from helios.routing import Kernel, Next, Route
 
 class Context:
@@ -45,8 +45,8 @@ class Application:
 			ensure_content_length,
 			capture_errors,
 			adapt_artificial_method,
-			handle_not_found,
 			*components,
+			handle_http_errors,
 		])
 		self.components = components
 
@@ -90,8 +90,8 @@ def capture_errors(req: Request, ctx: Context, next: Next) -> Response:
 		traceback.print_exception(err, file = sys.stderr)
 		return Response.text("500 Internal Server Error", Status.INTERNAL_SERVER_ERROR)
 
-def handle_not_found(req: Request, ctx: Context, next: Next) -> Response:
+def handle_http_errors(req: Request, ctx: Context, next: Next) -> Response:
 	try:
 		return next(req, ctx)
-	except NotFoundError:
-		return Response.text("404 Not Found", Status.NOT_FOUND)
+	except HTTPError as err:
+		return Response.text(f"{err.status}", err.status)

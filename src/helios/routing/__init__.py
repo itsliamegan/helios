@@ -2,8 +2,8 @@ from collections.abc import Callable
 import re
 from typing import Any, Concatenate
 
-from helios.errors import NotFoundError as BaseNotFoundError
 from helios.http import Body, Headers, Method, Request, Response, Status, URL
+from helios.http.error import NotFoundError as BaseNotFoundError
 
 from . import convert
 
