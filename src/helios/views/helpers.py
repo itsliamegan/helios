@@ -1,10 +1,13 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
 from markupsafe import Markup, escape
 
 from helios.http import URL
 
+
 def date(date: datetime) -> str:
 	return date.strftime("%b %-d, %Y")
+
 
 def url(url: URL) -> str:
 	# escape returns a Markup object which will always escape further
@@ -13,6 +16,7 @@ def url(url: URL) -> str:
 	escaped = str(escape(url))
 	broken = escaped.replace("/", "/<wbr>")
 	return Markup(broken)
+
 
 def elapsed(then: datetime, now: datetime | None = None) -> str:
 	if now is None:
@@ -31,6 +35,7 @@ def elapsed(then: datetime, now: datetime | None = None) -> str:
 		return f"{diff.days} {pluralize("day", diff.days)} ago"
 	else:
 		return date(then)
+
 
 def pluralize(noun: str, count: int) -> str:
 	if count == 1:

@@ -4,6 +4,7 @@ version = "0.1"
 requires-python = ">=3.14"
 dependencies = [
 	"jinja2==3.1.*",
+	"ruff>=0.16.6",
 	"werkzeug==3.1.*",
 ]
 
@@ -13,3 +14,23 @@ test = "helios.test:main"
 [build-system]
 requires = ["uv_build"]
 build-backend = "uv_build"
+
+[tool.ruff]
+target-version = "py314"
+
+[tool.ruff.format]
+indent-style = "tab"
+nested-string-quote-style = "preferred"
+quote-style = "double"
+
+[tool.ruff.lint]
+ignore = [
+	"BLE001",
+	"RUF012",
+]
+
+[tool.ruff.lint.isort]
+case-sensitive = true
+known-first-party = ["helios"]
+force-sort-within-sections = true
+order-by-type = false

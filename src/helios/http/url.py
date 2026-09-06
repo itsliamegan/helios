@@ -1,5 +1,6 @@
 from urllib.parse import urlencode as encode_query
 
+
 class URL:
 	def __init__(self, path: str, query: dict[str, str | list[str]] | None = None):
 		if query is None:
@@ -14,4 +15,4 @@ class URL:
 		return res
 
 	def __repr__(self) -> str:
-		return f"URL({repr(self.path)}, {repr(self.query)})"
+		return f"URL({self.path!r}, {self.query!r})"

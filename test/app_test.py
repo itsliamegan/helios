@@ -1,9 +1,10 @@
+from uuid import uuid4
+
 from helios.app import Application, Component, Thread
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
 from helios.routing import NotFoundError, Pattern, Route, Router
 from helios.store import Model, Store
 
-from uuid import uuid4
 
 def test_boots_components():
 	class ExampleComponent(Component):
@@ -17,6 +18,7 @@ def test_boots_components():
 
 	assert component.booted == True
 
+
 def test_ensures_content_length():
 	def index(req, ctx):
 		return Response.text("Hello, world!")
@@ -27,6 +29,7 @@ def test_ensures_content_length():
 	res = app.handle(req)
 
 	assert str(res.headers["Content-Length"]) == "13"
+
 
 def test_adapts_artificial_method():
 	def destroy(req, ctx):
@@ -39,6 +42,7 @@ def test_adapts_artificial_method():
 
 	assert res.status == Status.NO_CONTENT
 
+
 def test_captures_errors():
 	def index(req, ctx):
 		raise RuntimeError
@@ -50,6 +54,7 @@ def test_captures_errors():
 
 	assert res.status == Status.INTERNAL_SERVER_ERROR
 
+
 def test_handles_route_not_found():
 	app = Application(Router([]), [])
 	req = Request(Method.GET, URL("/"), Headers(), Input())
@@ -57,6 +62,7 @@ def test_handles_route_not_found():
 	res = app.handle(req)
 
 	assert res.status == Status.NOT_FOUND
+
 
 def test_handles_model_not_found():
 	class Post(Model):
@@ -72,6 +78,7 @@ def test_handles_model_not_found():
 
 	assert res.status == Status.NOT_FOUND
 
+
 def test_runs_component_after_hooks_for_http_errors():
 	class Post(Model):
 		pass
@@ -86,14 +93,16 @@ def test_runs_component_after_hooks_for_http_errors():
 
 	component = RecordingComponent()
 	unmatched_app = Application(Router([]), [component])
-	unmatched_res = unmatched_app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
+	unmatched_res = unmatched_app.handle(
+		Request(Method.GET, URL("/"), Headers(), Input())
+	)
 
 	def show(req, ctx):
 		Store().find_one(Post, uuid4())
 
-	missing_model_app = Application(Router([
-		Route(Method.GET, Pattern("/posts/missing"), show)
-	]), [component])
+	missing_model_app = Application(
+		Router([Route(Method.GET, Pattern("/posts/missing"), show)]), [component]
+	)
 	missing_model_res = missing_model_app.handle(
 		Request(Method.GET, URL("/posts/missing"), Headers(), Input())
 	)
@@ -101,6 +110,7 @@ def test_runs_component_after_hooks_for_http_errors():
 	assert component.statuses == [Status.NOT_FOUND, Status.NOT_FOUND]
 	assert str(unmatched_res.headers["X-After"]) == "ran"
 	assert str(missing_model_res.headers["X-After"]) == "ran"
+
 
 def test_builds_a_middleware_thread_around_a_last_callable():
 	def middleware(req, ctx, next):
@@ -117,6 +127,7 @@ def test_builds_a_middleware_thread_around_a_last_callable():
 	assert str(res.body) == "Dispatched"
 	assert str(res.headers["X-Middleware"]) == "ran"
 
+
 def test_runs_component_after_hooks_for_guard_responses():
 	class RecordingComponent(Component):
 		def after(self, res, ctx):
@@ -128,13 +139,15 @@ def test_runs_component_after_hooks_for_guard_responses():
 	def handler(req, ctx):
 		return Response.empty(Status.OK)
 
-	app = Application(Router([
-		Route(Method.GET, Pattern("/"), handler, guards=[guard])
-	]), [RecordingComponent()])
+	app = Application(
+		Router([Route(Method.GET, Pattern("/"), handler, guards=[guard])]),
+		[RecordingComponent()],
+	)
 	res = app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
 
 	assert res.status == Status.FORBIDDEN
 	assert str(res.headers["X-After"]) == "ran"
+
 
 def test_handles_guard_http_errors_inside_component_chain():
 	class RecordingComponent(Component):
@@ -147,13 +160,15 @@ def test_handles_guard_http_errors_inside_component_chain():
 	def handler(req, ctx):
 		return Response.empty(Status.OK)
 
-	app = Application(Router([
-		Route(Method.GET, Pattern("/"), handler, guards=[guard])
-	]), [RecordingComponent()])
+	app = Application(
+		Router([Route(Method.GET, Pattern("/"), handler, guards=[guard])]),
+		[RecordingComponent()],
+	)
 	res = app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
 
 	assert res.status == Status.NOT_FOUND
 	assert str(res.headers["X-After"]) == "ran"
+
 
 def test_captures_unexpected_guard_errors():
 	def guard(req, ctx):
@@ -162,9 +177,9 @@ def test_captures_unexpected_guard_errors():
 	def handler(req, ctx):
 		return Response.empty(Status.OK)
 
-	app = Application(Router([
-		Route(Method.GET, Pattern("/"), handler, guards=[guard])
-	]), [])
+	app = Application(
+		Router([Route(Method.GET, Pattern("/"), handler, guards=[guard])]), []
+	)
 	res = app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
 
 	assert res.status == Status.INTERNAL_SERVER_ERROR

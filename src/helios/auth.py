@@ -7,6 +7,7 @@ from helios.store import Model, NotFoundError
 
 SESSION_KEY = "_user_id"
 
+
 class Component(Component):
 	def __init__(self, user_type: type[Model], key: str = SESSION_KEY):
 		self.user_type = user_type
@@ -29,8 +30,11 @@ class Component(Component):
 			user = None
 		ctx.auth = Authenticator(ctx.session, user, self.key)
 
+
 class Authenticator:
-	def __init__(self, session: Session, user: Model | None = None, key: str = SESSION_KEY):
+	def __init__(
+		self, session: Session, user: Model | None = None, key: str = SESSION_KEY
+	):
 		self.session = session
 		self.user = user
 		self.key = key

@@ -1,14 +1,15 @@
+from datetime import UTC, datetime
 import json
-from datetime import datetime, UTC
-from inspect import get_annotations as get_annots
 from pathlib import Path
 from typing import Any
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
 from helios.app import Component, Context
 from helios.http import Request, Response
 from helios.http.error import NotFoundError as BaseNotFoundError
+
 from . import types
+
 
 class Component(Component):
 	def __init__(self, file: Path, schema: Schema):
@@ -21,14 +22,17 @@ class Component(Component):
 	def after(self, res: Response, ctx: Context):
 		save(self.file, ctx.store)
 
+
 class ModelError(RuntimeError):
 	pass
 
+
 class NotFoundError(BaseNotFoundError):
-	def __init__(self, model_type: type["Model"], id: UUID):
+	def __init__(self, model_type: type[Model], id: UUID):
 		self.model_type = model_type
 		self.id = id
 		super().__init__(f"{model_type.__name__} {id} not found")
+
 
 class Attribute:
 	def __init__(
@@ -36,7 +40,7 @@ class Attribute:
 		name: str,
 		typ: types.Type,
 		default: Any | None = None,
-		nullable: bool = False
+		nullable: bool = False,
 	):
 		self.name = name
 		self.type = typ
@@ -44,7 +48,8 @@ class Attribute:
 		self.nullable = nullable
 
 	def __repr__(self) -> str:
-		return f"Attribute({repr(self.name)}, {repr(self.type)}, default = {repr(self.default)}, nullable = {repr(self.nullable)})"
+		return f"Attribute({self.name!r}, {self.type!r}, default = {self.default!r}, nullable = {self.nullable!r})"
+
 
 class Model:
 	attrs = {}
@@ -87,7 +92,8 @@ class Model:
 			return super().__getattribute__(name)
 
 	def __repr__(self) -> str:
-		return f"{type(self).__name__}({repr(self.id)})"
+		return f"{type(self).__name__}({self.id!r})"
+
 
 class Schema:
 	def __init__(self, raw_model_types: list[type[Model]]):
@@ -98,6 +104,7 @@ class Schema:
 
 	def get_model_type(self, name: str) -> type[Model]:
 		return self.model_types[name]
+
 
 class Store:
 	def __init__(self, models: dict[UUID, Model] | None = None):
@@ -123,8 +130,8 @@ class Store:
 		for model in self.models.values():
 			if type(model) == model_type:
 				matches = True
-				for attr in attrs:
-					if getattr(model, attr) != attrs[attr]:
+				for name, value in attrs.items():
+					if getattr(model, name) != value:
 						matches = False
 				if matches:
 					models.append(model)
@@ -140,20 +147,23 @@ class Store:
 	def delete(self, model_type: type[Model], id: UUID):
 		del self.models[id]
 
+
 def load(path: Path, schema: Schema) -> Store:
 	with open(path, "r") as file:
 		data = json.load(file)
 		store = decode(data, schema)
 		return store
 
+
 def save(path: Path, store: Store):
 	with open(path, "w") as file:
 		data = encode(store)
 		json.dump(data, file)
 
+
 def encode(store: Store) -> list[dict[str, Any]]:
 	data = []
-	for id, model in store.models.items():
+	for model in store.models.values():
 		model_data = {}
 		model_data["_type"] = type(model).__name__
 		model_data["id"] = types.UUID().encode(model.id)
@@ -168,6 +178,7 @@ def encode(store: Store) -> list[dict[str, Any]]:
 			model_data[attr.name] = attr_val
 		data.append(model_data)
 	return data
+
 
 def decode(data: list[dict[str, Any]], schema: Schema) -> Store:
 	models = {}

@@ -1,4 +1,5 @@
-from collections.abc import Iterable
+from collections.abc import Iterator
+
 
 class Header:
 	def __init__(self, name: str, vals: str | list[str]):
@@ -14,14 +15,15 @@ class Header:
 	def __add__(self, other: str) -> list[str]:
 		return self.vals + [other]
 
-	def __iter__(self) -> Iterable[str]:
+	def __iter__(self) -> Iterator[str]:
 		return iter(self.vals)
 
 	def __str__(self) -> str:
 		return ", ".join(self.vals)
 
 	def __repr__(self) -> str:
-		return f"Header({repr(self.name)}, {repr(self.vals)})"
+		return f"Header({self.name!r}, {self.vals!r})"
+
 
 class Headers:
 	def __init__(self, pairs: dict[str, str | list[str]] | None = None):
@@ -46,7 +48,7 @@ class Headers:
 	def __contains__(self, name: str) -> bool:
 		return normalize(name) in self.headers
 
-	def __iter__(self) -> Iterable[tuple[str, str]]:
+	def __iter__(self) -> Iterator[tuple[str, str]]:
 		for name in self.headers:
 			header = self.headers[name]
 			if name == "Set-Cookie":
@@ -56,7 +58,8 @@ class Headers:
 				yield name, str(header)
 
 	def __repr__(self) -> str:
-		return f"Headers({repr(self.headers)})"
+		return f"Headers({self.headers!r})"
+
 
 def normalize(raw_name: str) -> str:
 	parts = raw_name.split("-")

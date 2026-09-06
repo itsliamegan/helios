@@ -8,6 +8,7 @@ from helios.routing import Router
 type Next = Callable[[Request, Any], Response]
 type Middleware = Callable[[Request, Any, Next], Response]
 
+
 class Context:
 	def __init__(self):
 		self.provided = {}
@@ -26,6 +27,7 @@ class Context:
 		else:
 			self.provided[name] = val
 
+
 class Component:
 	def boot(self):
 		pass
@@ -42,6 +44,7 @@ class Component:
 		self.after(res, ctx)
 		return res
 
+
 class Thread:
 	def __init__(self, middleware: Middleware, next: Next):
 		self.middleware = middleware
@@ -57,15 +60,19 @@ class Thread:
 	def __call__(self, req: Request, ctx: Any) -> Response:
 		return self.middleware(req, ctx, self.next)
 
+
 class Application:
 	def __init__(self, router: Router, components: list[Component]):
-		self.thread = Thread.build([
-			ensure_content_length,
-			capture_errors,
-			adapt_artificial_method,
-			*components,
-			handle_http_errors,
-		], router)
+		self.thread = Thread.build(
+			[
+				ensure_content_length,
+				capture_errors,
+				adapt_artificial_method,
+				*components,
+				handle_http_errors,
+			],
+			router,
+		)
 		self.components = components
 
 	def boot(self):
@@ -76,11 +83,13 @@ class Application:
 		ctx = Context()
 		return self.thread(req, ctx)
 
+
 def ensure_content_length(req: Request, ctx: Context, next: Next) -> Response:
 	res = next(req, ctx)
 	if "Content-Length" not in res.headers:
 		res.headers["Content-Length"] = str(len(str(res.body)))
 	return res
+
 
 def adapt_artificial_method(req: Request, ctx: Context, next: Next) -> Response:
 	if "_method" in req.input:
@@ -99,14 +108,17 @@ def adapt_artificial_method(req: Request, ctx: Context, next: Next) -> Response:
 		req.method = method
 	return next(req, ctx)
 
+
 def capture_errors(req: Request, ctx: Context, next: Next) -> Response:
 	try:
 		return next(req, ctx)
 	except Exception as err:
 		import sys
 		import traceback
-		traceback.print_exception(err, file = sys.stderr)
+
+		traceback.print_exception(err, file=sys.stderr)
 		return Response.text("500 Internal Server Error", Status.INTERNAL_SERVER_ERROR)
+
 
 def handle_http_errors(req: Request, ctx: Context, next: Next) -> Response:
 	try:

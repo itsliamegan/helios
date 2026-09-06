@@ -1,6 +1,7 @@
 from uuid import uuid4
 
-from helios.session import decode, encode, Session, Sessions
+from helios.session import Session, Sessions, decode, encode
+
 
 def test_finds_session_by_id():
 	id = uuid4()
@@ -11,6 +12,7 @@ def test_finds_session_by_id():
 
 	assert sessions.get(id) == session
 
+
 def test_stores_values():
 	id = uuid4()
 	session = Session(id)
@@ -18,6 +20,7 @@ def test_stores_values():
 	session["message"] = "You do not have access."
 
 	assert session["message"] == "You do not have access."
+
 
 def test_clears_values():
 	id = uuid4()
@@ -28,6 +31,7 @@ def test_clears_values():
 
 	assert "user_id" not in session
 
+
 def test_deletes_values():
 	id = uuid4()
 	session = Session(id)
@@ -36,6 +40,7 @@ def test_deletes_values():
 	del session["user_id"]
 
 	assert "user_id" not in session
+
 
 def test_encodes_and_decodes_sessions():
 	id = uuid4()

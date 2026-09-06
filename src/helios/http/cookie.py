@@ -1,8 +1,8 @@
-from collections.abc import Iterable
 from datetime import datetime
 from email.utils import formatdate
 
 from .headers import Headers
+
 
 class Cookie:
 	def __init__(
@@ -22,13 +22,14 @@ class Cookie:
 	def __str__(self) -> str:
 		res = f"{self.name}={self.val}; Path={self.path}"
 		if self.expires is not None:
-			res += f"; Expires={formatdate(self.expires.timestamp(), usegmt = True)}"
+			res += f"; Expires={formatdate(self.expires.timestamp(), usegmt=True)}"
 		if self.http_only:
 			res += "; HttpOnly"
 		return res
 
 	def __repr__(self) -> str:
 		return f"Cookie(name={self.name}, val={self.val})"
+
 
 class Cookies:
 	def __init__(self, pairs: dict[str, str] | None = None):
@@ -40,7 +41,7 @@ class Cookies:
 		self.cookies = cookies
 
 	@classmethod
-	def from_headers(cls, headers: Headers) -> "Cookies":
+	def from_headers(cls, headers: Headers) -> Cookies:
 		cookies = cls()
 		if "Cookie" not in headers:
 			return cookies
@@ -71,4 +72,4 @@ class Cookies:
 		return name in self.cookies
 
 	def __repr__(self) -> str:
-		return f"Cookies({repr({name: self.cookies[name].val for name in self.cookies})})"
+		return f"Cookies({ {name: self.cookies[name].val for name in self.cookies}!r})"

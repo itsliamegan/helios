@@ -4,6 +4,7 @@ from .cookie import Cookies
 from .headers import Headers
 from .url import URL
 
+
 class Method(Enum):
 	GET = "GET"
 	POST = "POST"
@@ -12,7 +13,8 @@ class Method(Enum):
 	DELETE = "DELETE"
 
 	def __repr__(self) -> str:
-		return f"Method({repr(self.name)})"
+		return f"Method({self.name!r})"
+
 
 class Status(Enum):
 	OK = 200, "OK"
@@ -31,7 +33,8 @@ class Status(Enum):
 		return f"{self.code} {self.reason}"
 
 	def __repr__(self) -> str:
-		return f"Status({repr(self.code)}, {repr(self.reason)})"
+		return f"Status({self.code!r}, {self.reason!r})"
+
 
 class Input:
 	def __init__(self, items: dict[str, str | list[str]] | None = None):
@@ -49,7 +52,8 @@ class Input:
 		return name in self.items
 
 	def __repr__(self) -> str:
-		return f"Input({repr(self.items)})"
+		return f"Input({self.items!r})"
+
 
 class Body:
 	def __init__(self, content: str | None = ""):
@@ -59,7 +63,8 @@ class Body:
 		return str(self.content)
 
 	def __repr__(self) -> str:
-		return f"Body({repr(self.content)})"
+		return f"Body({self.content!r})"
+
 
 class Request:
 	def __init__(self, method: Method, url: URL, headers: Headers, input: Input):
@@ -77,7 +82,10 @@ class Request:
 			return None
 
 	def __repr__(self) -> str:
-		return f"Request({repr(self.method)}, {repr(self.url)}, {repr(self.headers)}, {repr(self.input)})"
+		return (
+			f"Request({self.method!r}, {self.url!r}, {self.headers!r}, {self.input!r})"
+		)
+
 
 class Response:
 	def __init__(self, status: Status, headers: Headers, cookies: Cookies, body: Body):
@@ -87,20 +95,24 @@ class Response:
 		self.body = body
 
 	@classmethod
-	def empty(cls, status: Status = Status.NO_CONTENT) -> "Response":
+	def empty(cls, status: Status = Status.NO_CONTENT) -> Response:
 		return cls(status, Headers(), Cookies(), Body())
 
 	@classmethod
-	def text(cls, text: str, status: Status = Status.OK) -> "Response":
-		return cls(status, Headers({"Content-Type": "text/plain"}), Cookies(), Body(text))
+	def text(cls, text: str, status: Status = Status.OK) -> Response:
+		return cls(
+			status, Headers({"Content-Type": "text/plain"}), Cookies(), Body(text)
+		)
 
 	@classmethod
-	def html(cls, html: str, status: Status = Status.OK) -> "Response":
-		return cls(status, Headers({"Content-Type": "text/html"}), Cookies(), Body(html))
+	def html(cls, html: str, status: Status = Status.OK) -> Response:
+		return cls(
+			status, Headers({"Content-Type": "text/html"}), Cookies(), Body(html)
+		)
 
 	@classmethod
-	def redirect(cls, url: URL) -> "Response":
+	def redirect(cls, url: URL) -> Response:
 		return cls(Status.FOUND, Headers({"Location": str(url)}), Cookies(), Body())
 
 	def __repr__(self) -> str:
-		return f"Response({repr(self.status)}, {repr(self.headers)}, {repr(self.body)})"
+		return f"Response({self.status!r}, {self.headers!r}, {self.body!r})"

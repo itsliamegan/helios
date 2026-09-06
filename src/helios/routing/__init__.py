@@ -7,14 +7,18 @@ from helios.http.error import NotFoundError as BaseNotFoundError
 
 from . import convert
 
+
 class NotFoundError(BaseNotFoundError):
 	pass
+
 
 class MethodNotAllowedError(Exception):
 	pass
 
+
 PARAM_REGEX = re.compile(r"{(\w+)(?::(\w+))?}")
 PARAM_VALUE_REGEX = r"[\w-]+"
+
 
 class Pattern:
 	def __init__(self, raw: str):
@@ -52,10 +56,12 @@ class Pattern:
 			return None
 
 	def __repr__(self) -> str:
-		return f"Pattern({repr(self.raw)})"
+		return f"Pattern({self.raw!r})"
+
 
 type Handler[**P] = Callable[Concatenate[Request, Any, P], Response]
 type Guard[**P] = Callable[Concatenate[Request, Any, P], Response | None]
+
 
 class Route:
 	def __init__(
@@ -79,7 +85,8 @@ class Route:
 		return None
 
 	def __repr__(self) -> str:
-		return f"Route({repr(self.method)}, {repr(self.pattern)}, {repr(self.handler)})"
+		return f"Route({self.method!r}, {self.pattern!r}, {self.handler!r})"
+
 
 class Group:
 	def __init__(
@@ -103,18 +110,22 @@ class Group:
 		routes = []
 		for item in items:
 			if isinstance(item, cls):
-				routes.extend(cls.flatten(
-					item.routes,
-					cls.join(prefix, item.prefix),
-					[*guards, *item.guards],
-				))
+				routes.extend(
+					cls.flatten(
+						item.routes,
+						cls.join(prefix, item.prefix),
+						[*guards, *item.guards],
+					)
+				)
 			elif prefix or guards:
-				routes.append(Route(
-					item.method,
-					Pattern(cls.join(prefix, item.pattern.raw)),
-					item.handler,
-					[*guards, *item.guards],
-				))
+				routes.append(
+					Route(
+						item.method,
+						Pattern(cls.join(prefix, item.pattern.raw)),
+						item.handler,
+						[*guards, *item.guards],
+					)
+				)
 			else:
 				routes.append(item)
 		return routes
@@ -125,7 +136,8 @@ class Group:
 			return pattern
 		if not pattern:
 			return prefix
-		return f"{prefix.rstrip('/')}/{pattern.lstrip('/')}"
+		return f"{prefix.rstrip("/")}/{pattern.lstrip("/")}"
+
 
 class Router:
 	def __init__(self, routes: list[Route | Group]):

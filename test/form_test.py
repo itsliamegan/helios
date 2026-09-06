@@ -5,9 +5,7 @@ from helios.http import Input
 
 
 def test_validates_required_when_provided():
-	form = Form([
-		Field("title", parser.Required(parser.Str()))
-	])
+	form = Form([Field("title", parser.Required(parser.Str()))])
 
 	input, errs = form.validate(Input({"title": "Intro"}))
 
@@ -16,9 +14,7 @@ def test_validates_required_when_provided():
 
 
 def test_validates_required_when_missing():
-	form = Form([
-		Field("title", parser.Required(parser.Str()))
-	])
+	form = Form([Field("title", parser.Required(parser.Str()))])
 
 	input, errs = form.validate(Input())
 
@@ -27,9 +23,7 @@ def test_validates_required_when_missing():
 
 
 def test_validates_required_when_empty():
-	form = Form([
-		Field("title", parser.Required(parser.Str()))
-	])
+	form = Form([Field("title", parser.Required(parser.Str()))])
 
 	input, errs = form.validate(Input({"title": ""}))
 
@@ -39,9 +33,7 @@ def test_validates_required_when_empty():
 
 def test_parses_uuid():
 	raw = "102ddad7-06d1-484f-a3f8-3cf4711e91ba"
-	form = Form([
-		Field("user_id", parser.UUID())
-	])
+	form = Form([Field("user_id", parser.UUID())])
 
 	data, errors = form.validate(Input({"user_id": raw}))
 
@@ -58,9 +50,7 @@ def test_custom_parser_can_handle_missing_input():
 				raise parser.ParseError("must be a single value")
 			return value
 
-	form = Form([
-		Field("value", DefaultParser())
-	])
+	form = Form([Field("value", DefaultParser())])
 
 	data, errors = form.validate(Input())
 
@@ -69,9 +59,7 @@ def test_custom_parser_can_handle_missing_input():
 
 
 def test_records_parse_errors():
-	form = Form([
-		Field("user_id", parser.UUID())
-	])
+	form = Form([Field("user_id", parser.UUID())])
 
 	data, errors = form.validate(Input({"user_id": "not-a-uuid"}))
 
@@ -80,11 +68,13 @@ def test_records_parse_errors():
 
 
 def test_parses_missing_optional_boolean_and_list_fields():
-	form = Form([
-		Field("parent_id", parser.Optional(parser.UUID())),
-		Field("archived", parser.Bool()),
-		Field("user_id", parser.List(parser.UUID())),
-	])
+	form = Form(
+		[
+			Field("parent_id", parser.Optional(parser.UUID())),
+			Field("archived", parser.Bool()),
+			Field("user_id", parser.List(parser.UUID())),
+		]
+	)
 
 	data, errors = form.validate(Input())
 
@@ -95,9 +85,7 @@ def test_parses_missing_optional_boolean_and_list_fields():
 def test_parses_list_uuid_field_from_browser_input():
 	first = "102ddad7-06d1-484f-a3f8-3cf4711e91ba"
 	second = "f262c72c-92e8-4e1f-9644-b1d24afad614"
-	form = Form([
-		Field("user_id", parser.List(parser.UUID()))
-	])
+	form = Form([Field("user_id", parser.List(parser.UUID()))])
 
 	scalar, scalar_errors = form.validate(Input({"user_id": first}))
 	repeated, repeated_errors = form.validate(Input({"user_id": [first, second]}))
@@ -109,9 +97,7 @@ def test_parses_list_uuid_field_from_browser_input():
 
 
 def test_parses_checkbox_presence():
-	form = Form([
-		Field("archived", parser.Bool())
-	])
+	form = Form([Field("archived", parser.Bool())])
 
 	checked, checked_errors = form.validate(Input({"archived": "on"}))
 	unexpected, unexpected_errors = form.validate(Input({"archived": "yes"}))

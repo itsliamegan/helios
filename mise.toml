@@ -7,3 +7,7 @@ python.uv_venv_auto = "create|source"
 
 [tasks]
 test = "uv run test"
+lint = [
+	"ruff format",
+	"ruff check --fix",
+]

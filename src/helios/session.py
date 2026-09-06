@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 import json
 from pathlib import Path
 from typing import Any
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
 from helios.app import Component, Context
 from helios.http import Request, Response
+
 
 class Component(Component):
 	def __init__(self, file: Path):
@@ -29,9 +30,10 @@ class Component(Component):
 
 	def after(self, res: Response, ctx: Context):
 		res.cookies["session_id"] = str(ctx.session.id)
-		res.cookies["session_id"].expires = datetime.now() + timedelta(days = 30)
+		res.cookies["session_id"].expires = datetime.now(UTC) + timedelta(days=30)
 		res.cookies["session_id"].http_only = True
 		save(self.file, self.sessions)
+
 
 class Session:
 	def __init__(self, id: UUID, items: dict[str, Any] | None = None):
@@ -56,7 +58,8 @@ class Session:
 		return key in self.items
 
 	def __repr__(self) -> str:
-		return f"Session({repr(self.id)}, {repr(self.items)})"
+		return f"Session({self.id!r}, {self.items!r})"
+
 
 class Sessions:
 	def __init__(self, sessions: dict[UUID, Session] | None = None):
@@ -74,12 +77,14 @@ class Sessions:
 		return id in self.sessions
 
 	def __repr__(self) -> str:
-		return f"Sessions({repr(self.sessions)})"
+		return f"Sessions({self.sessions!r})"
+
 
 def save(path: Path, sessions: Sessions):
 	with open(path, "w") as file:
 		data = encode(sessions)
 		json.dump(data, file)
+
 
 def load(path: Path) -> Sessions:
 	with open(path, "r") as file:
@@ -87,15 +92,17 @@ def load(path: Path) -> Sessions:
 		sessions = decode(data)
 		return sessions
 
+
 def encode(sessions: Sessions) -> dict[str, Any]:
 	data = {}
 	for id in sessions.sessions:
 		data[str(id)] = sessions.sessions[id].items
 	return data
 
+
 def decode(data: dict[str, Any]) -> Sessions:
 	sessions = {}
-	for raw_id in data:
+	for raw_id, session_data in data.items():
 		id = UUID(raw_id)
-		sessions[id] = Session(id, data[raw_id])
+		sessions[id] = Session(id, session_data)
 	return Sessions(sessions)

@@ -1,5 +1,5 @@
-import uuid
 from typing import Any, Protocol
+import uuid
 
 type RawValue = str | list[str] | None
 
@@ -9,8 +9,7 @@ class ParseError(ValueError):
 
 
 class Parser[T](Protocol):
-	def parse(self, value: RawValue) -> T:
-		...
+	def parse(self, value: RawValue) -> T: ...
 
 
 class Scalar:

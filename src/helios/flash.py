@@ -3,6 +3,7 @@ from typing import Any
 from helios.app import Component, Context
 from helios.http import Request, Response
 
+
 class Component(Component):
 	def before(self, req: Request, ctx: Context):
 		if "_flash" in ctx.session:
@@ -15,6 +16,7 @@ class Component(Component):
 	def after(self, res: Response, ctx: Context):
 		if ctx.flash.is_dirty():
 			ctx.session["_flash"] = ctx.flash.dirty()
+
 
 class Flashes:
 	def __init__(self, flashes: dict[str, Any] | None = None):
@@ -48,7 +50,8 @@ class Flashes:
 		return name in self.flashes
 
 	def __repr__(self) -> str:
-		return f"Flash({repr(self.flashes)})"
+		return f"Flash({self.flashes!r})"
+
 
 class Flash:
 	def __init__(self, name: str, val: Any):

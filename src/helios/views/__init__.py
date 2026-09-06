@@ -1,11 +1,13 @@
-from jinja2 import DictLoader, Environment, select_autoescape
-from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
+from jinja2 import DictLoader, Environment, select_autoescape
+
 from helios.app import Component, Context
 from helios.http import Request
+
 from . import helpers
+
 
 class Component(Component):
 	def __init__(self, dir: Path):
@@ -18,14 +20,12 @@ class Component(Component):
 	def before(self, req: Request, ctx: Context):
 		ctx.views = self.engine
 
+
 class Views:
 	def __init__(self, tmpls: dict[str, str] | None = None):
 		if tmpls is None:
 			tmpls = {}
-		self.jinja = Environment(
-			loader = DictLoader(tmpls),
-			autoescape = select_autoescape
-		)
+		self.jinja = Environment(loader=DictLoader(tmpls), autoescape=select_autoescape)
 		self.jinja.filters["date"] = helpers.date
 		self.jinja.filters["url"] = helpers.url
 		self.jinja.filters["elapsed"] = helpers.elapsed
@@ -36,9 +36,10 @@ class Views:
 		tmpl = self.jinja.get_template(name)
 		return tmpl.render(**assigns)
 
+
 def load(views_dir: Path) -> Views:
 	tmpls = {}
-	for (dir, _, files) in views_dir.walk():
+	for dir, _, files in views_dir.walk():
 		if dir.name.startswith("."):
 			continue
 		parts = dir.relative_to(views_dir).parts
