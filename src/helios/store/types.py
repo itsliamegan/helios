@@ -35,6 +35,17 @@ class Bool(Type[bool]):
 			return bool(val)
 
 
+class Int(Type[int]):
+	def encode(self, val: int) -> Any:
+		return val
+
+	def decode(self, val: Any) -> int:
+		if isinstance(val, int):
+			return val
+		else:
+			return int(val)
+
+
 class List(Type[list[Any]]):
 	def __init__(self, item: Type):
 		self.item = item

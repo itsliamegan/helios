@@ -228,6 +228,20 @@ def test_encodes_and_decodes_attrs_with_simple_types():
 	assert found.title == created.title
 
 
+def test_encodes_and_decodes_integer_attrs():
+	class Post(Model):
+		attrs = [Attribute("points", types.Int())]
+
+	store = Store()
+	created = store.create(Post, points=3)
+
+	encoded = encode(store)
+	decoded = decode(encoded, Schema([Post]))
+	found = decoded.find_one(Post, created.id)
+
+	assert found.points == created.points
+
+
 def test_encodes_and_decodes_attrs_with_complex_types():
 	class Post(Model):
 		attrs = [Attribute("author_id", types.UUID())]
