@@ -3,14 +3,7 @@ from uuid import UUID
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
 from helios.form import parser
-
-
-def assert_parse_error(value_parser, value, message):
-	with assert_raises(parser.ParseError) as raised:
-		value_parser.parse(value)
-
-	assert_eq(str(raised.exception), message)
-
+from helios.form.parser import ParseError
 
 def test_parses_strings_without_coercion():
 	value_parser = parser.Str()
@@ -65,3 +58,10 @@ def test_list_preserves_item_parse_error():
 	value_parser = parser.List(parser.UUID())
 
 	assert_parse_error(value_parser, ["not-a-uuid"], "must be a valid UUID")
+
+
+def assert_parse_error(value_parser, value, message):
+	with assert_raises(ParseError) as raised:
+		value_parser.parse(value)
+
+	assert_eq(str(raised.exception), message)

@@ -2,11 +2,11 @@ from typing import Any
 
 from helios.http import Input
 
-from . import parser
+from .parser import ParseError, Parser
 
 
 class Field:
-	def __init__(self, name: str, parser: parser.Parser[Any]):
+	def __init__(self, name: str, parser: Parser[Any]):
 		self.name = name
 		self.parser = parser
 
@@ -18,7 +18,7 @@ class Field:
 
 		try:
 			return self.parser.parse(raw), []
-		except parser.ParseError as error:
+		except ParseError as error:
 			return None, [str(error)]
 
 

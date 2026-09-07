@@ -3,6 +3,7 @@ from uuid import UUID
 from luna.test.assertion import assert_eq
 
 from helios.form import Field, Form, parser
+from helios.form.parser import ParseError
 from helios.http import Input
 
 
@@ -49,7 +50,7 @@ def test_custom_parser_can_handle_missing_input():
 			if value is None:
 				return "default"
 			if isinstance(value, list):
-				raise parser.ParseError("must be a single value")
+				raise ParseError("must be a single value")
 			return value
 
 	form = Form([Field("value", DefaultParser())])
