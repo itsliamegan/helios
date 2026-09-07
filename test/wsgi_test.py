@@ -1,3 +1,4 @@
+from luna.test.assertion import assert_eq, assert_that
 from werkzeug.test import EnvironBuilder
 
 from helios.http import Body, Cookies, Headers, Method, Response, Status
@@ -9,7 +10,7 @@ def test_adapts_method():
 
 	req = adapt_env(env)
 
-	assert req.method is Method.GET
+	assert_that(req.method is Method.GET)
 
 
 def test_adapts_url():
@@ -17,8 +18,8 @@ def test_adapts_url():
 
 	req = adapt_env(env)
 
-	assert req.url.path == "/search"
-	assert req.url.query == {"q": "Intro"}
+	assert_eq(req.url.path, "/search")
+	assert_eq(req.url.query, {"q": "Intro"})
 
 
 def test_adapts_headers():
@@ -28,8 +29,8 @@ def test_adapts_headers():
 
 	req = adapt_env(env)
 
-	assert str(req.headers["Accept"]) == "text/html"
-	assert str(req.headers["User-Agent"]) == "Mozilla/5.0"
+	assert_eq(str(req.headers["Accept"]), "text/html")
+	assert_eq(str(req.headers["User-Agent"]), "Mozilla/5.0")
 
 
 def test_adapts_content_info():
@@ -37,8 +38,8 @@ def test_adapts_content_info():
 
 	req = adapt_env(env)
 
-	assert str(req.headers["Content-Type"]) == "text/html"
-	assert str(req.headers["Content-Length"]) == "100"
+	assert_eq(str(req.headers["Content-Type"]), "text/html")
+	assert_eq(str(req.headers["Content-Length"]), "100")
 
 
 def test_adapts_form_input():
@@ -46,7 +47,7 @@ def test_adapts_form_input():
 
 	req = adapt_env(env)
 
-	assert req.input["content"] == "An interesting article."
+	assert_eq(req.input["content"], "An interesting article.")
 
 
 def test_adapts_res():
@@ -58,15 +59,21 @@ def test_adapts_res():
 	)
 
 	def start_res(status, pairs):
-		assert status == "200 OK"
-		assert pairs == [
-			("Content-Type", "text/html"),
-			("Set-Cookie", "session_id=51d0d53a-11dd-47a5-b438-5eb1b84e1432; Path=/"),
-		]
+		assert_eq(status, "200 OK")
+		assert_eq(
+			pairs,
+			[
+				("Content-Type", "text/html"),
+				(
+					"Set-Cookie",
+					"session_id=51d0d53a-11dd-47a5-b438-5eb1b84e1432; Path=/",
+				),
+			],
+		)
 
 	body = adapt_res(res, start_res)
 
-	assert list(body) == [b"<h1>Index</h1>"]
+	assert_eq(list(body), [b"<h1>Index</h1>"])
 
 
 def test_adapts_multiple_cookies():
@@ -75,9 +82,15 @@ def test_adapts_multiple_cookies():
 	res.cookies["csrf_token"] = "fd3e6aff6360af4d6ba905d4299cff81"
 
 	def start_res(status, pairs):
-		assert pairs == [
-			("Set-Cookie", "session_id=51d0d53a-11dd-47a5-b438-5eb1b84e1432; Path=/"),
-			("Set-Cookie", "csrf_token=fd3e6aff6360af4d6ba905d4299cff81; Path=/"),
-		]
+		assert_eq(
+			pairs,
+			[
+				(
+					"Set-Cookie",
+					"session_id=51d0d53a-11dd-47a5-b438-5eb1b84e1432; Path=/",
+				),
+				("Set-Cookie", "csrf_token=fd3e6aff6360af4d6ba905d4299cff81; Path=/"),
+			],
+		)
 
 	adapt_res(res, start_res)

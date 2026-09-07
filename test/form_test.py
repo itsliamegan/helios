@@ -1,5 +1,7 @@
 from uuid import UUID
 
+from luna.test.assertion import assert_eq
+
 from helios.form import Field, Form, parser
 from helios.http import Input
 
@@ -9,8 +11,8 @@ def test_validates_required_when_provided():
 
 	input, errs = form.validate(Input({"title": "Intro"}))
 
-	assert input == {"title": "Intro"}
-	assert errs == {}
+	assert_eq(input, {"title": "Intro"})
+	assert_eq(errs, {})
 
 
 def test_validates_required_when_missing():
@@ -18,8 +20,8 @@ def test_validates_required_when_missing():
 
 	input, errs = form.validate(Input())
 
-	assert input == {}
-	assert errs == {"title": ["must be provided"]}
+	assert_eq(input, {})
+	assert_eq(errs, {"title": ["must be provided"]})
 
 
 def test_validates_required_when_empty():
@@ -27,8 +29,8 @@ def test_validates_required_when_empty():
 
 	input, errs = form.validate(Input({"title": ""}))
 
-	assert input == {}
-	assert errs == {"title": ["must not be empty"]}
+	assert_eq(input, {})
+	assert_eq(errs, {"title": ["must not be empty"]})
 
 
 def test_parses_uuid():
@@ -37,8 +39,8 @@ def test_parses_uuid():
 
 	data, errors = form.validate(Input({"user_id": raw}))
 
-	assert data == {"user_id": UUID(raw)}
-	assert errors == {}
+	assert_eq(data, {"user_id": UUID(raw)})
+	assert_eq(errors, {})
 
 
 def test_custom_parser_can_handle_missing_input():
@@ -54,8 +56,8 @@ def test_custom_parser_can_handle_missing_input():
 
 	data, errors = form.validate(Input())
 
-	assert data == {"value": "default"}
-	assert errors == {}
+	assert_eq(data, {"value": "default"})
+	assert_eq(errors, {})
 
 
 def test_records_parse_errors():
@@ -63,8 +65,8 @@ def test_records_parse_errors():
 
 	data, errors = form.validate(Input({"user_id": "not-a-uuid"}))
 
-	assert data == {}
-	assert errors == {"user_id": ["must be a valid UUID"]}
+	assert_eq(data, {})
+	assert_eq(errors, {"user_id": ["must be a valid UUID"]})
 
 
 def test_parses_missing_optional_boolean_and_list_fields():
@@ -78,8 +80,8 @@ def test_parses_missing_optional_boolean_and_list_fields():
 
 	data, errors = form.validate(Input())
 
-	assert data == {"parent_id": None, "archived": False, "user_id": []}
-	assert errors == {}
+	assert_eq(data, {"parent_id": None, "archived": False, "user_id": []})
+	assert_eq(errors, {})
 
 
 def test_parses_list_uuid_field_from_browser_input():
@@ -90,10 +92,10 @@ def test_parses_list_uuid_field_from_browser_input():
 	scalar, scalar_errors = form.validate(Input({"user_id": first}))
 	repeated, repeated_errors = form.validate(Input({"user_id": [first, second]}))
 
-	assert scalar == {"user_id": [UUID(first)]}
-	assert scalar_errors == {}
-	assert repeated == {"user_id": [UUID(first), UUID(second)]}
-	assert repeated_errors == {}
+	assert_eq(scalar, {"user_id": [UUID(first)]})
+	assert_eq(scalar_errors, {})
+	assert_eq(repeated, {"user_id": [UUID(first), UUID(second)]})
+	assert_eq(repeated_errors, {})
 
 
 def test_parses_checkbox_presence():
@@ -102,7 +104,7 @@ def test_parses_checkbox_presence():
 	checked, checked_errors = form.validate(Input({"archived": "on"}))
 	unexpected, unexpected_errors = form.validate(Input({"archived": "yes"}))
 
-	assert checked == {"archived": True}
-	assert checked_errors == {}
-	assert unexpected == {}
-	assert unexpected_errors == {"archived": ['must be "on" or omitted']}
+	assert_eq(checked, {"archived": True})
+	assert_eq(checked_errors, {})
+	assert_eq(unexpected, {})
+	assert_eq(unexpected_errors, {"archived": ['must be "on" or omitted']})

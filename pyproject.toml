@@ -8,9 +8,6 @@ dependencies = [
 	"werkzeug==3.1.*",
 ]
 
-[project.scripts]
-test = "helios.test:main"
-
 [build-system]
 requires = ["uv_build"]
 build-backend = "uv_build"
@@ -34,3 +31,11 @@ case-sensitive = true
 known-first-party = ["helios"]
 force-sort-within-sections = true
 order-by-type = false
+
+[tool.uv.sources]
+luna = { path = "../luna", editable = true }
+
+[dependency-groups]
+dev = [
+	"luna",
+]

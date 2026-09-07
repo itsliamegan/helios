@@ -1,5 +1,7 @@
 from uuid import uuid4
 
+from luna.test.assertion import assert_eq
+
 from helios.app import Application, Component, Thread
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
 from helios.routing import NotFoundError, Pattern, Route, Router
@@ -16,7 +18,7 @@ def test_boots_components():
 
 	app.boot()
 
-	assert component.booted == True
+	assert_eq(component.booted, True)
 
 
 def test_ensures_content_length():
@@ -28,7 +30,7 @@ def test_ensures_content_length():
 
 	res = app.handle(req)
 
-	assert str(res.headers["Content-Length"]) == "13"
+	assert_eq(str(res.headers["Content-Length"]), "13")
 
 
 def test_adapts_artificial_method():
@@ -40,7 +42,7 @@ def test_adapts_artificial_method():
 
 	res = app.handle(req)
 
-	assert res.status == Status.NO_CONTENT
+	assert_eq(res.status, Status.NO_CONTENT)
 
 
 def test_captures_errors():
@@ -52,7 +54,7 @@ def test_captures_errors():
 
 	res = app.handle(req)
 
-	assert res.status == Status.INTERNAL_SERVER_ERROR
+	assert_eq(res.status, Status.INTERNAL_SERVER_ERROR)
 
 
 def test_handles_route_not_found():
@@ -61,7 +63,7 @@ def test_handles_route_not_found():
 
 	res = app.handle(req)
 
-	assert res.status == Status.NOT_FOUND
+	assert_eq(res.status, Status.NOT_FOUND)
 
 
 def test_handles_model_not_found():
@@ -76,7 +78,7 @@ def test_handles_model_not_found():
 
 	res = app.handle(req)
 
-	assert res.status == Status.NOT_FOUND
+	assert_eq(res.status, Status.NOT_FOUND)
 
 
 def test_runs_component_after_hooks_for_http_errors():
@@ -107,9 +109,9 @@ def test_runs_component_after_hooks_for_http_errors():
 		Request(Method.GET, URL("/posts/missing"), Headers(), Input())
 	)
 
-	assert component.statuses == [Status.NOT_FOUND, Status.NOT_FOUND]
-	assert str(unmatched_res.headers["X-After"]) == "ran"
-	assert str(missing_model_res.headers["X-After"]) == "ran"
+	assert_eq(component.statuses, [Status.NOT_FOUND, Status.NOT_FOUND])
+	assert_eq(str(unmatched_res.headers["X-After"]), "ran")
+	assert_eq(str(missing_model_res.headers["X-After"]), "ran")
 
 
 def test_builds_a_middleware_thread_around_a_last_callable():
@@ -124,8 +126,8 @@ def test_builds_a_middleware_thread_around_a_last_callable():
 	thread = Thread.build([middleware], last)
 	res = thread(Request(Method.GET, URL("/anything"), Headers(), Input()), None)
 
-	assert str(res.body) == "Dispatched"
-	assert str(res.headers["X-Middleware"]) == "ran"
+	assert_eq(str(res.body), "Dispatched")
+	assert_eq(str(res.headers["X-Middleware"]), "ran")
 
 
 def test_runs_component_after_hooks_for_guard_responses():
@@ -145,8 +147,8 @@ def test_runs_component_after_hooks_for_guard_responses():
 	)
 	res = app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
 
-	assert res.status == Status.FORBIDDEN
-	assert str(res.headers["X-After"]) == "ran"
+	assert_eq(res.status, Status.FORBIDDEN)
+	assert_eq(str(res.headers["X-After"]), "ran")
 
 
 def test_handles_guard_http_errors_inside_component_chain():
@@ -166,8 +168,8 @@ def test_handles_guard_http_errors_inside_component_chain():
 	)
 	res = app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
 
-	assert res.status == Status.NOT_FOUND
-	assert str(res.headers["X-After"]) == "ran"
+	assert_eq(res.status, Status.NOT_FOUND)
+	assert_eq(str(res.headers["X-After"]), "ran")
 
 
 def test_captures_unexpected_guard_errors():
@@ -182,4 +184,4 @@ def test_captures_unexpected_guard_errors():
 	)
 	res = app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
 
-	assert res.status == Status.INTERNAL_SERVER_ERROR
+	assert_eq(res.status, Status.INTERNAL_SERVER_ERROR)

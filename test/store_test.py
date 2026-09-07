@@ -1,5 +1,7 @@
 from uuid import uuid4
 
+from luna.test.assertion import assert_eq, assert_raises, assert_that
+
 from helios.store import (
 	Attribute,
 	Model,
@@ -21,8 +23,8 @@ def test_creates_model_with_builtin_attrs():
 
 	created = store.create(Post)
 
-	assert created.id is not None
-	assert created.created_at is not None
+	assert_that(created.id is not None)
+	assert_that(created.created_at is not None)
 
 
 def test_creates_model_with_attr():
@@ -33,7 +35,7 @@ def test_creates_model_with_attr():
 
 	created = store.create(Post, title="Intro")
 
-	assert created.title == "Intro"
+	assert_eq(created.title, "Intro")
 
 
 def test_creates_model_with_compound_attr():
@@ -44,7 +46,7 @@ def test_creates_model_with_compound_attr():
 
 	created = store.create(Post, tags=["news"])
 
-	assert created.tags == ["news"]
+	assert_eq(created.tags, ["news"])
 
 
 def test_creates_model_with_default_attr():
@@ -55,7 +57,7 @@ def test_creates_model_with_default_attr():
 
 	created = store.create(Post)
 
-	assert created.unread == True
+	assert_eq(created.unread, True)
 
 
 def test_doesnt_create_model_with_missing_attr():
@@ -64,11 +66,8 @@ def test_doesnt_create_model_with_missing_attr():
 
 	store = Store()
 
-	try:
+	with assert_raises(ModelError):
 		store.create(Post)
-		assert False, "should throw ModelError"
-	except ModelError:
-		assert True
 
 
 def test_doesnt_create_model_with_extra_attr():
@@ -77,11 +76,8 @@ def test_doesnt_create_model_with_extra_attr():
 
 	store = Store()
 
-	try:
+	with assert_raises(ModelError):
 		store.create(Post, title="Intro")
-		assert False, "should throw ModelError"
-	except ModelError:
-		assert True
 
 
 def test_doesnt_create_model_with_null_attr():
@@ -90,11 +86,8 @@ def test_doesnt_create_model_with_null_attr():
 
 	store = Store()
 
-	try:
+	with assert_raises(ModelError):
 		store.create(Post, title=None)
-		assert False, "should throw ModelError"
-	except ModelError:
-		assert True
 
 
 def test_finds_all_models():
@@ -107,7 +100,7 @@ def test_finds_all_models():
 
 	found = store.find_all(Post)
 
-	assert len(found) == 2
+	assert_eq(len(found), 2)
 
 
 def test_finds_one_model():
@@ -119,7 +112,7 @@ def test_finds_one_model():
 
 	found = store.find_one(Post, created.id)
 
-	assert found.id == created.id
+	assert_eq(found.id, created.id)
 
 
 def test_find_one_raises_when_model_doesnt_exist():
@@ -129,12 +122,11 @@ def test_find_one_raises_when_model_doesnt_exist():
 	store = Store()
 	id = uuid4()
 
-	try:
+	with assert_raises(NotFoundError) as raised:
 		store.find_one(Post, id)
-		assert False, "should throw NotFoundError"
-	except NotFoundError as err:
-		assert err.model_type is Post
-		assert err.id == id
+
+	assert_that(raised.exception.model_type is Post)
+	assert_eq(raised.exception.id, id)
 
 
 def test_find_one_raises_when_model_has_wrong_type():
@@ -147,11 +139,8 @@ def test_find_one_raises_when_model_has_wrong_type():
 	store = Store()
 	user = store.create(User)
 
-	try:
+	with assert_raises(NotFoundError):
 		store.find_one(Post, user.id)
-		assert False, "should throw NotFoundError"
-	except NotFoundError:
-		assert True
 
 
 def test_finds_model_by_attrs():
@@ -165,7 +154,7 @@ def test_finds_model_by_attrs():
 
 	found = store.find_by(User, admin=False)
 
-	assert len(found) == 2
+	assert_eq(len(found), 2)
 
 
 def test_finds_model_by_conjunction():
@@ -182,7 +171,7 @@ def test_finds_model_by_conjunction():
 
 	found = store.find_by(User, name="Clyde", admin=True)
 
-	assert len(found) == 1
+	assert_eq(len(found), 1)
 
 
 def test_deletes_model():
@@ -195,7 +184,7 @@ def test_deletes_model():
 	store.delete(Post, created.id)
 	found = store.find_all(Post)
 
-	assert len(found) == 0
+	assert_eq(len(found), 0)
 
 
 def test_encodes_and_decodes_store():
@@ -209,7 +198,7 @@ def test_encodes_and_decodes_store():
 	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
-	assert found.id == created.id
+	assert_eq(found.id, created.id)
 
 
 def test_encodes_and_decodes_attrs_with_simple_types():
@@ -223,9 +212,9 @@ def test_encodes_and_decodes_attrs_with_simple_types():
 	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
-	assert found.id == created.id
-	assert found.created_at == created.created_at
-	assert found.title == created.title
+	assert_eq(found.id, created.id)
+	assert_eq(found.created_at, created.created_at)
+	assert_eq(found.title, created.title)
 
 
 def test_encodes_and_decodes_integer_attrs():
@@ -239,7 +228,7 @@ def test_encodes_and_decodes_integer_attrs():
 	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
-	assert found.points == created.points
+	assert_eq(found.points, created.points)
 
 
 def test_encodes_and_decodes_attrs_with_complex_types():
@@ -253,7 +242,7 @@ def test_encodes_and_decodes_attrs_with_complex_types():
 	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
-	assert found.author_id == created.author_id
+	assert_eq(found.author_id, created.author_id)
 
 
 def test_encodes_and_decodes_attrs_with_compound_types():
@@ -267,7 +256,7 @@ def test_encodes_and_decodes_attrs_with_compound_types():
 	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
-	assert found.backlink_ids == created.backlink_ids
+	assert_eq(found.backlink_ids, created.backlink_ids)
 
 
 def test_encodes_and_decodes_nullable_attrs_when_present():
@@ -281,7 +270,7 @@ def test_encodes_and_decodes_nullable_attrs_when_present():
 	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
-	assert found.author_id == created.author_id
+	assert_eq(found.author_id, created.author_id)
 
 
 def test_encodes_and_decodes_nullable_attrs_when_absent():
@@ -295,4 +284,4 @@ def test_encodes_and_decodes_nullable_attrs_when_absent():
 	decoded = decode(encoded, Schema([Post]))
 	found = decoded.find_one(Post, created.id)
 
-	assert found.author_id == None
+	assert_eq(found.author_id, None)

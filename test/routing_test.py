@@ -1,5 +1,7 @@
 from uuid import UUID
 
+from luna.test.assertion import assert_eq, assert_that
+
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
 from helios.routing import Group, Pattern, Route, Router
 
@@ -11,7 +13,7 @@ def test_dispatches_directly():
 	router = Router([Route(Method.GET, Pattern("/"), handler)])
 	res = router(Request(Method.GET, URL("/"), Headers(), Input()), None)
 
-	assert res.status == Status.OK
+	assert_eq(res.status, Status.OK)
 
 
 def test_routes_to_root():
@@ -21,7 +23,7 @@ def test_routes_to_root():
 
 	match = router.match(Request(Method.GET, URL("/"), Headers(), Input()))
 
-	assert match == (route, {})
+	assert_eq(match, (route, {}))
 
 
 def test_routes_by_path():
@@ -36,8 +38,8 @@ def test_routes_by_path():
 		Request(Method.GET, URL("/comments/"), Headers(), Input())
 	)
 
-	assert articles_match == (articles, {})
-	assert comments_match == (comments, {})
+	assert_eq(articles_match, (articles, {}))
+	assert_eq(comments_match, (comments, {}))
 
 
 def test_routes_by_method():
@@ -52,8 +54,8 @@ def test_routes_by_method():
 		Request(Method.POST, URL("/articles/"), Headers(), Input())
 	)
 
-	assert index_match == (index, {})
-	assert store_match == (store, {})
+	assert_eq(index_match, (index, {}))
+	assert_eq(store_match, (store, {}))
 
 
 def test_routes_with_params():
@@ -64,7 +66,7 @@ def test_routes_with_params():
 		Request(Method.GET, URL("/articles/intro"), Headers(), Input())
 	)
 
-	assert match == (route, {"slug": "intro"})
+	assert_eq(match, (route, {"slug": "intro"}))
 
 
 def test_routes_with_explicit_str_converter():
@@ -75,7 +77,7 @@ def test_routes_with_explicit_str_converter():
 		Request(Method.GET, URL("/articles/intro"), Headers(), Input())
 	)
 
-	assert match == (route, {"slug": "intro"})
+	assert_eq(match, (route, {"slug": "intro"}))
 
 
 def test_routes_with_uuid_converter():
@@ -87,7 +89,7 @@ def test_routes_with_uuid_converter():
 		Request(Method.GET, URL(f"/articles/{id}"), Headers(), Input())
 	)
 
-	assert match == (route, {"id": id})
+	assert_eq(match, (route, {"id": id}))
 
 
 def test_passes_converted_params_to_handler_by_name():
@@ -102,7 +104,7 @@ def test_passes_converted_params_to_handler_by_name():
 
 	router(Request(Method.GET, URL(f"/articles/{id}/intro"), Headers(), Input()), None)
 
-	assert called_with == [("intro", id)]
+	assert_eq(called_with, [("intro", id)])
 
 
 def test_uuid_converter_doesnt_match_invalid_uuid():
@@ -110,7 +112,7 @@ def test_uuid_converter_doesnt_match_invalid_uuid():
 
 	match = pattern.match(URL("/boards/not-a-uuid"))
 
-	assert match is None
+	assert_that(match is None)
 
 
 def test_routes_instead_of_param():
@@ -120,7 +122,7 @@ def test_routes_instead_of_param():
 
 	match = router.match(Request(Method.GET, URL("/articles/new"), Headers(), Input()))
 
-	assert match == (new, {})
+	assert_eq(match, (new, {}))
 
 
 def test_routes_with_param_to_subroute():
@@ -131,7 +133,7 @@ def test_routes_with_param_to_subroute():
 		Request(Method.POST, URL("/articles/intro/read"), Headers(), Input())
 	)
 
-	assert match == (route, {"slug": "intro"})
+	assert_eq(match, (route, {"slug": "intro"}))
 
 
 def test_runs_route_guards_in_order_before_handler():
@@ -150,7 +152,7 @@ def test_runs_route_guards_in_order_before_handler():
 	router = Router([Route(Method.GET, Pattern("/"), handler, guards=[first, second])])
 	router(Request(Method.GET, URL("/"), Headers(), Input()), None)
 
-	assert calls == ["first", "second", "handler"]
+	assert_eq(calls, ["first", "second", "handler"])
 
 
 def test_guard_response_stops_dispatch():
@@ -170,8 +172,8 @@ def test_guard_response_stops_dispatch():
 	router = Router([Route(Method.GET, Pattern("/"), handler, guards=[stop, later])])
 	res = router(Request(Method.GET, URL("/"), Headers(), Input()), None)
 
-	assert res.status == Status.FORBIDDEN
-	assert calls == ["stop"]
+	assert_eq(res.status, Status.FORBIDDEN)
+	assert_eq(calls, ["stop"])
 
 
 def test_passes_converted_params_to_guards_by_name():
@@ -189,7 +191,7 @@ def test_passes_converted_params_to_guards_by_name():
 	)
 	router(Request(Method.GET, URL(f"/articles/{id}"), Headers(), Input()), None)
 
-	assert called_with == [id]
+	assert_eq(called_with, [id])
 
 
 def test_doesnt_run_guards_for_unmatched_routes():
@@ -201,8 +203,8 @@ def test_doesnt_run_guards_for_unmatched_routes():
 	router = Router([Route(Method.GET, Pattern("/articles"), object(), guards=[guard])])
 	match = router.match(Request(Method.GET, URL("/missing"), Headers(), Input()))
 
-	assert match is None
-	assert calls == []
+	assert_that(match is None)
+	assert_eq(calls, [])
 
 
 def test_group_without_prefix_or_guards_preserves_route_configuration():
@@ -211,11 +213,11 @@ def test_group_without_prefix_or_guards_preserves_route_configuration():
 
 	effective = Router([Group(routes=[route])]).routes[0]
 
-	assert effective is route
-	assert effective.method is Method.GET
-	assert effective.pattern.raw == "/articles"
-	assert effective.handler is handler
-	assert effective.guards == []
+	assert_that(effective is route)
+	assert_that(effective.method is Method.GET)
+	assert_eq(effective.pattern.raw, "/articles")
+	assert_that(effective.handler is handler)
+	assert_eq(effective.guards, [])
 
 
 def test_applies_group_prefix_to_direct_routes():
@@ -231,10 +233,13 @@ def test_applies_group_prefix_to_direct_routes():
 		]
 	)
 
-	assert [route.pattern.raw for route in router.routes] == [
-		"/articles/",
-		"/articles/new",
-	]
+	assert_eq(
+		[route.pattern.raw for route in router.routes],
+		[
+			"/articles/",
+			"/articles/new",
+		],
+	)
 
 
 def test_composes_nested_group_prefixes_and_trailing_slashes():
@@ -255,10 +260,13 @@ def test_composes_nested_group_prefixes_and_trailing_slashes():
 		]
 	)
 
-	assert [route.pattern.raw for route in router.routes] == [
-		"/articles/comments/",
-		"/articles/comments/{id:uuid}/",
-	]
+	assert_eq(
+		[route.pattern.raw for route in router.routes],
+		[
+			"/articles/comments/",
+			"/articles/comments/{id:uuid}/",
+		],
+	)
 
 
 def test_converts_params_in_grouped_patterns():
@@ -281,7 +289,7 @@ def test_converts_params_in_grouped_patterns():
 	)
 	router(Request(Method.GET, URL(f"/articles/{id}"), Headers(), Input()), None)
 
-	assert called_with == [id]
+	assert_eq(called_with, [id])
 
 
 def test_inherits_group_guards_into_every_descendant():
@@ -300,8 +308,8 @@ def test_inherits_group_guards_into_every_descendant():
 		]
 	)
 
-	assert [route.guards for route in router.routes] == [[guard], [guard]]
-	assert router.routes[0].guards is not router.routes[1].guards
+	assert_eq([route.guards for route in router.routes], [[guard], [guard]])
+	assert_that(router.routes[0].guards is not router.routes[1].guards)
 
 
 def test_runs_nested_and_route_guards_outermost_first():
@@ -339,7 +347,7 @@ def test_runs_nested_and_route_guards_outermost_first():
 	)
 	router(Request(Method.GET, URL("/"), Headers(), Input()), None)
 
-	assert calls == ["outer", "inner", "route", "handler"]
+	assert_eq(calls, ["outer", "inner", "route", "handler"])
 
 
 def test_inherited_guard_response_stops_dispatch():
@@ -368,8 +376,8 @@ def test_inherited_guard_response_stops_dispatch():
 	)
 	res = router(Request(Method.GET, URL("/"), Headers(), Input()), None)
 
-	assert res.status == Status.FORBIDDEN
-	assert calls == ["outer"]
+	assert_eq(res.status, Status.FORBIDDEN)
+	assert_eq(calls, ["outer"])
 
 
 def test_group_flattening_preserves_declaration_and_matching_order():
@@ -388,9 +396,9 @@ def test_group_flattening_preserves_declaration_and_matching_order():
 		]
 	)
 
-	assert [route.handler for route in router.routes] == [first, second, third]
+	assert_eq([route.handler for route in router.routes], [first, second, third])
 	match = router.match(Request(Method.GET, URL("/new"), Headers(), Input()))
-	assert match[0].handler is first
+	assert_that(match[0].handler is first)
 
 
 def test_reusing_group_configuration_doesnt_mutate_sources():
@@ -409,15 +417,18 @@ def test_reusing_group_configuration_doesnt_mutate_sources():
 		]
 	)
 
-	assert route.pattern.raw == "/{id:uuid}/"
-	assert route.guards == [route_guard]
-	assert shared.prefix == "/items"
-	assert shared.guards == [group_guard]
-	assert shared.routes == [route]
-	assert [effective.pattern.raw for effective in router.routes] == [
-		"/one/items/{id:uuid}/",
-		"/two/items/{id:uuid}/",
-	]
-	assert router.routes[0].guards == [group_guard, route_guard]
-	assert router.routes[1].guards == [group_guard, route_guard]
-	assert router.routes[0].guards is not router.routes[1].guards
+	assert_eq(route.pattern.raw, "/{id:uuid}/")
+	assert_eq(route.guards, [route_guard])
+	assert_eq(shared.prefix, "/items")
+	assert_eq(shared.guards, [group_guard])
+	assert_eq(shared.routes, [route])
+	assert_eq(
+		[effective.pattern.raw for effective in router.routes],
+		[
+			"/one/items/{id:uuid}/",
+			"/two/items/{id:uuid}/",
+		],
+	)
+	assert_eq(router.routes[0].guards, [group_guard, route_guard])
+	assert_eq(router.routes[1].guards, [group_guard, route_guard])
+	assert_that(router.routes[0].guards is not router.routes[1].guards)
