@@ -5,6 +5,7 @@ from luna.test.assertion import assert_eq, assert_raises, assert_that
 from helios.form import parser
 from helios.form.parser import ParseError
 
+
 def test_parses_strings_without_coercion():
 	value_parser = parser.Str()
 
