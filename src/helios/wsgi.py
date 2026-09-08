@@ -1,9 +1,11 @@
 from collections.abc import Iterable
+from typing import Any
 from urllib.parse import parse_qs as parse_query
 from urllib.parse import urlparse as parse_url
 from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
 
 from werkzeug.http import parse_options_header
+from werkzeug.test import Client, Cookie, TestResponse
 from werkzeug.wsgi import get_current_url, get_input_stream
 
 from helios.app import Application
@@ -95,3 +97,79 @@ def adapt_input(env: WSGIEnvironment) -> Input:
 			return Input(items)
 		else:
 			return Input()
+
+
+class TestClient:
+	def __init__(self, app: Application):
+		self.client = Client(app, use_cookies=True)
+
+	def request(
+		self,
+		method: Method,
+		path: str,
+		query: Any = None,
+		form: Any = None,
+		headers: Any = None,
+		redirect: bool = False,
+		**kwargs: Any,
+	) -> TestResponse:
+		return self.client.open(
+			path,
+			method=method.value,
+			query_string=query,
+			data=form,
+			headers=headers,
+			follow_redirects=redirect,
+			**kwargs,
+		)
+
+	def get(self, path: str, **kwargs: Any) -> TestResponse:
+		return self.request(Method.GET, path, **kwargs)
+
+	def post(self, path: str, **kwargs: Any) -> TestResponse:
+		return self.request(Method.POST, path, **kwargs)
+
+	def put(self, path: str, **kwargs: Any) -> TestResponse:
+		return self.request(Method.PUT, path, **kwargs)
+
+	def patch(self, path: str, **kwargs: Any) -> TestResponse:
+		return self.request(Method.PATCH, path, **kwargs)
+
+	def delete(self, path: str, **kwargs: Any) -> TestResponse:
+		return self.request(Method.DELETE, path, **kwargs)
+
+	def get_cookie(
+		self,
+		key: str,
+		domain: str = "localhost",
+		path: str = "/",
+	) -> Cookie | None:
+		return self.client.get_cookie(key, domain, path)
+
+	def set_cookie(
+		self,
+		key: str,
+		value: str = "",
+		*,
+		domain: str = "localhost",
+		origin_only: bool = True,
+		path: str = "/",
+		**kwargs: Any,
+	) -> None:
+		self.client.set_cookie(
+			key,
+			value,
+			domain=domain,
+			origin_only=origin_only,
+			path=path,
+			**kwargs,
+		)
+
+	def delete_cookie(
+		self,
+		key: str,
+		*,
+		domain: str = "localhost",
+		path: str = "/",
+	) -> None:
+		self.client.delete_cookie(key, domain=domain, path=path)
