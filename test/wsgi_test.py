@@ -1,8 +1,9 @@
 from luna.test.assertion import assert_eq, assert_that
 from werkzeug.test import EnvironBuilder
 
-from helios.http import Body, Cookies, Headers, Method, Response, Status
-from helios.wsgi import adapt_env, adapt_res
+from helios.http import Body, Cookies, Headers, Method, Response, Status, URL
+from helios.routing import Pattern, Route, Router
+from helios.wsgi import Application, TestClient, adapt_env, adapt_res
 
 
 def test_adapts_method():
@@ -94,3 +95,133 @@ def test_adapts_multiple_cookies():
 		)
 
 	adapt_res(res, start_res)
+
+
+def test_client_routes_get_and_exposes_response():
+	def show(req, ctx):
+		res = Response.html("<h1>Index</h1>")
+		res.headers["X-Result"] = "found"
+		return res
+
+	client = make_client([Route(Method.GET, Pattern("/"), show)])
+
+	res = client.get("/")
+
+	assert_eq(res.status_code, 200)
+	assert_eq(res.headers["Content-Type"], "text/html")
+	assert_eq(res.headers["X-Result"], "found")
+	assert_eq(res.text, "<h1>Index</h1>")
+
+
+def test_client_sends_query_and_headers():
+	def search(req, ctx):
+		return Response.text(f"{req.url.query["q"]}|{req.headers["X-Filter"]}")
+
+	client = make_client([Route(Method.GET, Pattern("/search"), search)])
+
+	res = client.get(
+		"/search",
+		query={"q": "Intro"},
+		headers={"X-Filter": "recent"},
+	)
+
+	assert_eq(res.text, "Intro|recent")
+
+
+def test_client_sends_scalar_and_repeated_form_values():
+	def create(req, ctx):
+		board_ids = req.input["board_id"]
+		return Response.text(f"{req.input["title"]}|{",".join(board_ids)}")
+
+	client = make_client([Route(Method.POST, Pattern("/pins"), create)])
+	form = {
+		"title": "Reading",
+		"board_id": ["first", "second"],
+	}
+
+	res = client.post("/pins", form=form)
+
+	assert_eq(res.text, "Reading|first,second")
+
+
+def test_client_retains_response_cookies():
+	token = "fd3e6aff6360af4d6ba905d4299cff81"
+
+	def remember(req, ctx):
+		res = Response.empty()
+		res.cookies["token"] = token
+		return res
+
+	def recall(req, ctx):
+		return Response.text(req.cookies["token"].val)
+
+	client = make_client(
+		[
+			Route(Method.GET, Pattern("/remember"), remember),
+			Route(Method.GET, Pattern("/recall"), recall),
+		]
+	)
+
+	client.get("/remember")
+	res = client.get("/recall")
+
+	assert_eq(res.text, token)
+	assert_eq(client.get_cookie("token").value, token)
+
+
+def test_client_manages_cookies():
+	client = make_client([])
+	token = "fd3e6aff6360af4d6ba905d4299cff81"
+
+	client.set_cookie("token", token)
+	cookie = client.get_cookie("token")
+
+	assert_eq(cookie.value, token)
+
+	client.delete_cookie("token")
+
+	assert_that(client.get_cookie("token") is None)
+
+
+def test_client_follows_redirects():
+	def index(req, ctx):
+		return Response.html("<h1>Index</h1>")
+
+	def create(req, ctx):
+		return Response.redirect(URL("/"))
+
+	client = make_client(
+		[
+			Route(Method.GET, Pattern("/"), index),
+			Route(Method.POST, Pattern("/"), create),
+		]
+	)
+
+	redirect = client.post("/")
+	followed = client.post("/", follow_redirects=True)
+
+	assert_eq(redirect.status_code, 302)
+	assert_eq(redirect.headers["Location"], "/")
+	assert_eq(redirect.history, ())
+
+	assert_eq(followed.status_code, 200)
+	assert_eq(followed.text, "<h1>Index</h1>")
+	assert_eq(len(followed.history), 1)
+	assert_eq(followed.history[0].status_code, 302)
+
+
+def test_client_submits_method_override():
+	def delete(req, ctx, id):
+		return Response.text(f"{req.method.value}|{"_method" in req.input}")
+
+	client = make_client([Route(Method.DELETE, Pattern("/posts/{id}"), delete)])
+
+	res = client.post("/posts/1234", form={"_method": "DELETE"})
+
+	assert_eq(res.text, "DELETE|False")
+
+
+def make_client(routes):
+	app = Application(Router(routes), [])
+	app.boot()
+	return TestClient(app)
