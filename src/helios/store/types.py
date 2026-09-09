@@ -1,11 +1,23 @@
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import Any, cast
 import uuid
-
-T = TypeVar("T")
 
 
 class Type[T]:
+	@staticmethod
+	def resolve[ValueT](typ: type[ValueT]) -> Type[ValueT]:
+		if typ is str:
+			return cast(Type[ValueT], Str())
+		if typ is bool:
+			return cast(Type[ValueT], Bool())
+		if typ is int:
+			return cast(Type[ValueT], Int())
+		if typ is uuid.UUID:
+			return cast(Type[ValueT], UUID())
+		if typ is datetime:
+			return cast(Type[ValueT], Date())
+		raise TypeError(f"unsupported attribute type: {typ!r}")
+
 	def encode(self, val: T) -> Any:
 		raise NotImplementedError
 
@@ -44,23 +56,6 @@ class Int(Type[int]):
 			return val
 		else:
 			return int(val)
-
-
-class List(Type[list[Any]]):
-	def __init__(self, item: Type):
-		self.item = item
-
-	def encode(self, val: list[Any]) -> Any:
-		encoded = []
-		for item in val:
-			encoded.append(self.item.encode(item))
-		return encoded
-
-	def decode(self, val: Any) -> list[Any]:
-		decoded = []
-		for item in val:
-			decoded.append(self.item.decode(item))
-		return decoded
 
 
 class UUID(Type[uuid.UUID]):

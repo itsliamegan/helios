@@ -6,11 +6,11 @@ from helios.app import Context
 from helios.auth import Authenticator, Component
 from helios.http import Headers, Input, Method, Request, URL
 from helios.session import Session
-from helios.store import Attribute, Model, Store, types
+from helios.store import Model, Store, attr
 
 
 class User(Model):
-	attrs = [Attribute("name", types.Str())]
+	name = attr(str)
 
 
 def context(store: Store, session: Session) -> Context:

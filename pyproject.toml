@@ -23,7 +23,6 @@ quote-style = "double"
 [tool.ruff.lint]
 ignore = [
 	"BLE001",
-	"RUF012",
 ]
 
 [tool.ruff.lint.isort]

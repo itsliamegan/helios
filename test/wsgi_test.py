@@ -198,7 +198,7 @@ def test_client_follows_redirects():
 	)
 
 	redirect = client.post("/")
-	followed = client.post("/", follow_redirects=True)
+	followed = client.post("/", redirect=True)
 
 	assert_eq(redirect.status_code, 302)
 	assert_eq(redirect.headers["Location"], "/")

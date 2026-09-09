@@ -1,17 +1,16 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
 from helios.store import (
-	Attribute,
 	Model,
 	ModelError,
 	NotFoundError,
 	Schema,
 	Store,
+	attr,
 	decode,
 	encode,
-	types,
 )
 
 
@@ -27,9 +26,59 @@ def test_creates_model_with_builtin_attrs():
 	assert_that(created.created_at is not None)
 
 
+def test_stores_model_metadata():
+	class Post(Model):
+		pass
+
+	assert_that(Post.id is not None)
+	assert_that(Post.created_at is not None)
+
+
+def test_constructs_unsaved_model():
+	class Post(Model):
+		title = attr(str)
+
+	new = Post(title="Intro")
+
+	assert_that(new.id is not None)
+	assert_that(new.created_at is None)
+	assert_eq(new.title, "Intro")
+
+
+def test_adds_model_to_store():
+	class Post(Model):
+		pass
+
+	new = Post()
+	store = Store()
+
+	store.add(new)
+	created_at = new.created_at
+	store.add(new)
+
+	assert_that(created_at is not None)
+	assert_eq(new.created_at, created_at)
+	assert_that(store.find_one(Post, new.id) is new)
+
+
+def test_doesnt_accept_non_init_attrs():
+	class Post(Model):
+		pass
+
+	with assert_raises(ModelError):
+		Store().create(Post, id=uuid4())
+
+
+def test_doesnt_override_builtin_attrs():
+	with assert_raises(ModelError):
+
+		class Post(Model):
+			id = attr(UUID)
+
+
 def test_creates_model_with_attr():
 	class Post(Model):
-		attrs = [Attribute("title", types.Str())]
+		title = attr(str)
 
 	store = Store()
 
@@ -38,20 +87,84 @@ def test_creates_model_with_attr():
 	assert_eq(created.title, "Intro")
 
 
-def test_creates_model_with_compound_attr():
+def test_infers_attr_name_from_class_assignment():
 	class Post(Model):
-		attrs = [Attribute("tags", types.List(types.Str()))]
+		title = attr(str)
 
-	store = Store()
+	assert_eq(Post.title.name, "title")
+	assert_that(Post.attrs["title"] is Post.title)
 
-	created = store.create(Post, tags=["news"])
 
-	assert_eq(created.tags, ["news"])
+def test_assigns_model_attr():
+	class Post(Model):
+		title = attr(str)
+
+	created = Store().create(Post, title="Intro")
+	created.title = "Revised"
+
+	assert_eq(created.title, "Revised")
+
+
+def test_inherits_model_attrs():
+	class Content(Model):
+		title = attr(str)
+
+	class Post(Content):
+		body = attr(str)
+
+	created = Store().create(Post, title="Intro", body="Welcome")
+
+	assert_that(Post.title is not None)
+	assert_that(Post.body is not None)
+	assert_eq(created.title, "Intro")
+	assert_eq(created.body, "Welcome")
+
+
+def test_doesnt_inherit_from_multiple_model_classes():
+	class Content(Model):
+		pass
+
+	class Publishable(Model):
+		pass
+
+	with assert_raises(ModelError):
+
+		class Post(Content, Publishable):
+			pass
+
+
+def test_overrides_inherited_model_attr():
+	class Content(Model):
+		score = attr(str)
+
+	class Post(Content):
+		score = attr(int)
+
+	created = Store().create(Post, score=3)
+
+	assert_eq(created.score, 3)
+
+
+def test_doesnt_replace_inherited_attr_with_non_attribute():
+	class Content(Model):
+		title = attr(str)
+
+	with assert_raises(ModelError):
+
+		class Post(Content):
+			title = "Intro"
+
+
+def test_rejects_attrs_declaration():
+	with assert_raises(ModelError):
+
+		class Post(Model):
+			attrs = ()
 
 
 def test_creates_model_with_default_attr():
 	class Post(Model):
-		attrs = [Attribute("unread", types.Bool(), default=True)]
+		unread = attr(bool, default=True)
 
 	store = Store()
 
@@ -62,7 +175,7 @@ def test_creates_model_with_default_attr():
 
 def test_doesnt_create_model_with_missing_attr():
 	class Post(Model):
-		attrs = [Attribute("title", types.Str())]
+		title = attr(str)
 
 	store = Store()
 
@@ -72,7 +185,7 @@ def test_doesnt_create_model_with_missing_attr():
 
 def test_doesnt_create_model_with_extra_attr():
 	class Post(Model):
-		attrs = []
+		pass
 
 	store = Store()
 
@@ -82,7 +195,7 @@ def test_doesnt_create_model_with_extra_attr():
 
 def test_doesnt_create_model_with_null_attr():
 	class Post(Model):
-		attrs = [Attribute("title", types.Str())]
+		title = attr(str)
 
 	store = Store()
 
@@ -145,7 +258,7 @@ def test_find_one_raises_when_model_has_wrong_type():
 
 def test_finds_model_by_attrs():
 	class User(Model):
-		attrs = [Attribute("admin", types.Bool())]
+		admin = attr(bool)
 
 	store = Store()
 	store.create(User, admin=False)
@@ -159,10 +272,8 @@ def test_finds_model_by_attrs():
 
 def test_finds_model_by_conjunction():
 	class User(Model):
-		attrs = [
-			Attribute("name", types.Str()),
-			Attribute("admin", types.Bool()),
-		]
+		name = attr(str)
+		admin = attr(bool)
 
 	store = Store()
 	store.create(User, name="Alice", admin=False)
@@ -199,11 +310,13 @@ def test_encodes_and_decodes_store():
 	found = decoded.find_one(Post, created.id)
 
 	assert_eq(found.id, created.id)
+	assert_eq(encode(decoded), encoded)
+	assert_eq(list(encoded[0]), ["_type", "id", "created_at"])
 
 
 def test_encodes_and_decodes_attrs_with_simple_types():
 	class Post(Model):
-		attrs = [Attribute("title", types.Str())]
+		title = attr(str)
 
 	store = Store()
 	created = store.create(Post, title="Intro")
@@ -219,7 +332,7 @@ def test_encodes_and_decodes_attrs_with_simple_types():
 
 def test_encodes_and_decodes_integer_attrs():
 	class Post(Model):
-		attrs = [Attribute("points", types.Int())]
+		points = attr(int)
 
 	store = Store()
 	created = store.create(Post, points=3)
@@ -233,7 +346,7 @@ def test_encodes_and_decodes_integer_attrs():
 
 def test_encodes_and_decodes_attrs_with_complex_types():
 	class Post(Model):
-		attrs = [Attribute("author_id", types.UUID())]
+		author_id = attr(UUID)
 
 	store = Store()
 	created = store.create(Post, author_id=uuid4())
@@ -245,23 +358,9 @@ def test_encodes_and_decodes_attrs_with_complex_types():
 	assert_eq(found.author_id, created.author_id)
 
 
-def test_encodes_and_decodes_attrs_with_compound_types():
-	class Post(Model):
-		attrs = [Attribute("backlink_ids", types.List(types.UUID()))]
-
-	store = Store()
-	created = store.create(Post, backlink_ids=[uuid4()])
-
-	encoded = encode(store)
-	decoded = decode(encoded, Schema([Post]))
-	found = decoded.find_one(Post, created.id)
-
-	assert_eq(found.backlink_ids, created.backlink_ids)
-
-
 def test_encodes_and_decodes_nullable_attrs_when_present():
 	class Post(Model):
-		attrs = [Attribute("author_id", types.UUID(), nullable=True)]
+		author_id = attr(UUID, nullable=True)
 
 	store = Store()
 	created = store.create(Post, author_id=uuid4())
@@ -275,7 +374,7 @@ def test_encodes_and_decodes_nullable_attrs_when_present():
 
 def test_encodes_and_decodes_nullable_attrs_when_absent():
 	class Post(Model):
-		attrs = [Attribute("author_id", types.UUID(), nullable=True)]
+		author_id = attr(UUID, nullable=True)
 
 	store = Store()
 	created = store.create(Post)
