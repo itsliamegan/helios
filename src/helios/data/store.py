@@ -8,7 +8,7 @@ from uuid import UUID
 from helios.app import Component, Context
 from helios.http import Request, Response
 from helios.http.error import NotFoundError as BaseNotFoundError
-from helios.persist import JSONFile, JSONValue, Persistence
+from helios.persist import Files, JSONValue, Persistence
 
 from .model import Model, ModelError
 
@@ -164,8 +164,8 @@ class Component(Component[Store]):
 	provides = Store
 	requires = (Persistence,)
 
-	def __init__(self, file: JSONFile[Store]):
-		self.file = file
+	def __init__(self, config: Config, files: Files, schema: Schema):
+		self.file = files.json(config.store_file, Format(schema))
 
 	def provide(self, req: Request, ctx: Context) -> Store:
 		persistence = ctx.get(Persistence)

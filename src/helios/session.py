@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from helios.app import Component, Context
 from helios.http import Request, Response
-from helios.persist import JSONFile, JSONValue, Persistence
+from helios.persist import Files, JSONValue, Persistence
 
 
 class Config:
@@ -96,8 +96,8 @@ class Component(Component[Session]):
 	provides = Session
 	requires = (Persistence,)
 
-	def __init__(self, file: JSONFile[Sessions]):
-		self.file = file
+	def __init__(self, config: Config, files: Files):
+		self.file = files.json(config.store_file, Format())
 
 	def provide(self, req: Request, ctx: Context) -> Session:
 		persistence = ctx.get(Persistence)

@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios import persist
+from helios import data, persist
 from helios.app import Application, ComponentError, Context
 from helios.data import Component, Format, Model, Schema, Store, attr
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
@@ -27,10 +27,13 @@ def persistence(path: Path) -> tuple[Files, JSONFile[Store]]:
 
 
 def application(path: Path, handler) -> Application:
-	files, file = persistence(path)
+	files, _ = persistence(path)
 	return Application(
 		Router([Route(Method.GET, Pattern("/"), handler)]),
-		[persist.Component(files), Component(file)],
+		[
+			persist.Component(files),
+			Component(data.Config(path), files, Schema([Post])),
+		],
 	)
 
 
@@ -43,8 +46,7 @@ def load_store(path: Path) -> Store:
 def test_uses_persistence_protocol():
 	persistence = MemoryPersistence(Store())
 	files = Files(persist.Config(Path("persistence.lock")))
-	file = files.json(Path("store.json"), Format(Schema([Post])))
-	component = Component(file)
+	component = Component(data.Config(Path("store.json")), files, Schema([Post]))
 	ctx = Context()
 	ctx.put(Persistence, persistence)
 
@@ -75,8 +77,8 @@ def test_requires_persistence():
 	with TemporaryDirectory() as dir:
 		path = Path(dir, "store.json")
 		path.write_text("[]")
-		_, file = persistence(path)
-		component = Component(file)
+		files, _ = persistence(path)
+		component = Component(data.Config(path), files, Schema([Post]))
 
 		with assert_raises(ComponentError):
 			component.provide(request(), Context())
