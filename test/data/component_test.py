@@ -21,7 +21,7 @@ def request() -> Request:
 
 
 def persistence(path: Path) -> tuple[Files, JSONFile[Store]]:
-	files = Files(Path(path.parent, "persistence.lock"))
+	files = Files(persist.Config(Path(path.parent, "persistence.lock")))
 	file = files.json(path, Format(Schema([Post])))
 	return files, file
 
@@ -42,7 +42,7 @@ def load_store(path: Path) -> Store:
 
 def test_uses_persistence_protocol():
 	persistence = MemoryPersistence(Store())
-	files = Files(Path("persistence.lock"))
+	files = Files(persist.Config(Path("persistence.lock")))
 	file = files.json(Path("store.json"), Format(Schema([Post])))
 	component = Component(file)
 	ctx = Context()

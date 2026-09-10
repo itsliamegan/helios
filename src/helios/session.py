@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any, cast
 from uuid import UUID, uuid4
 
 from helios.app import Component, Context
 from helios.http import Request, Response
 from helios.persist import JSONFile, JSONValue, Persistence
+
+
+class Config:
+	def __init__(self, store_file: Path):
+		self.store_file = store_file
 
 
 class Session:

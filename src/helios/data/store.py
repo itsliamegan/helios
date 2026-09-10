@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, cast
 from uuid import UUID
 
@@ -10,6 +11,11 @@ from helios.http.error import NotFoundError as BaseNotFoundError
 from helios.persist import JSONFile, JSONValue, Persistence
 
 from .model import Model, ModelError
+
+
+class Config:
+	def __init__(self, store_file: Path):
+		self.store_file = store_file
 
 
 class NotFoundError(BaseNotFoundError):

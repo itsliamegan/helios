@@ -31,6 +31,11 @@ class Persistence(Protocol):
 	def open[T](self, file: JSONFile[T]) -> Handle[T]: ...
 
 
+class Config:
+	def __init__(self, lock_file: Path):
+		self.lock_file = lock_file
+
+
 class PersistenceError(Exception):
 	pass
 
@@ -100,8 +105,8 @@ class FilePersistence:
 
 
 class Files:
-	def __init__(self, lock_file: Path):
-		self.lock_file = lock_file
+	def __init__(self, config: Config):
+		self.lock_file = config.lock_file
 
 	def json[T](self, path: Path, format: Format[T]) -> JSONFile[T]:
 		return JSONFile(self, path, format)

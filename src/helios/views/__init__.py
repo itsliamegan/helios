@@ -9,6 +9,11 @@ from helios.http import Request
 from . import helpers
 
 
+class Config:
+	def __init__(self, dir: Path):
+		self.dir = dir
+
+
 class Views:
 	def __init__(self, tmpls: dict[str, str] | None = None):
 		if tmpls is None:
@@ -48,8 +53,8 @@ def load(views_dir: Path) -> Views:
 class Component(Component[Views]):
 	provides = Views
 
-	def __init__(self, dir: Path):
-		self.dir = dir
+	def __init__(self, config: Config):
+		self.dir = config.dir
 		self.engine: Views | None = None
 
 	def boot(self):
