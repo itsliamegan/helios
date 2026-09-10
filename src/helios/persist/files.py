@@ -9,8 +9,7 @@ import stat
 import tempfile
 from typing import Any, Protocol, Self, TextIO, cast
 
-from helios.app import Component, Context
-from helios.http import Request
+from .config import Config
 
 type JSONValue = (
 	None | bool | int | float | str | list[JSONValue] | dict[str, JSONValue]
@@ -29,11 +28,6 @@ class Handle[T](Protocol):
 
 class Persistence(Protocol):
 	def open[T](self, file: JSONFile[T]) -> Handle[T]: ...
-
-
-class Config:
-	def __init__(self, lock_file: Path):
-		self.lock_file = lock_file
 
 
 class PersistenceError(Exception):
@@ -113,16 +107,6 @@ class Files:
 
 	def lock(self) -> FilePersistence:
 		return FilePersistence(self)
-
-
-class Component(Component[Persistence]):
-	provides = Persistence
-
-	def __init__(self, files: Files):
-		self.files = files
-
-	def provide(self, req: Request, ctx: Context) -> FilePersistence:
-		return ctx.enter(self.files.lock())
 
 
 class FileHandle[T]:

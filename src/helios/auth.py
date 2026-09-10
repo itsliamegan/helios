@@ -3,9 +3,10 @@ from __future__ import annotations
 from uuid import UUID
 
 from helios.app import Component, Context
-from helios.data import Model, NotFoundError, Store
+from helios.data.model import Model
+from helios.data.store import NotFoundError, Store
 from helios.http import Request
-from helios.session import Session
+from helios.session.store import Session
 
 SESSION_KEY = "_user_id"
 

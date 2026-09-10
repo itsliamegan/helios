@@ -3,7 +3,8 @@ from uuid import uuid4
 from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Application, Component, ComponentError, Context, Thread
-from helios.data import Model, Store
+from helios.data.model import Model
+from helios.data.store import Store
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
 from helios.routing import NotFoundError, Pattern, Route, Router
 

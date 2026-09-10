@@ -4,9 +4,11 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios import persist
 from helios.app import Application
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.persist.component import Component
+from helios.persist.config import Config
+from helios.persist.files import Files
 from helios.routing import Pattern, Route, Router
 
 
@@ -16,7 +18,7 @@ def increment_in_process(
 	entered,
 	release,
 ) -> None:
-	files = persist.Files(persist.Config(lock_path))
+	files = Files(Config(lock_path))
 	with files.lock():
 		value = int(path.read_text())
 		entered.set()
@@ -44,7 +46,7 @@ def test_opens_file_from_active_scope():
 	with TemporaryDirectory() as dir:
 		path = Path(dir, "value.json")
 		path.write_text("1")
-		files = persist.Files(persist.Config(Path(dir, "persistence.lock")))
+		files = Files(Config(Path(dir, "persistence.lock")))
 		file = files.json(path, IntegerFormat())
 
 		with files.lock() as scope:
@@ -57,7 +59,7 @@ def test_reuses_handle_for_same_file():
 	with TemporaryDirectory() as dir:
 		path = Path(dir, "value.json")
 		path.write_text("1")
-		files = persist.Files(persist.Config(Path(dir, "persistence.lock")))
+		files = Files(Config(Path(dir, "persistence.lock")))
 		file = files.json(path, IntegerFormat())
 
 		with files.lock() as scope:
@@ -69,7 +71,7 @@ def test_reuses_handle_for_same_file():
 
 def test_opens_distinct_handles_for_different_files():
 	with TemporaryDirectory() as dir:
-		files = persist.Files(persist.Config(Path(dir, "persistence.lock")))
+		files = Files(Config(Path(dir, "persistence.lock")))
 		first_file = files.json(Path(dir, "first.json"), IntegerFormat())
 		second_file = files.json(Path(dir, "second.json"), IntegerFormat())
 
@@ -84,7 +86,7 @@ def test_caches_loaded_value():
 	with TemporaryDirectory() as dir:
 		path = Path(dir, "value.json")
 		path.write_text("[]")
-		files = persist.Files(persist.Config(Path(dir, "persistence.lock")))
+		files = Files(Config(Path(dir, "persistence.lock")))
 		file = files.json(path, ListFormat())
 
 		with files.lock() as scope:
@@ -99,7 +101,7 @@ def test_save_replaces_cached_value():
 	with TemporaryDirectory() as dir:
 		path = Path(dir, "value.json")
 		path.write_text("[]")
-		files = persist.Files(persist.Config(Path(dir, "persistence.lock")))
+		files = Files(Config(Path(dir, "persistence.lock")))
 		file = files.json(path, ListFormat())
 		saved = [1]
 
@@ -113,7 +115,7 @@ def test_save_replaces_cached_value():
 
 def test_rejects_open_outside_scope():
 	with TemporaryDirectory() as dir:
-		files = persist.Files(persist.Config(Path(dir, "persistence.lock")))
+		files = Files(Config(Path(dir, "persistence.lock")))
 		file = files.json(Path(dir, "value.json"), IntegerFormat())
 		scope = files.lock()
 
@@ -125,7 +127,7 @@ def test_rejects_handle_after_scope_closes():
 	with TemporaryDirectory() as dir:
 		path = Path(dir, "value.json")
 		path.write_text("1")
-		files = persist.Files(persist.Config(Path(dir, "persistence.lock")))
+		files = Files(Config(Path(dir, "persistence.lock")))
 		file = files.json(path, IntegerFormat())
 
 		with files.lock() as scope:
@@ -137,8 +139,8 @@ def test_rejects_handle_after_scope_closes():
 
 def test_rejects_file_from_different_files():
 	with TemporaryDirectory() as dir:
-		first = persist.Files(persist.Config(Path(dir, "first.lock")))
-		second = persist.Files(persist.Config(Path(dir, "second.lock")))
+		first = Files(Config(Path(dir, "first.lock")))
+		second = Files(Config(Path(dir, "second.lock")))
 		file = second.json(Path(dir, "value.json"), IntegerFormat())
 
 		with first.lock() as scope, assert_raises(RuntimeError):
@@ -190,7 +192,7 @@ def run_request(
 
 	app = Application(
 		Router([Route(Method.GET, Pattern("/"), hold)]),
-		[persist.Component(persist.Files(persist.Config(lock_path)))],
+		[Component(Files(Config(lock_path)))],
 	)
 	res = app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
 	if res.status is not Status.OK:

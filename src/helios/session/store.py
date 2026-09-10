@@ -1,18 +1,9 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any, cast
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from helios.app import Component, Context
-from helios.http import Request, Response
-from helios.persist import Files, JSONValue, Persistence
-
-
-class Config:
-	def __init__(self, store_file: Path):
-		self.store_file = store_file
+from helios.persist.files import JSONValue
 
 
 class Session:
@@ -90,39 +81,3 @@ def decode(data: dict[str, Any]) -> Sessions:
 		id = UUID(raw_id)
 		sessions[id] = Session(id, session_data)
 	return Sessions(sessions)
-
-
-class Component(Component[Session]):
-	provides = Session
-	requires = (Persistence,)
-
-	def __init__(self, config: Config, files: Files):
-		self.file = files.json(config.store_file, Format())
-
-	def provide(self, req: Request, ctx: Context) -> Session:
-		persistence = ctx.get(Persistence)
-
-		sessions = persistence.open(self.file).load()
-		if "session_id" in req.cookies:
-			id = UUID(req.cookies["session_id"].val)
-			if id in sessions:
-				return sessions.get(id)
-			session = Session(id)
-			sessions.put(session)
-			return session
-
-		session = Session(uuid4())
-		sessions.put(session)
-		return session
-
-	def finish(self, res: Response, ctx: Context):
-		session = ctx.get(Session)
-		persistence = ctx.get(Persistence)
-
-		res.cookies["session_id"] = str(session.id)
-		res.cookies["session_id"].expires = datetime.now(UTC) + timedelta(days=30)
-		res.cookies["session_id"].http_only = True
-		handle = persistence.open(self.file)
-		sessions = handle.load()
-		if sessions.is_dirty():
-			handle.save(sessions)

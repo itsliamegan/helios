@@ -3,11 +3,15 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios import data, persist
 from helios.app import Application, ComponentError, Context
-from helios.data import Component, Format, Model, Schema, Store, attr
+from helios.data.component import Component
+from helios.data.config import Config
+from helios.data.model import Model, attr
+from helios.data.store import Format, Schema, Store
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
-from helios.persist import Files, JSONFile, Persistence
+import helios.persist.component
+import helios.persist.config
+from helios.persist.files import Files, JSONFile, Persistence
 from helios.routing import NotFoundError, Pattern, Route, Router
 from test.support import MemoryPersistence
 
@@ -21,7 +25,7 @@ def request() -> Request:
 
 
 def persistence(path: Path) -> tuple[Files, JSONFile[Store]]:
-	files = Files(persist.Config(Path(path.parent, "persistence.lock")))
+	files = Files(helios.persist.config.Config(Path(path.parent, "persistence.lock")))
 	file = files.json(path, Format(Schema([Post])))
 	return files, file
 
@@ -31,8 +35,8 @@ def application(path: Path, handler) -> Application:
 	return Application(
 		Router([Route(Method.GET, Pattern("/"), handler)]),
 		[
-			persist.Component(files),
-			Component(data.Config(path), files, Schema([Post])),
+			helios.persist.component.Component(files),
+			Component(Config(path), files, Schema([Post])),
 		],
 	)
 
@@ -45,8 +49,8 @@ def load_store(path: Path) -> Store:
 
 def test_uses_persistence_protocol():
 	persistence = MemoryPersistence(Store())
-	files = Files(persist.Config(Path("persistence.lock")))
-	component = Component(data.Config(Path("store.json")), files, Schema([Post]))
+	files = Files(helios.persist.config.Config(Path("persistence.lock")))
+	component = Component(Config(Path("store.json")), files, Schema([Post]))
 	ctx = Context()
 	ctx.put(Persistence, persistence)
 
@@ -78,7 +82,7 @@ def test_requires_persistence():
 		path = Path(dir, "store.json")
 		path.write_text("[]")
 		files, _ = persistence(path)
-		component = Component(data.Config(path), files, Schema([Post]))
+		component = Component(Config(path), files, Schema([Post]))
 
 		with assert_raises(ComponentError):
 			component.provide(request(), Context())

@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from helios.persist import Handle, JSONFile
+from helios.persist.files import Handle, JSONFile
 
 
 class MemoryHandle[T]:

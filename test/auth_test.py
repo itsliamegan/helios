@@ -4,9 +4,10 @@ from luna.test.assertion import assert_eq, assert_not, assert_that
 
 from helios.app import Context
 from helios.auth import Authenticator, Component
-from helios.data import Model, Store, attr
+from helios.data.model import Model, attr
+from helios.data.store import Store
 from helios.http import Headers, Input, Method, Request, URL
-from helios.session import Session
+from helios.session.store import Session
 
 
 class User(Model):

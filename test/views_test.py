@@ -5,7 +5,8 @@ from tempfile import TemporaryDirectory
 from luna.test.assertion import assert_eq
 
 from helios.http import URL
-from helios.views import Views, helpers, load
+from helios.views import helpers
+from helios.views.engine import Views, load
 
 
 def test_renders_simple():

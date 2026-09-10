@@ -4,7 +4,7 @@ from typing import Any
 
 from helios.app import Component, Context
 from helios.http import Request, Response
-from helios.session import Session
+from helios.session.store import Session
 
 
 class Flashes:

@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from luna.test.assertion import assert_eq, assert_that
 
-from helios.session import Format, Session, Sessions
+from helios.session.store import Format, Session, Sessions
 
 
 def test_finds_session_by_id():

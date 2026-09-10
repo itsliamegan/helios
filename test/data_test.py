@@ -2,16 +2,8 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.data import (
-	Model,
-	ModelError,
-	NotFoundError,
-	Schema,
-	Store,
-	attr,
-	decode,
-	encode,
-)
+from helios.data.model import Model, ModelError, attr
+from helios.data.store import NotFoundError, Schema, Store, decode, encode
 
 
 def test_creates_model():
