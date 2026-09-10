@@ -61,7 +61,7 @@ def test_defaults_text_for_empty_value():
 
 
 def test_defaults_path_for_empty_value():
-	loaded = Config.load({"EXAMPLE_FILES_DIR": ""})
+	loaded = CustomConfig.load({"EXAMPLE_FILES_DIR": ""})
 
 	assert_eq(loaded.files.dir, Path("data"))
 
