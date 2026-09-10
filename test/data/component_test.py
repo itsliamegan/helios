@@ -1,12 +1,15 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq
+from luna.test.assertion import assert_eq, assert_raises
 
-from helios.app import Application
+from helios import persist
+from helios.app import Application, ComponentError, Context
+from helios.data import Component, Format, Model, Schema, Store, attr
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.persist import Files, JSONFile, Persistence
 from helios.routing import NotFoundError, Pattern, Route, Router
-from helios.store import Component, Model, Schema, attr, load
+from test.support import MemoryPersistence
 
 
 class Post(Model):
@@ -17,16 +20,45 @@ def request() -> Request:
 	return Request(Method.GET, URL("/"), Headers(), Input())
 
 
+def persistence(path: Path) -> tuple[Files, JSONFile[Store]]:
+	files = Files(Path(path.parent, "persistence.lock"))
+	file = files.json(path, Format(Schema([Post])))
+	return files, file
+
+
 def application(path: Path, handler) -> Application:
+	files, file = persistence(path)
 	return Application(
 		Router([Route(Method.GET, Pattern("/"), handler)]),
-		[Component(path, Schema([Post]))],
+		[persist.Component(files), Component(file)],
 	)
 
 
-def test_skips_read_only_write():
+def load_store(path: Path) -> Store:
+	files, file = persistence(path)
+	with files.lock() as scope:
+		return scope.open(file).load()
+
+
+def test_uses_persistence_protocol():
+	persistence = MemoryPersistence(Store())
+	files = Files(Path("persistence.lock"))
+	file = files.json(Path("store.json"), Format(Schema([Post])))
+	component = Component(file)
+	ctx = Context()
+	ctx.put(Persistence, persistence)
+
+	store = component.provide(request(), ctx)
+	ctx.put(Store, store)
+	store.create(Post, title="Intro")
+	component.finish(Response.empty(), ctx)
+
+	assert_eq(persistence.handle.saved, store)
+
+
+def test_skips_write_for_unchanged_store():
 	def index(req, ctx):
-		ctx.store.find_all(Post)
+		ctx.get(Store).find_all(Post)
 		return Response.empty(Status.OK)
 
 	with TemporaryDirectory() as dir:
@@ -39,9 +71,20 @@ def test_skips_read_only_write():
 		assert_eq(path.read_text(), "[]\n")
 
 
+def test_requires_persistence():
+	with TemporaryDirectory() as dir:
+		path = Path(dir, "store.json")
+		path.write_text("[]")
+		_, file = persistence(path)
+		component = Component(file)
+
+		with assert_raises(ComponentError):
+			component.provide(request(), Context())
+
+
 def test_redirect_saves():
 	def create(req, ctx):
-		ctx.store.create(Post, title="Intro")
+		ctx.get(Store).create(Post, title="Intro")
 		return Response.redirect(URL("/posts"))
 
 	with TemporaryDirectory() as dir:
@@ -50,7 +93,7 @@ def test_redirect_saves():
 		app = application(path, create)
 
 		res = app.handle(request())
-		persisted = load(path, Schema([Post]))
+		persisted = load_store(path)
 
 		assert_eq(res.status, Status.FOUND)
 		assert_eq(persisted.find_all(Post)[0].title, "Intro")
@@ -58,7 +101,7 @@ def test_redirect_saves():
 
 def test_http_error_saves():
 	def create(req, ctx):
-		ctx.store.create(Post, title="Intro")
+		ctx.get(Store).create(Post, title="Intro")
 		raise NotFoundError()
 
 	with TemporaryDirectory() as dir:
@@ -67,7 +110,7 @@ def test_http_error_saves():
 		app = application(path, create)
 
 		res = app.handle(request())
-		persisted = load(path, Schema([Post]))
+		persisted = load_store(path)
 
 		assert_eq(res.status, Status.NOT_FOUND)
 		assert_eq(persisted.find_all(Post)[0].title, "Intro")
@@ -75,7 +118,7 @@ def test_http_error_saves():
 
 def test_returned_error_saves():
 	def create(req, ctx):
-		ctx.store.create(Post, title="Intro")
+		ctx.get(Store).create(Post, title="Intro")
 		return Response.text("Failed", Status.INTERNAL_SERVER_ERROR)
 
 	with TemporaryDirectory() as dir:
@@ -84,7 +127,7 @@ def test_returned_error_saves():
 		app = application(path, create)
 
 		res = app.handle(request())
-		persisted = load(path, Schema([Post]))
+		persisted = load_store(path)
 
 		assert_eq(res.status, Status.INTERNAL_SERVER_ERROR)
 		assert_eq(persisted.find_all(Post)[0].title, "Intro")
@@ -92,7 +135,7 @@ def test_returned_error_saves():
 
 def test_exception_skips_save():
 	def create(req, ctx):
-		ctx.store.create(Post, title="Intro")
+		ctx.get(Store).create(Post, title="Intro")
 		raise RuntimeError
 
 	with TemporaryDirectory() as dir:
@@ -101,7 +144,7 @@ def test_exception_skips_save():
 		app = application(path, create)
 
 		res = app.handle(request())
-		persisted = load(path, Schema([Post]))
+		persisted = load_store(path)
 
 		assert_eq(res.status, Status.INTERNAL_SERVER_ERROR)
 		assert_eq(persisted.find_all(Post), [])

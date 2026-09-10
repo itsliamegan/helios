@@ -1,5 +1,6 @@
 from collections.abc import Callable
-from typing import Any
+from contextlib import AbstractContextManager, ExitStack
+from typing import Any, cast
 
 from helios.http import Method, Request, Response, Status
 from helios.http.error import HTTPError
@@ -11,37 +12,43 @@ type Middleware = Callable[[Request, Any, Next], Response]
 
 class Context:
 	def __init__(self):
-		self.provided = {}
+		self.provided: dict[type[Any], Any] = {}
+		self.resources = ExitStack()
 
-	def __getattr__(self, name: str) -> Any:
-		if name == "provided":
-			return self.__dict__[name]
-		elif name in self.provided:
-			return self.provided[name]
-		else:
-			return super().__getattribute__(name)
+	def get[T](self, key: type[T]) -> T:
+		if key not in self.provided:
+			raise ComponentError(f"nothing provides {key.__qualname__}")
+		return cast(T, self.provided[key])
 
-	def __setattr__(self, name: str, val: Any):
-		if name == "provided":
-			self.__dict__[name] = val
-		else:
-			self.provided[name] = val
+	def put[T](self, key: type[T], val: T) -> None:
+		self.provided[key] = val
+
+	def enter[T](self, resource: AbstractContextManager[T]) -> T:
+		return self.resources.enter_context(resource)
 
 
-class Component:
+class ComponentError(Exception):
+	pass
+
+
+class Component[T]:
+	provides: type[T] | None
+	requires: tuple[type[Any], ...] = ()
+
 	def boot(self):
 		pass
 
-	def before(self, req: Request, ctx: Context):
-		pass
+	def provide(self, req: Request, ctx: Context) -> T:
+		raise NotImplementedError
 
-	def after(self, res: Response, ctx: Context):
+	def finish(self, res: Response, ctx: Context):
 		pass
 
 	def __call__(self, req: Request, ctx: Context, next: Next) -> Response:
-		self.before(req, ctx)
+		if self.provides is not None:
+			ctx.put(self.provides, self.provide(req, ctx))
 		res = next(req, ctx)
-		self.after(res, ctx)
+		self.finish(res, ctx)
 		return res
 
 
@@ -62,17 +69,21 @@ class Thread:
 
 
 class Application:
-	def __init__(self, router: Router, components: list[Component]):
-		self.thread = Thread.build(
-			[
-				ensure_content_length,
-				capture_errors,
-				adapt_artificial_method,
-				*components,
-				handle_http_errors,
-			],
-			router,
-		)
+	def __init__(
+		self,
+		router: Router,
+		components: list[Component[Any]],
+	):
+		verify(components)
+		middlewares: list[Middleware] = [
+			ensure_content_length,
+			capture_errors,
+			manage_resources,
+			adapt_artificial_method,
+			*components,
+			handle_http_errors,
+		]
+		self.thread = Thread.build(middlewares, router)
 		self.components = components
 
 	def boot(self):
@@ -82,6 +93,35 @@ class Application:
 	def handle(self, req: Request) -> Response:
 		ctx = Context()
 		return self.thread(req, ctx)
+
+
+def verify(components: list[Component[Any]]) -> None:
+	provided: set[type[Any]] = set()
+	for component in components:
+		if not hasattr(component, "provides"):
+			raise ComponentError(
+				f"{type(component).__qualname__} does not declare what it provides"
+			)
+
+		for requirement in component.requires:
+			if requirement not in provided:
+				raise ComponentError(
+					f"{type(component).__qualname__} requires "
+					f"{requirement.__qualname__}, which no earlier component provides"
+				)
+
+		if component.provides is None:
+			continue
+		if component.provides in provided:
+			raise ComponentError(
+				f"more than one component provides {component.provides.__qualname__}"
+			)
+		provided.add(component.provides)
+
+
+def manage_resources(req: Request, ctx: Context, next: Next) -> Response:
+	with ctx.resources:
+		return next(req, ctx)
 
 
 def ensure_content_length(req: Request, ctx: Context, next: Next) -> Response:

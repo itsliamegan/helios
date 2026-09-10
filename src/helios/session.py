@@ -1,38 +1,12 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime, timedelta
-import json
-from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from helios.app import Component, Context
 from helios.http import Request, Response
-
-
-class Component(Component):
-	def __init__(self, file: Path):
-		self.file = file
-		self.sessions = None
-
-	def before(self, req: Request, ctx: Context):
-		self.sessions = load(self.file)
-		if "session_id" in req.cookies:
-			id = UUID(req.cookies["session_id"].val)
-			if id in self.sessions:
-				ctx.session = self.sessions.get(id)
-			else:
-				session = Session(id)
-				self.sessions.put(session)
-				ctx.session = session
-		else:
-			session = Session(uuid4())
-			self.sessions.put(session)
-			ctx.session = session
-
-	def after(self, res: Response, ctx: Context):
-		res.cookies["session_id"] = str(ctx.session.id)
-		res.cookies["session_id"].expires = datetime.now(UTC) + timedelta(days=30)
-		res.cookies["session_id"].http_only = True
-		save(self.file, self.sessions)
+from helios.persist import JSONFile, JSONValue, Persistence
 
 
 class Session:
@@ -41,18 +15,22 @@ class Session:
 			items = {}
 		self.id = id
 		self.items = items
+		self.dirty = False
 
 	def __getitem__(self, key: str) -> Any:
 		return self.items[key]
 
 	def __setitem__(self, key: str, val: Any):
 		self.items[key] = val
+		self.dirty = True
 
 	def __delitem__(self, key: str):
 		del self.items[key]
+		self.dirty = True
 
 	def clear(self):
 		self.items = {}
+		self.dirty = True
 
 	def __contains__(self, key: str) -> bool:
 		return key in self.items
@@ -66,12 +44,17 @@ class Sessions:
 		if sessions is None:
 			sessions = {}
 		self.sessions = sessions
+		self.dirty = False
 
 	def get(self, id: UUID) -> Session:
 		return self.sessions[id]
 
 	def put(self, session: Session):
 		self.sessions[session.id] = session
+		self.dirty = True
+
+	def is_dirty(self) -> bool:
+		return self.dirty or any(session.dirty for session in self.sessions.values())
 
 	def __contains__(self, id: UUID) -> bool:
 		return id in self.sessions
@@ -80,17 +63,12 @@ class Sessions:
 		return f"Sessions({self.sessions!r})"
 
 
-def save(path: Path, sessions: Sessions):
-	with open(path, "w") as file:
-		data = encode(sessions)
-		json.dump(data, file)
+class Format:
+	def encode(self, sessions: Sessions) -> JSONValue:
+		return cast(JSONValue, encode(sessions))
 
-
-def load(path: Path) -> Sessions:
-	with open(path, "r") as file:
-		data = json.load(file)
-		sessions = decode(data)
-		return sessions
+	def decode(self, value: JSONValue) -> Sessions:
+		return decode(cast(dict[str, Any], value))
 
 
 def encode(sessions: Sessions) -> dict[str, Any]:
@@ -106,3 +84,39 @@ def decode(data: dict[str, Any]) -> Sessions:
 		id = UUID(raw_id)
 		sessions[id] = Session(id, session_data)
 	return Sessions(sessions)
+
+
+class Component(Component[Session]):
+	provides = Session
+	requires = (Persistence,)
+
+	def __init__(self, file: JSONFile[Sessions]):
+		self.file = file
+
+	def provide(self, req: Request, ctx: Context) -> Session:
+		persistence = ctx.get(Persistence)
+
+		sessions = persistence.open(self.file).load()
+		if "session_id" in req.cookies:
+			id = UUID(req.cookies["session_id"].val)
+			if id in sessions:
+				return sessions.get(id)
+			session = Session(id)
+			sessions.put(session)
+			return session
+
+		session = Session(uuid4())
+		sessions.put(session)
+		return session
+
+	def finish(self, res: Response, ctx: Context):
+		session = ctx.get(Session)
+		persistence = ctx.get(Persistence)
+
+		res.cookies["session_id"] = str(session.id)
+		res.cookies["session_id"].expires = datetime.now(UTC) + timedelta(days=30)
+		res.cookies["session_id"].http_only = True
+		handle = persistence.open(self.file)
+		sessions = handle.load()
+		if sessions.is_dirty():
+			handle.save(sessions)

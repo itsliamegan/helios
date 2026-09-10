@@ -1,34 +1,13 @@
+from __future__ import annotations
+
 from uuid import UUID
 
 from helios.app import Component, Context
+from helios.data import Model, NotFoundError, Store
 from helios.http import Request
 from helios.session import Session
-from helios.store import Model, NotFoundError
 
 SESSION_KEY = "_user_id"
-
-
-class Component(Component):
-	def __init__(self, user_type: type[Model], key: str = SESSION_KEY):
-		self.user_type = user_type
-		self.key = key
-
-	def before(self, req: Request, ctx: Context):
-		if self.key in ctx.session:
-			try:
-				id = UUID(ctx.session[self.key])
-			except ValueError:
-				id = None
-			if id is not None:
-				try:
-					user = ctx.store.find_one(self.user_type, id)
-				except NotFoundError:
-					user = None
-			else:
-				user = None
-		else:
-			user = None
-		ctx.auth = Authenticator(ctx.session, user, self.key)
 
 
 class Authenticator:
@@ -53,3 +32,32 @@ class Authenticator:
 
 	def __repr__(self) -> str:
 		return f"Authenticator({self.user})"
+
+
+class Component(Component[Authenticator]):
+	provides = Authenticator
+	requires = (Session, Store)
+
+	def __init__(self, user_type: type[Model], key: str = SESSION_KEY):
+		self.user_type = user_type
+		self.key = key
+
+	def provide(self, req: Request, ctx: Context) -> Authenticator:
+		session = ctx.get(Session)
+		store = ctx.get(Store)
+
+		if self.key in session:
+			try:
+				id = UUID(session[self.key])
+			except ValueError:
+				id = None
+			if id is not None:
+				try:
+					user = store.find_one(self.user_type, id)
+				except NotFoundError:
+					user = None
+			else:
+				user = None
+		else:
+			user = None
+		return Authenticator(session, user, self.key)

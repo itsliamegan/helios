@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from luna.test.assertion import assert_eq, assert_that
 
-from helios.session import Session, Sessions, decode, encode
+from helios.session import Format, Session, Sessions
 
 
 def test_finds_session_by_id():
@@ -13,6 +13,28 @@ def test_finds_session_by_id():
 	sessions.put(session)
 
 	assert_eq(sessions.get(id), session)
+
+
+def test_tracks_added_sessions():
+	sessions = Sessions()
+
+	sessions.put(Session(uuid4()))
+
+	assert_that(sessions.is_dirty())
+
+
+def test_tracks_changed_sessions():
+	set_session = Session(uuid4())
+	deleted_session = Session(uuid4(), {"message": "Hello"})
+	cleared_session = Session(uuid4(), {"message": "Hello"})
+
+	set_session["message"] = "Hello"
+	del deleted_session["message"]
+	cleared_session.clear()
+
+	assert_that(Sessions({set_session.id: set_session}).is_dirty())
+	assert_that(Sessions({deleted_session.id: deleted_session}).is_dirty())
+	assert_that(Sessions({cleared_session.id: cleared_session}).is_dirty())
 
 
 def test_stores_values():
@@ -50,7 +72,7 @@ def test_encodes_and_decodes_sessions():
 	session["message"] = "You do not have access."
 	sessions = Sessions({id: session})
 
-	encoded = encode(sessions)
-	decoded = decode(encoded)
+	encoded = Format().encode(sessions)
+	decoded = Format().decode(encoded)
 
 	assert_eq(decoded.get(id)["message"], "You do not have access.")

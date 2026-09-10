@@ -2,7 +2,7 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.store import (
+from helios.data import (
 	Model,
 	ModelError,
 	NotFoundError,

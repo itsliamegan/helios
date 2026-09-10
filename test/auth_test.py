@@ -4,9 +4,9 @@ from luna.test.assertion import assert_eq, assert_not, assert_that
 
 from helios.app import Context
 from helios.auth import Authenticator, Component
+from helios.data import Model, Store, attr
 from helios.http import Headers, Input, Method, Request, URL
 from helios.session import Session
-from helios.store import Model, Store, attr
 
 
 class User(Model):
@@ -15,8 +15,8 @@ class User(Model):
 
 def context(store: Store, session: Session) -> Context:
 	ctx = Context()
-	ctx.store = store
-	ctx.session = session
+	ctx.put(Store, store)
+	ctx.put(Session, session)
 	return ctx
 
 
@@ -28,10 +28,10 @@ def test_finds_no_user_when_signed_out():
 	ctx = context(Store(), Session(uuid4()))
 	auth = Component(User)
 
-	auth.before(request(), ctx)
+	provided = auth.provide(request(), ctx)
 
-	assert_that(ctx.auth.user is None)
-	assert_not(ctx.auth.is_signed_in())
+	assert_that(provided.user is None)
+	assert_not(provided.is_signed_in())
 
 
 def test_finds_user_from_session():
@@ -42,10 +42,10 @@ def test_finds_user_from_session():
 	ctx = context(store, session)
 	auth = Component(User)
 
-	auth.before(request(), ctx)
+	provided = auth.provide(request(), ctx)
 
-	assert_eq(ctx.auth.user, user)
-	assert_that(ctx.auth.is_signed_in())
+	assert_eq(provided.user, user)
+	assert_that(provided.is_signed_in())
 
 
 def test_finds_no_user_when_session_is_stale():
@@ -54,9 +54,9 @@ def test_finds_no_user_when_session_is_stale():
 	ctx = context(Store(), session)
 	auth = Component(User)
 
-	auth.before(request(), ctx)
+	provided = auth.provide(request(), ctx)
 
-	assert_that(ctx.auth.user is None)
+	assert_that(provided.user is None)
 
 
 def test_signs_in():
@@ -108,6 +108,6 @@ def test_uses_a_configurable_session_key():
 	session["current_user"] = str(user.id)
 	ctx = context(store, session)
 
-	Component(User, "current_user").before(request(), ctx)
+	provided = Component(User, "current_user").provide(request(), ctx)
 
-	assert_eq(ctx.auth.user, user)
+	assert_eq(provided.user, user)

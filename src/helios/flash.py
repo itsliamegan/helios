@@ -1,21 +1,10 @@
+from __future__ import annotations
+
 from typing import Any
 
 from helios.app import Component, Context
 from helios.http import Request, Response
-
-
-class Component(Component):
-	def before(self, req: Request, ctx: Context):
-		if "_flash" in ctx.session:
-			flashes = Flashes(ctx.session["_flash"])
-			del ctx.session["_flash"]
-		else:
-			flashes = Flashes()
-		ctx.flash = flashes
-
-	def after(self, res: Response, ctx: Context):
-		if ctx.flash.is_dirty():
-			ctx.session["_flash"] = ctx.flash.dirty()
+from helios.session import Session
 
 
 class Flashes:
@@ -58,3 +47,25 @@ class Flash:
 		self.name = name
 		self.val = val
 		self.is_dirty = False
+
+
+class Component(Component[Flashes]):
+	provides = Flashes
+	requires = (Session,)
+
+	def provide(self, req: Request, ctx: Context) -> Flashes:
+		session = ctx.get(Session)
+
+		if "_flash" in session:
+			flashes = Flashes(session["_flash"])
+			del session["_flash"]
+		else:
+			flashes = Flashes()
+		return flashes
+
+	def finish(self, res: Response, ctx: Context):
+		flashes = ctx.get(Flashes)
+		session = ctx.get(Session)
+
+		if flashes.is_dirty():
+			session["_flash"] = flashes.dirty()

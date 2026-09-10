@@ -1,28 +1,15 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime
-import json
-from pathlib import Path
 from typing import Any, cast
 from uuid import UUID
 
-from helios.app import Component as BaseComponent
-from helios.app import Context
+from helios.app import Component, Context
 from helios.http import Request, Response
 from helios.http.error import NotFoundError as BaseNotFoundError
+from helios.persist import JSONFile, JSONValue, Persistence
 
 from .model import Model, ModelError
-
-
-class Component(BaseComponent):
-	def __init__(self, file: Path, schema: Schema):
-		self.file = file
-		self.schema = schema
-
-	def before(self, req: Request, ctx: Context):
-		ctx.store = load(self.file, self.schema)
-
-	def after(self, res: Response, ctx: Context):
-		if ctx.store.pending:
-			save(self.file, ctx.store)
 
 
 class NotFoundError(BaseNotFoundError):
@@ -113,18 +100,15 @@ class Store:
 		self.pending.deletes.add(id)
 
 
-def load(path: Path, schema: Schema) -> Store:
-	with open(path, "r") as file:
-		data = json.load(file)
-		store = decode(data, schema)
-		return store
+class Format:
+	def __init__(self, schema: Schema):
+		self.schema = schema
 
+	def encode(self, store: Store) -> JSONValue:
+		return cast(JSONValue, encode(store))
 
-def save(path: Path, store: Store):
-	with open(path, "w") as file:
-		data = encode(store)
-		json.dump(data, file)
-	store.pending.clear()
+	def decode(self, value: JSONValue) -> Store:
+		return decode(cast(list[dict[str, Any]], value), self.schema)
 
 
 def encode(store: Store) -> list[dict[str, Any]]:
@@ -168,3 +152,24 @@ def decode(data: list[dict[str, Any]], schema: Schema) -> Store:
 		model = model_type._hydrate(model_data)
 		models[model.id] = model
 	return Store(models)
+
+
+class Component(Component[Store]):
+	provides = Store
+	requires = (Persistence,)
+
+	def __init__(self, file: JSONFile[Store]):
+		self.file = file
+
+	def provide(self, req: Request, ctx: Context) -> Store:
+		persistence = ctx.get(Persistence)
+
+		return persistence.open(self.file).load()
+
+	def finish(self, res: Response, ctx: Context):
+		store = ctx.get(Store)
+		persistence = ctx.get(Persistence)
+
+		if store.pending:
+			persistence.open(self.file).save(store)
+			store.pending.clear()

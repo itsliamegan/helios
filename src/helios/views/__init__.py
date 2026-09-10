@@ -9,23 +9,13 @@ from helios.http import Request
 from . import helpers
 
 
-class Component(Component):
-	def __init__(self, dir: Path):
-		self.dir = dir
-		self.engine = None
-
-	def boot(self):
-		self.engine = load(self.dir)
-
-	def before(self, req: Request, ctx: Context):
-		ctx.views = self.engine
-
-
 class Views:
 	def __init__(self, tmpls: dict[str, str] | None = None):
 		if tmpls is None:
 			tmpls = {}
-		self.jinja = Environment(loader=DictLoader(tmpls), autoescape=select_autoescape)
+		self.jinja = Environment(
+			loader=DictLoader(tmpls), autoescape=select_autoescape()
+		)
 		self.jinja.filters["date"] = helpers.date
 		self.jinja.filters["url"] = helpers.url
 		self.jinja.filters["elapsed"] = helpers.elapsed
@@ -53,3 +43,19 @@ def load(views_dir: Path) -> Views:
 					src = stream.read()
 					tmpls[name] = src
 	return Views(tmpls)
+
+
+class Component(Component[Views]):
+	provides = Views
+
+	def __init__(self, dir: Path):
+		self.dir = dir
+		self.engine: Views | None = None
+
+	def boot(self):
+		self.engine = load(self.dir)
+
+	def provide(self, req: Request, ctx: Context) -> Views:
+		if self.engine is None:
+			raise RuntimeError("views component is not booted")
+		return self.engine

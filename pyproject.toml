@@ -37,4 +37,5 @@ luna = { path = "../luna", editable = true }
 [dependency-groups]
 dev = [
 	"luna",
+	"ty>=0.0.80",
 ]
