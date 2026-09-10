@@ -55,9 +55,22 @@ class Attribute[StoredT, ValueT = StoredT]:
 				f"{owner.__name__}.{self.name} has not been initialized"
 			) from None
 
+	def check(self, value: object, model_type: type):
+		if self.name is None:
+			raise AttributeError("attribute has not been assigned to a model")
+		if value is None:
+			if self.nullable:
+				return
+			raise ModelError(f"{model_type.__name__}.{self.name}: cannot be null")
+		try:
+			self.type.check(value)
+		except TypeError as error:
+			raise ModelError(f"{model_type.__name__}.{self.name}: {error}") from error
+
 	def __set__(self, instance: Model, value: ValueT):
 		if self.name is None:
 			raise AttributeError("attribute has not been assigned to a model")
+		self.check(value, type(instance))
 		if self.name in instance._values and self.name not in instance._old_values:
 			instance._old_values[self.name] = instance._values[self.name]
 		instance._values[self.name] = value
@@ -147,7 +160,7 @@ class Model(metaclass=_ModelMeta):
 		self._values = type(self)._initialize(attrs)
 		self._old_values: dict[str, Any] = {}
 		self.id = uuid4()
-		self.created_at = None
+		self._values["created_at"] = None
 
 	@classmethod
 	def _hydrate(cls, values: dict[str, Any]) -> Model:
@@ -158,26 +171,26 @@ class Model(metaclass=_ModelMeta):
 
 	@classmethod
 	def _initialize(cls, raw_attrs: dict[str, Any]) -> dict[str, Any]:
-		values = {}
-		for name, val in raw_attrs.items():
+		for name in raw_attrs:
 			attr = cls.attrs.get(name)
 			if attr is None or not attr.init:
 				raise ModelError(f"extra attr '{name}'")
-			if val is None:
-				if attr.nullable:
-					val = attr.default
-				else:
-					raise ModelError(f"missing attr '{name}'")
-			values[name] = val
 
+		values = {}
 		for name, attr in cls.attrs.items():
 			if not attr.init:
 				continue
-			if name not in values:
-				if not attr.required or attr.nullable:
-					values[name] = attr.default
-				else:
-					raise ModelError(f"missing attr '{name}'")
+
+			if name in raw_attrs:
+				value = raw_attrs[name]
+			elif not attr.required:
+				value = attr.default
+			elif attr.nullable:
+				value = None
+			else:
+				raise ModelError(f"missing attr '{name}'")
+			attr.check(value, cls)
+			values[name] = value
 		return values
 
 	def __repr__(self) -> str:

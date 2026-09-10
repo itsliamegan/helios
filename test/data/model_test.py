@@ -33,6 +33,53 @@ def test_defaults_attr():
 	assert_eq(post.unread, True)
 
 
+def test_preserves_null_with_default():
+	class Post(Model):
+		title = attr(str, default="Untitled", nullable=True)
+
+	post = Post(title=None)
+
+	assert_eq(post.title, None)
+
+
+def test_missing_nullable_attr_is_null():
+	class Post(Model):
+		title = attr(str, nullable=True)
+
+	post = Post()
+
+	assert_eq(post.title, None)
+
+
+def test_rejects_wrong_attr_type():
+	class Post(Model):
+		points = attr(int)
+
+	with assert_raises(ModelError) as raised:
+		Post(points=True)
+
+	assert_eq(str(raised.exception), "Post.points: expected an integer, got bool")
+
+
+def test_rejects_wrong_default_type():
+	class Post(Model):
+		points = attr(int, default=True)
+
+	with assert_raises(ModelError) as raised:
+		Post()
+
+	assert_eq(str(raised.exception), "Post.points: expected an integer, got bool")
+
+
+def test_preserves_false_with_default():
+	class Post(Model):
+		unread = attr(bool, default=True)
+
+	post = Post(unread=False)
+
+	assert_eq(post.unread, False)
+
+
 def test_rejects_non_init_attr():
 	class Post(Model):
 		pass
@@ -88,6 +135,43 @@ def test_assigns_attr():
 	post.title = "Revised"
 
 	assert_eq(post.title, "Revised")
+
+
+def test_assigns_null_attr():
+	class Post(Model):
+		title = attr(str, nullable=True)
+
+	post = Post(title="Intro")
+	post.title = None
+
+	assert_eq(post.title, None)
+
+
+def test_failed_assignment_preserves_state():
+	class Post(Model):
+		points = attr(int)
+
+	post = Post(points=3)
+
+	with assert_raises(ModelError) as raised:
+		post.points = True
+
+	assert_eq(str(raised.exception), "Post.points: expected an integer, got bool")
+	assert_eq(post.points, 3)
+	assert_eq(post._old_values, {})
+
+
+def test_rejects_null_assignment():
+	class Post(Model):
+		title = attr(str)
+
+	post = Post(title="Intro")
+
+	with assert_raises(ModelError) as raised:
+		post.title = None
+
+	assert_eq(str(raised.exception), "Post.title: cannot be null")
+	assert_eq(post.title, "Intro")
 
 
 def test_inherits_attrs():

@@ -136,17 +136,24 @@ def decode(data: list[dict[str, Any]], schema: Schema) -> Store:
 			if name == "_type":
 				continue
 			attr = model_type.attrs[name]
-			if raw_val is None and attr.nullable:
-				val = attr.default
+			if raw_val is None:
+				val = None
 			else:
 				val = attr.type.decode(raw_val)
+			attr.check(val, model_type)
 			model_data[name] = val
 		for name, attr in model_type.attrs.items():
-			if name not in model_data:
-				if not attr.required or attr.nullable:
-					model_data[name] = attr.default
-				else:
-					raise ModelError(f"missing attr '{name}'")
+			if name in model_data:
+				continue
+
+			if not attr.required:
+				val = attr.default
+			elif attr.nullable:
+				val = None
+			else:
+				raise ModelError(f"missing attr '{name}'")
+			attr.check(val, model_type)
+			model_data[name] = val
 		model = model_type._hydrate(model_data)
 		models[model.id] = model
 	return Store(models)

@@ -121,6 +121,7 @@ def test_saves_new_model():
 	store.save(new)
 
 	assert_that(created_at is not None)
+	assert_that(created_at.utcoffset() is not None)
 	assert_eq(new.created_at, created_at)
 	assert_that(store.find_one(Post, new.id) is new)
 
@@ -370,3 +371,69 @@ def test_round_trips_null_attr():
 	found = decoded.find_one(Post, created.id)
 
 	assert_eq(found.author_id, None)
+
+
+def test_decodes_null_instead_of_default():
+	class Post(Model):
+		title = attr(str, default="Untitled", nullable=True)
+
+	created = Store().create(Post, title=None)
+	encoded = encode(Store({created.id: created}))
+
+	decoded = decode(encoded, Schema([Post]))
+
+	assert_eq(decoded.find_one(Post, created.id).title, None)
+
+
+def test_applies_default_for_missing_attr():
+	class Post(Model):
+		title = attr(str, default="Untitled")
+
+	created = Store().create(Post)
+	encoded = encode(Store({created.id: created}))
+	del encoded[0]["title"]
+
+	decoded = decode(encoded, Schema([Post]))
+
+	assert_eq(decoded.find_one(Post, created.id).title, "Untitled")
+
+
+def test_decodes_missing_nullable_attr():
+	class Post(Model):
+		title = attr(str, nullable=True)
+
+	created = Store().create(Post)
+	encoded = encode(Store({created.id: created}))
+	del encoded[0]["title"]
+
+	decoded = decode(encoded, Schema([Post]))
+
+	assert_eq(decoded.find_one(Post, created.id).title, None)
+
+
+def test_rejects_invalid_missing_default():
+	class Post(Model):
+		points = attr(int, default=True)
+
+	created = Store().create(Post, points=3)
+	encoded = encode(Store({created.id: created}))
+	del encoded[0]["points"]
+
+	with assert_raises(ModelError) as raised:
+		decode(encoded, Schema([Post]))
+
+	assert_eq(str(raised.exception), "Post.points: expected an integer, got bool")
+
+
+def test_rejects_nonnullable_null():
+	class Post(Model):
+		title = attr(str)
+
+	created = Store().create(Post, title="Intro")
+	encoded = encode(Store({created.id: created}))
+	encoded[0]["title"] = None
+
+	with assert_raises(ModelError) as raised:
+		decode(encoded, Schema([Post]))
+
+	assert_eq(str(raised.exception), "Post.title: cannot be null")

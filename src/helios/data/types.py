@@ -1,6 +1,8 @@
 from datetime import datetime
-from typing import Any, cast
+from typing import cast
 import uuid
+
+from helios.persist.files import JSONValue
 
 
 class Type[T]:
@@ -18,63 +20,93 @@ class Type[T]:
 			return cast(Type[ValueT], Date())
 		raise TypeError(f"unsupported attribute type: {typ!r}")
 
-	def encode(self, val: T) -> Any:
+	def check(self, val: object):
 		raise NotImplementedError
 
-	def decode(self, val: Any) -> T:
+	def encode(self, val: T) -> JSONValue:
+		raise NotImplementedError
+
+	def decode(self, val: JSONValue) -> T:
 		raise NotImplementedError
 
 
 class Str(Type[str]):
-	def encode(self, val: str) -> Any:
+	def check(self, val: object):
+		if not isinstance(val, str):
+			raise TypeError(f"expected a string, got {type(val).__name__}")
+
+	def encode(self, val: str) -> JSONValue:
+		self.check(val)
 		return val
 
-	def decode(self, val: Any) -> str:
-		if isinstance(val, str):
-			return val
-		else:
-			return str(val)
+	def decode(self, val: JSONValue) -> str:
+		if not isinstance(val, str):
+			raise TypeError(f"expected a string, got {type(val).__name__}")
+		return val
 
 
 class Bool(Type[bool]):
-	def encode(self, val: bool) -> Any:
+	def check(self, val: object):
+		if not isinstance(val, bool):
+			raise TypeError(f"expected a boolean, got {type(val).__name__}")
+
+	def encode(self, val: bool) -> JSONValue:
+		self.check(val)
 		return val
 
-	def decode(self, val: Any) -> bool:
-		if isinstance(val, bool):
-			return val
-		else:
-			return bool(val)
+	def decode(self, val: JSONValue) -> bool:
+		if not isinstance(val, bool):
+			raise TypeError(f"expected a boolean, got {type(val).__name__}")
+		return val
 
 
 class Int(Type[int]):
-	def encode(self, val: int) -> Any:
+	def check(self, val: object):
+		if not isinstance(val, int) or isinstance(val, bool):
+			raise TypeError(f"expected an integer, got {type(val).__name__}")
+
+	def encode(self, val: int) -> JSONValue:
+		self.check(val)
 		return val
 
-	def decode(self, val: Any) -> int:
-		if isinstance(val, int):
-			return val
-		else:
-			return int(val)
+	def decode(self, val: JSONValue) -> int:
+		if not isinstance(val, int) or isinstance(val, bool):
+			raise TypeError(f"expected an integer, got {type(val).__name__}")
+		return val
 
 
 class UUID(Type[uuid.UUID]):
-	def encode(self, val: uuid.UUID) -> Any:
+	def check(self, val: object):
+		if not isinstance(val, uuid.UUID):
+			raise TypeError(f"expected a UUID, got {type(val).__name__}")
+
+	def encode(self, val: uuid.UUID) -> JSONValue:
+		self.check(val)
 		return str(val)
 
-	def decode(self, val: Any) -> uuid.UUID:
-		if isinstance(val, uuid.UUID):
-			return val
-		else:
-			return uuid.UUID(val)
+	def decode(self, val: JSONValue) -> uuid.UUID:
+		if not isinstance(val, str):
+			raise TypeError(f"expected a UUID string, got {type(val).__name__}")
+		return uuid.UUID(val)
 
 
 class Date(Type[datetime]):
-	def encode(self, val: datetime) -> Any:
+	def check(self, val: object):
+		if (
+			not isinstance(val, datetime)
+			or val.tzinfo is None
+			or val.utcoffset() is None
+		):
+			raise TypeError(f"expected an aware datetime, got {type(val).__name__}")
+
+	def encode(self, val: datetime) -> JSONValue:
+		self.check(val)
 		return val.isoformat()
 
-	def decode(self, val: Any) -> datetime:
-		if isinstance(val, datetime):
-			return val
-		else:
-			return datetime.fromisoformat(val)
+	def decode(self, val: JSONValue) -> datetime:
+		if not isinstance(val, str):
+			raise TypeError(f"expected a datetime string, got {type(val).__name__}")
+		decoded = datetime.fromisoformat(val)
+		if decoded.tzinfo is None or decoded.utcoffset() is None:
+			raise ValueError("expected an aware datetime")
+		return decoded
