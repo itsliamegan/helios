@@ -33,7 +33,7 @@ class Pending:
 		self.saves: set[UUID] = set()
 		self.deletes: set[UUID] = set()
 
-	def clear(self) -> None:
+	def clear(self):
 		self.saves.clear()
 		self.deletes.clear()
 
@@ -74,7 +74,7 @@ class Store:
 					models.append(cast(T, model))
 		return models
 
-	def save(self, model: Model) -> None:
+	def save(self, model: Model):
 		current = self.models.get(model.id)
 		if current is not None and current is not model:
 			raise ModelError(f"{model!r} is not the live model held by this Store")

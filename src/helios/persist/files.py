@@ -23,7 +23,7 @@ class Format[T](Protocol):
 
 class Handle[T](Protocol):
 	def load(self) -> T: ...
-	def save(self, value: T) -> None: ...
+	def save(self, value: T): ...
 
 
 class Persistence(Protocol):
@@ -123,16 +123,16 @@ class FileHandle[T]:
 			self.loaded = True
 		return cast(T, self.value)
 
-	def save(self, value: T) -> None:
+	def save(self, value: T):
 		self.ensure_active()
 		self.file.save(value)
 		self.value = value
 		self.loaded = True
 
-	def close(self) -> None:
+	def close(self):
 		self.active = False
 
-	def ensure_active(self) -> None:
+	def ensure_active(self):
 		if not self.active:
 			raise RuntimeError("persistence handle is not active")
 
@@ -155,7 +155,7 @@ class JSONFile[T]:
 		except Exception as error:
 			raise FormatError(f"could not decode file {self.path}") from error
 
-	def save(self, value: T) -> None:
+	def save(self, value: T):
 		try:
 			encoded = self.format.encode(value)
 		except Exception as error:

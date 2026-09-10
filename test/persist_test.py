@@ -17,7 +17,7 @@ def increment_in_process(
 	lock_path: Path,
 	entered,
 	release,
-) -> None:
+):
 	files = Files(Config(lock_path))
 	with files.lock():
 		value = int(path.read_text())
@@ -184,7 +184,7 @@ def run_request(
 	lock_path: Path,
 	entered,
 	release,
-) -> None:
+):
 	def hold(req, ctx):
 		entered.set()
 		release.wait()

@@ -11,7 +11,7 @@ class MemoryHandle[T]:
 	def load(self) -> T:
 		return self.value
 
-	def save(self, value: T) -> None:
+	def save(self, value: T):
 		self.saved = value
 		self.value = value
 

@@ -55,7 +55,7 @@ class Attribute[StoredT, ValueT = StoredT]:
 				f"{owner.__name__}.{self.name} has not been initialized"
 			) from None
 
-	def __set__(self, instance: Model, value: ValueT) -> None:
+	def __set__(self, instance: Model, value: ValueT):
 		if self.name is None:
 			raise AttributeError("attribute has not been assigned to a model")
 		if self.name in instance._values and self.name not in instance._old_values:

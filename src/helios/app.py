@@ -20,7 +20,7 @@ class Context:
 			raise ComponentError(f"nothing provides {key.__qualname__}")
 		return cast(T, self.provided[key])
 
-	def put[T](self, key: type[T], val: T) -> None:
+	def put[T](self, key: type[T], val: T):
 		self.provided[key] = val
 
 	def enter[T](self, resource: AbstractContextManager[T]) -> T:
@@ -95,7 +95,7 @@ class Application:
 		return self.thread(req, ctx)
 
 
-def verify(components: list[Component[Any]]) -> None:
+def verify(components: list[Component[Any]]):
 	provided: set[type[Any]] = set()
 	for component in components:
 		if not hasattr(component, "provides"):

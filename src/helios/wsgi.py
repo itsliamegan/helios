@@ -155,7 +155,7 @@ class TestClient:
 		origin_only: bool = True,
 		path: str = "/",
 		**kwargs: Any,
-	) -> None:
+	):
 		self.client.set_cookie(
 			key,
 			value,
@@ -171,5 +171,5 @@ class TestClient:
 		*,
 		domain: str = "localhost",
 		path: str = "/",
-	) -> None:
+	):
 		self.client.delete_cookie(key, domain=domain, path=path)
