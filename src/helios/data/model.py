@@ -81,7 +81,7 @@ class Attribute[StoredT, ValueT = StoredT]:
 
 @overload
 def attr[T](
-	typ: type[T],
+	typ: type[T] | types.Type[T],
 	*,
 	default: T = _MISSING,
 	nullable: Literal[False] = False,
@@ -91,7 +91,7 @@ def attr[T](
 
 @overload
 def attr[T](
-	typ: type[T],
+	typ: type[T] | types.Type[T],
 	*,
 	default: T | None = _MISSING,
 	nullable: Literal[True],
@@ -100,18 +100,34 @@ def attr[T](
 
 
 def attr(
-	typ: type[Any],
+	typ: type[Any] | types.Type[Any],
 	*,
 	default: Any = _MISSING,
 	nullable: bool = False,
 	init: bool = True,
 ) -> Attribute[Any, Any]:
 	return Attribute(
-		types.Type.resolve(typ),
+		resolve_type(typ),
 		default=default,
 		nullable=nullable,
 		init=init,
 	)
+
+
+def resolve_type[T](typ: type[T] | types.Type[T]) -> types.Type[T]:
+	if typ is str:
+		return cast(types.Type[T], types.Str())
+	if typ is bool:
+		return cast(types.Type[T], types.Bool())
+	if typ is int:
+		return cast(types.Type[T], types.Int())
+	if typ is UUID:
+		return cast(types.Type[T], types.UUID())
+	if typ is datetime:
+		return cast(types.Type[T], types.Date())
+	if isinstance(typ, types.Type):
+		return typ
+	raise TypeError(f"unsupported attribute type: {typ!r}")
 
 
 class _ModelMeta(type):

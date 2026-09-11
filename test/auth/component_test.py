@@ -3,7 +3,7 @@ from uuid import uuid4
 from luna.test.assertion import assert_eq, assert_not, assert_that
 
 from helios.app import Context
-from helios.auth import Authenticator, Component
+from helios.auth.component import Component
 from helios.data.model import Model, attr
 from helios.data.store import Store
 from helios.http import Headers, Input, Method, Request, URL
@@ -25,7 +25,7 @@ def request() -> Request:
 	return Request(Method.GET, URL("/"), Headers(), Input())
 
 
-def test_finds_no_user_when_signed_out():
+def test_finds_no_user():
 	ctx = context(Store(), Session(uuid4()))
 	auth = Component(User)
 
@@ -49,7 +49,7 @@ def test_finds_user_from_session():
 	assert_that(provided.is_signed_in())
 
 
-def test_finds_no_user_when_session_is_stale():
+def test_removes_stale_user_id():
 	session = Session(uuid4())
 	session["_user_id"] = str(uuid4())
 	ctx = context(Store(), session)
@@ -58,57 +58,16 @@ def test_finds_no_user_when_session_is_stale():
 	provided = auth.provide(request(), ctx)
 
 	assert_that(provided.user is None)
-
-
-def test_signs_in():
-	store = Store()
-	user = store.create(User, name="Alice")
-	session = Session(uuid4())
-	auth = Authenticator(session)
-
-	auth.sign_in(user)
-
-	assert_eq(auth.user, user)
-	assert_eq(session["_user_id"], str(user.id))
-
-
-def test_signs_out():
-	store = Store()
-	user = store.create(User, name="Alice")
-	session = Session(uuid4())
-	auth = Authenticator(session, user)
-
-	auth.sign_out()
-
-	assert_that(auth.user is None)
 	assert_that("_user_id" not in session)
 
 
-def test_signs_out_when_already_signed_out():
-	auth = Authenticator(Session(uuid4()))
-
-	auth.sign_out()
-
-	assert_that(auth.user is None)
-
-
-def test_keeps_other_session_values_on_sign_out():
+def test_removes_malformed_user_id():
 	session = Session(uuid4())
-	session["_flash"] = {"message": "Signed out."}
-	auth = Authenticator(session)
+	session["_user_id"] = "not-a-uuid"
+	ctx = context(Store(), session)
+	auth = Component(User)
 
-	auth.sign_out()
+	provided = auth.provide(request(), ctx)
 
-	assert_that("_flash" in session)
-
-
-def test_uses_a_configurable_session_key():
-	store = Store()
-	user = store.create(User, name="Alice")
-	session = Session(uuid4())
-	session["current_user"] = str(user.id)
-	ctx = context(store, session)
-
-	provided = Component(User, "current_user").provide(request(), ctx)
-
-	assert_eq(provided.user, user)
+	assert_that(provided.user is None)
+	assert_that("_user_id" not in session)

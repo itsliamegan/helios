@@ -1,6 +1,8 @@
-from luna.test.assertion import assert_eq, assert_that
+from typing import cast
 
-from helios.http import Cookies, Headers, Input, Method, Request, URL
+from luna.test.assertion import assert_eq, assert_raises, assert_that
+
+from helios.http import Cookie, Cookies, Headers, Input, Method, Request, SameSite, URL
 
 
 def test_encodes_url_path():
@@ -67,6 +69,36 @@ def test_encodes_cookies():
 		str(cookies["session_id"]),
 		"session_id=51d0d53a-11dd-47a5-b438-5eb1b84e1432; Path=/; HttpOnly",
 	)
+
+
+def test_encodes_secure_same_site_cookie():
+	cookie = Cookie(
+		"session_id",
+		"51d0d53a-11dd-47a5-b438-5eb1b84e1432",
+		http_only=True,
+		secure=True,
+		same_site="Lax",
+	)
+
+	assert_eq(
+		str(cookie),
+		"session_id=51d0d53a-11dd-47a5-b438-5eb1b84e1432; Path=/; Secure; HttpOnly; SameSite=Lax",
+	)
+
+
+def test_accepts_canonical_same_site_values():
+	assert_that("SameSite=Lax" in str(Cookie("id", "1", same_site="Lax")))
+	assert_that("SameSite=Strict" in str(Cookie("id", "1", same_site="Strict")))
+	assert_that("SameSite=None" in str(Cookie("id", "1", same_site="None")))
+
+
+def test_rejects_noncanonical_same_site_values():
+	with assert_raises(ValueError):
+		Cookie("id", "1", same_site=cast(SameSite, "lax"))
+
+	cookie = Cookie("id", "1")
+	with assert_raises(ValueError):
+		cookie.same_site = cast(SameSite, "invalid")
 
 
 def test_adapts_cookies_from_headers():

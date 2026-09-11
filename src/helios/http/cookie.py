@@ -1,7 +1,10 @@
 from datetime import datetime
 from email.utils import formatdate
+from typing import Literal
 
 from .headers import Headers
+
+type SameSite = Literal["Lax", "Strict", "None"]
 
 
 class Cookie:
@@ -12,19 +15,32 @@ class Cookie:
 		path: str = "/",
 		expires: datetime | None = None,
 		http_only: bool = False,
+		secure: bool = False,
+		same_site: SameSite | None = None,
 	):
 		self.name = name
 		self.val = val
 		self.path = path
 		self.expires = expires
 		self.http_only = http_only
+		self.secure = secure
+		self.same_site = same_site
+
+	def __setattr__(self, name: str, value: object):
+		if name == "same_site" and value not in (None, "Lax", "Strict", "None"):
+			raise ValueError(f"unsupported SameSite value: {value!r}")
+		super().__setattr__(name, value)
 
 	def __str__(self) -> str:
 		res = f"{self.name}={self.val}; Path={self.path}"
 		if self.expires is not None:
 			res += f"; Expires={formatdate(self.expires.timestamp(), usegmt=True)}"
+		if self.secure:
+			res += "; Secure"
 		if self.http_only:
 			res += "; HttpOnly"
+		if self.same_site is not None:
+			res += f"; SameSite={self.same_site}"
 		return res
 
 	def __repr__(self) -> str:

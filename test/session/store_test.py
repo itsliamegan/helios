@@ -66,7 +66,34 @@ def test_deletes_values():
 	assert_that("user_id" not in session)
 
 
-def test_encodes_and_decodes_sessions():
+def test_rotates_attached_session():
+	old_id = uuid4()
+	session = Session(old_id, {"message": "Hello"})
+	sessions = Sessions({old_id: session})
+
+	session.rotate()
+
+	assert_that(session.id != old_id)
+	assert_that(old_id not in sessions)
+	assert_that(session.id in sessions)
+	assert_eq(sessions.get(session.id)["message"], "Hello")
+	assert_that(sessions.is_dirty())
+
+
+def test_doesnt_rotate_detached_session():
+	old_id = uuid4()
+	session = Session(old_id)
+	sessions = Sessions({old_id: session})
+	del sessions.sessions[old_id]
+
+	session.rotate()
+
+	assert_eq(session.id, old_id)
+	assert_that(not session.dirty)
+	assert_that(not sessions.is_dirty())
+
+
+def test_round_trips_sessions():
 	id = uuid4()
 	session = Session(id)
 	session["message"] = "You do not have access."

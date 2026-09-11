@@ -1,6 +1,8 @@
 from enum import Enum
 
-from .cookie import Cookies
+from .cookie import Cookie as Cookie
+from .cookie import Cookies as Cookies
+from .cookie import SameSite as SameSite
 from .headers import Headers
 from .url import URL
 

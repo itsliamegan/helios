@@ -317,6 +317,75 @@ def test_round_trips_string_attr():
 	assert_eq(found.title, created.title)
 
 
+def test_round_trips_custom_attrs():
+	class Token:
+		def __init__(self, value: str):
+			self.value = value
+
+		@classmethod
+		def check(cls, value: object):
+			if not isinstance(value, cls):
+				raise TypeError(f"expected a Token, got {type(value).__name__}")
+
+		@classmethod
+		def encode(cls, value: Token):
+			cls.check(value)
+			return value.value
+
+		@classmethod
+		def decode(cls, value: object) -> Token:
+			if not isinstance(value, str):
+				raise TypeError(f"expected a string, got {type(value).__name__}")
+			return cls(value)
+
+	class Secret(Model):
+		token = attr(Token)
+		optional_token = attr(Token, nullable=True)
+		default_token = attr(Token, default=Token("default"))
+
+	store = Store()
+	created = store.create(Secret, token=Token("required"))
+
+	decoded = decode(encode(store), Schema([Secret]))
+	found = decoded.find_one(Secret, created.id)
+	token: Token = found.token
+	optional_token: Token | None = found.optional_token
+	default_token: Token = found.default_token
+
+	assert_that(Secret.token.type is Token)
+	assert_eq(token.value, "required")
+	assert_that(optional_token is None)
+	assert_eq(default_token.value, "default")
+
+
+def test_accepts_custom_codec_object():
+	class Uppercase:
+		def check(self, value: object):
+			if not isinstance(value, str):
+				raise TypeError(f"expected a string, got {type(value).__name__}")
+
+		def encode(self, value: str):
+			self.check(value)
+			return value.upper()
+
+		def decode(self, value: object) -> str:
+			if not isinstance(value, str):
+				raise TypeError(f"expected a string, got {type(value).__name__}")
+			return value.lower()
+
+	class Label(Model):
+		name = attr(Uppercase())
+
+	store = Store()
+	created = store.create(Label, name="example")
+
+	decoded = decode(encode(store), Schema([Label]))
+	found = decoded.find_one(Label, created.id)
+	name: str = found.name
+
+	assert_eq(name, "example")
+
+
 def test_round_trips_integer_attr():
 	class Post(Model):
 		points = attr(int)

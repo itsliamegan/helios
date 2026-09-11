@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from helios.persist.files import JSONValue
 
@@ -13,6 +13,7 @@ class Session:
 		self.id = id
 		self.items = items
 		self.dirty = False
+		self.sessions: Sessions | None = None
 
 	def __getitem__(self, key: str) -> Any:
 		return self.items[key]
@@ -32,6 +33,16 @@ class Session:
 	def __contains__(self, key: str) -> bool:
 		return key in self.items
 
+	def rotate(self):
+		old_id = self.id
+		if self.sessions is None:
+			self.id = uuid4()
+		else:
+			self.sessions.rotate(self, old_id)
+			if self.id == old_id:
+				return
+		self.dirty = True
+
 	def __repr__(self) -> str:
 		return f"Session({self.id!r}, {self.items!r})"
 
@@ -41,6 +52,8 @@ class Sessions:
 		if sessions is None:
 			sessions = {}
 		self.sessions = sessions
+		for session in self.sessions.values():
+			session.sessions = self
 		self.dirty = False
 
 	def get(self, id: UUID) -> Session:
@@ -48,6 +61,20 @@ class Sessions:
 
 	def put(self, session: Session):
 		self.sessions[session.id] = session
+		session.sessions = self
+		self.dirty = True
+
+	def rotate(self, session: Session, old_id: UUID):
+		if old_id not in self.sessions:
+			return
+		if self.sessions[old_id] is not session:
+			raise RuntimeError("session does not belong to this collection")
+		new_id = uuid4()
+		while new_id in self.sessions:
+			new_id = uuid4()
+		del self.sessions[old_id]
+		session.id = new_id
+		self.sessions[new_id] = session
 		self.dirty = True
 
 	def is_dirty(self) -> bool:
