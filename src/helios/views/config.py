@@ -1,6 +1,6 @@
 from pathlib import Path
 
 
-class Config[T = Path]:
-	def __init__(self, dir: T):
+class Config:
+	def __init__(self, dir: Path):
 		self.dir = dir

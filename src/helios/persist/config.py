@@ -1,6 +1,6 @@
 from pathlib import Path
 
 
-class Config[T = Path]:
-	def __init__(self, lock_file: T):
+class Config:
+	def __init__(self, lock_file: Path):
 		self.lock_file = lock_file
