@@ -34,11 +34,16 @@ def setup(sessions: Sessions, *, secure: bool = False):
 	return component, persistence, ctx
 
 
+def provide(component: Component, req: Request, ctx: Context) -> Session:
+	ctx.put(Request, req)
+	return component.provide(ctx)
+
+
 def test_generates_id_without_cookie():
 	sessions = Sessions()
 	component, persistence, ctx = setup(sessions)
 
-	session = component.provide(request(), ctx)
+	session = provide(component, request(), ctx)
 	ctx.put(Session, session)
 	component.finish(Response.empty(), ctx)
 
@@ -50,7 +55,7 @@ def test_replaces_malformed_cookie_id():
 	sessions = Sessions()
 	component, _, ctx = setup(sessions)
 
-	session = component.provide(request("not-a-uuid"), ctx)
+	session = provide(component, request("not-a-uuid"), ctx)
 
 	assert_that(session.id in sessions)
 
@@ -60,7 +65,7 @@ def test_replaces_unknown_cookie_id():
 	sessions = Sessions()
 	component, _, ctx = setup(sessions)
 
-	session = component.provide(request(str(unknown_id)), ctx)
+	session = provide(component, request(str(unknown_id)), ctx)
 
 	assert_that(session.id != unknown_id)
 	assert_that(unknown_id not in sessions)
@@ -75,7 +80,7 @@ def test_reuses_known_session():
 	component, _, ctx = setup(sessions)
 
 	with time_machine.travel(now, tick=False):
-		session = component.provide(request(str(id)), ctx)
+		session = provide(component, request(str(id)), ctx)
 
 	assert_that(session is existing)
 	assert_eq(session.id, id)
@@ -90,7 +95,7 @@ def test_renews_session_at_expiry_boundary():
 	component, _, ctx = setup(sessions)
 
 	with time_machine.travel(now, tick=False):
-		session = component.provide(request(str(id)), ctx)
+		session = provide(component, request(str(id)), ctx)
 
 	assert_that(session is existing)
 	assert_eq(session.last_active_at, now)
@@ -108,7 +113,7 @@ def test_removes_expired_session():
 	component, _, ctx = setup(sessions)
 
 	with time_machine.travel(now, tick=False):
-		session = component.provide(request(str(id)), ctx)
+		session = provide(component, request(str(id)), ctx)
 
 	assert_that(session.id != id)
 	assert_that(id not in sessions)
@@ -118,7 +123,7 @@ def test_removes_expired_session():
 def test_sets_cookie_policy():
 	sessions = Sessions()
 	component, _, ctx = setup(sessions, secure=True)
-	session = component.provide(request(), ctx)
+	session = provide(component, request(), ctx)
 	ctx.put(Session, session)
 	response = Response.empty()
 
@@ -136,7 +141,7 @@ def test_rotates_session():
 	session = Session(old_id, {"message": "Hello"})
 	sessions = Sessions({old_id: session})
 	component, persistence, ctx = setup(sessions)
-	provided = component.provide(request(str(old_id)), ctx)
+	provided = provide(component, request(str(old_id)), ctx)
 	ctx.put(Session, provided)
 
 	provided.rotate()

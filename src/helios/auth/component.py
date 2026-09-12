@@ -3,7 +3,6 @@ from uuid import UUID
 from helios.app import Component, Context
 from helios.data.model import Model
 from helios.data.store import NotFoundError, Store
-from helios.http import Request
 from helios.session.store import Session
 
 from .state import Authenticator, SESSION_KEY
@@ -16,7 +15,7 @@ class Component(Component[Authenticator]):
 	def __init__(self, user_type: type[Model]):
 		self.user_type = user_type
 
-	def provide(self, req: Request, ctx: Context) -> Authenticator:
+	def provide(self, ctx: Context) -> Authenticator:
 		session = ctx.get(Session)
 		store = ctx.get(Store)
 

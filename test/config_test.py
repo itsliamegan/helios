@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from luna.test.assertion import assert_eq, assert_raises
 
 from helios.config import Config, ConfigError
+from helios.http import URL
 
 
 class FilesConfig:
@@ -66,6 +67,19 @@ def test_defaults_path_for_empty_value():
 	assert_eq(loaded.files.dir, Path("data"))
 
 
+def test_loads_url():
+	loaded = Config.load({"BASE_URL": "https://example.com:8443"})
+
+	assert_eq(str(loaded.url("BASE_URL")), "https://example.com:8443")
+
+
+def test_defaults_url():
+	loaded = Config.load({})
+	default = URL("http://localhost:8000")
+
+	assert_eq(loaded.url("BASE_URL", default), default)
+
+
 def test_requires_value():
 	loaded = Config.load({"EXAMPLE_BUCKET": " example-backups "})
 
@@ -112,3 +126,17 @@ def test_raises_for_empty_path():
 
 	with assert_raises(ConfigError):
 		loaded.path("EXAMPLE_FILES_DIR")
+
+
+def test_raises_for_missing_url():
+	loaded = Config.load({})
+
+	with assert_raises(ConfigError):
+		loaded.url("BASE_URL")
+
+
+def test_raises_for_empty_url():
+	loaded = Config.load({"BASE_URL": ""})
+
+	with assert_raises(ConfigError):
+		loaded.url("BASE_URL")

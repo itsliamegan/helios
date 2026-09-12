@@ -1,9 +1,16 @@
 from uuid import UUID
 
-from luna.test.assertion import assert_eq, assert_that
+from luna.test.assertion import assert_eq, assert_raises, assert_that
 
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
-from helios.routing import Group, Pattern, Route, Router
+from helios.routing import (
+	Group,
+	Pattern,
+	Route,
+	RouteNotFoundError,
+	Router,
+	URLs,
+)
 
 
 def test_dispatches_directly():
@@ -399,6 +406,137 @@ def test_group_flattening_preserves_declaration_and_matching_order():
 	assert_eq([route.handler for route in router.routes], [first, second, third])
 	match = router.match(Request(Method.GET, URL("/new"), Headers(), Input()))
 	assert_that(match[0].handler is first)
+
+
+def test_generates_named_grouped_route():
+	router = Router(
+		[
+			Group(
+				prefix="/boards",
+				routes=[
+					Route(
+						Method.GET,
+						Pattern("/{id:uuid}/edit"),
+						lambda req, ctx: Response.empty(),
+						name="boards.edit",
+					)
+				],
+			)
+		]
+	)
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+
+	path = router.path("boards.edit", {"id": id})
+
+	assert_eq(path, f"/boards/{id}/edit")
+
+
+def test_rejects_generated_params_outside_route_syntax():
+	router = Router(
+		[
+			Route(
+				Method.GET,
+				Pattern("/articles/{slug}"),
+				lambda req, ctx: Response.empty(),
+				name="articles.show",
+			)
+		]
+	)
+
+	with assert_raises(ValueError):
+		router.path("articles.show", {"slug": "today news"})
+
+
+def test_rejects_invalid_route_generation():
+	router = Router(
+		[
+			Route(
+				Method.GET,
+				Pattern("/articles/{slug}"),
+				lambda req, ctx: Response.empty(),
+				name="articles.show",
+			)
+		]
+	)
+
+	with assert_raises(RouteNotFoundError):
+		router.path("missing")
+	with assert_raises(ValueError):
+		router.path("articles.show")
+	with assert_raises(ValueError):
+		router.path("articles.show", {"slug": "intro", "extra": "value"})
+
+	uuid_router = Router(
+		[
+			Route(
+				Method.GET,
+				Pattern("/articles/{id:uuid}"),
+				lambda req, ctx: Response.empty(),
+				name="articles.uuid",
+			)
+		]
+	)
+	with assert_raises(ValueError):
+		uuid_router.path("articles.uuid", {"id": "not-a-uuid"})
+
+
+def test_rejects_duplicate_route_names():
+	with assert_raises(ValueError):
+		Router(
+			[
+				Route(
+					Method.GET,
+					Pattern("/"),
+					lambda req, ctx: Response.empty(),
+					name="home",
+				),
+				Route(
+					Method.GET,
+					Pattern("/other"),
+					lambda req, ctx: Response.empty(),
+					name="home",
+				),
+			]
+		)
+
+
+def test_generates_absolute_route_with_query_by_default():
+	router = Router(
+		[
+			Route(
+				Method.GET,
+				Pattern("/redemptions/new"),
+				lambda req, ctx: Response.empty(),
+				name="redemptions.new",
+			)
+		]
+	)
+	urls = URLs(router, URL("https://cork.example:8443"))
+
+	url = urls.route("redemptions.new", query={"token": "secret value"})
+
+	assert_eq(
+		str(url),
+		"https://cork.example:8443/redemptions/new?token=secret+value",
+	)
+
+
+def test_generates_relative_route_explicitly():
+	router = Router(
+		[
+			Route(
+				Method.GET,
+				Pattern("/boards/"),
+				lambda req, ctx: Response.empty(),
+				name="boards.index",
+			)
+		]
+	)
+	urls = URLs(router, URL("https://cork.example"))
+
+	url = urls.route("boards.index", absolute=False)
+
+	assert_eq(str(url), "/boards/")
 
 
 def test_reusing_group_configuration_doesnt_mutate_sources():

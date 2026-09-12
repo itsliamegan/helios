@@ -9,8 +9,8 @@ from helios.data.model import Model, attr
 from helios.data.store import Store
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
 from helios.limit import RateLimitedError
-from helios.limit.component import Component
 from helios.limit.config import Config
+from helios.limit.middleware import Middleware
 from helios.session.store import Session
 
 
@@ -47,32 +47,32 @@ def ok(req: Request, ctx) -> Response:
 
 
 def test_limits_unauthenticated_requests():
-	component = Component(config())
-	component(request(), context(), ok)
+	middleware = Middleware(config())
+	middleware(request(), context(), ok)
 
 	with assert_raises(RateLimitedError):
-		component(request(), context(), ok)
+		middleware(request(), context(), ok)
 
 
 def test_skips_authenticated_requests():
-	component = Component(config())
-	component(request(), context(), ok)
+	middleware = Middleware(config())
+	middleware(request(), context(), ok)
 
-	component(request(), context(signed_in=True), ok)
+	middleware(request(), context(signed_in=True), ok)
 
 
 def test_tracks_by_ip():
-	component = Component(config())
-	component(request("1.2.3.4"), context(), ok)
+	middleware = Middleware(config())
+	middleware(request("1.2.3.4"), context(), ok)
 
-	component(request("5.6.7.8"), context(), ok)
+	middleware(request("5.6.7.8"), context(), ok)
 
 
 def test_uses_configured_header():
-	component = Component(config(header="X-Real-Ip"))
+	middleware = Middleware(config(header="X-Real-Ip"))
 	req = Request(Method.GET, URL("/"), Headers({"X-Real-Ip": "1.2.3.4"}), Input())
-	component(req, context(), ok)
+	middleware(req, context(), ok)
 
 	with assert_raises(RateLimitedError):
 		req = Request(Method.GET, URL("/"), Headers({"X-Real-Ip": "1.2.3.4"}), Input())
-		component(req, context(), ok)
+		middleware(req, context(), ok)

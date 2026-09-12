@@ -5,6 +5,8 @@ from typing import Self
 
 from dotenv import dotenv_values
 
+from helios.http import URL
+
 
 class ConfigError(Exception):
 	pass
@@ -47,6 +49,11 @@ class Config:
 		if self.value(name) is None and default is not None:
 			return default
 		return Path(self.require(name))
+
+	def url(self, name: str, default: URL | None = None) -> URL:
+		if self.value(name) is None and default is not None:
+			return default
+		return URL(self.require(name))
 
 	def require(self, name: str) -> str:
 		value = self.value(name)

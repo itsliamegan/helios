@@ -17,6 +17,21 @@ def test_encodes_url_query():
 	assert_eq(str(url), "/search?q=today&tags=news&tags=politics")
 
 
+def test_encodes_absolute_url():
+	url = URL("/search", {"q": "today"}, scheme="https", host="example.com")
+
+	assert_eq(str(url), "https://example.com/search?q=today")
+
+
+def test_preserves_absolute_url_port():
+	url = URL("https://example.com:8443/search")
+
+	assert_eq(url.scheme, "https")
+	assert_eq(url.host, "example.com")
+	assert_eq(url.port, 8443)
+	assert_eq(str(url), "https://example.com:8443/search")
+
+
 def test_gets_request_referrer():
 	request = Request(
 		Method.GET,

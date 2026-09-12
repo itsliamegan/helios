@@ -11,13 +11,14 @@ from .store import Format, MAX_AGE, Session
 
 class Component(Component[Session]):
 	provides = Session
-	requires = (Persistence,)
+	requires = (Request, Persistence)
 
 	def __init__(self, config: Config, files: Files):
 		self.secure = config.secure
 		self.file = files.json(config.store_file, Format())
 
-	def provide(self, req: Request, ctx: Context) -> Session:
+	def provide(self, ctx: Context) -> Session:
+		req = ctx.get(Request)
 		persistence = ctx.get(Persistence)
 
 		sessions = persistence.open(self.file).load()

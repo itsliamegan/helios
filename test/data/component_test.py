@@ -3,6 +3,7 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_raises
 
+import helios.app
 from helios.app import Application, ComponentError, Context
 from helios.data.component import Component
 from helios.data.config import Config
@@ -33,6 +34,7 @@ def persistence(path: Path) -> tuple[Files, JSONFile[Store]]:
 def application(path: Path, handler) -> Application:
 	files, _ = persistence(path)
 	return Application(
+		helios.app.Config(),
 		Router([Route(Method.GET, Pattern("/"), handler)]),
 		[
 			helios.persist.component.Component(files),
@@ -54,7 +56,7 @@ def test_uses_persistence_protocol():
 	ctx = Context()
 	ctx.put(Persistence, persistence)
 
-	store = component.provide(request(), ctx)
+	store = component.provide(ctx)
 	ctx.put(Store, store)
 	store.create(Post, title="Intro")
 	component.finish(Response.empty(), ctx)
@@ -85,7 +87,7 @@ def test_requires_persistence():
 		component = Component(Config(path), files, Schema([Post]))
 
 		with assert_raises(ComponentError):
-			component.provide(request(), Context())
+			component.provide(Context())
 
 
 def test_redirect_saves():

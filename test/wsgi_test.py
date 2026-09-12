@@ -1,6 +1,7 @@
 from luna.test.assertion import assert_eq, assert_that
 from werkzeug.test import EnvironBuilder
 
+import helios.app
 from helios.http import Body, Cookies, Headers, Method, Response, Status, URL
 from helios.routing import Pattern, Route, Router
 from helios.wsgi import Application, TestClient, adapt_env, adapt_res
@@ -222,6 +223,6 @@ def test_client_submits_method_override():
 
 
 def make_client(routes):
-	app = Application(Router(routes), [])
+	app = Application(helios.app.Config(), Router(routes), [])
 	app.boot()
 	return TestClient(app)

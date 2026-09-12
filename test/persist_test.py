@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
+import helios.app
 from helios.app import Application
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
 from helios.persist.component import Component
@@ -191,6 +192,7 @@ def run_request(
 		return Response.empty(Status.OK)
 
 	app = Application(
+		helios.app.Config(),
 		Router([Route(Method.GET, Pattern("/"), hold)]),
 		[Component(Files(Config(lock_path)))],
 	)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from helios.app import Component, Context
-from helios.http import Request, Response
+from helios.http import Response
 from helios.session.store import Session
 
 
@@ -53,7 +53,7 @@ class Component(Component[Flashes]):
 	provides = Flashes
 	requires = (Session,)
 
-	def provide(self, req: Request, ctx: Context) -> Flashes:
+	def provide(self, ctx: Context) -> Flashes:
 		session = ctx.get(Session)
 
 		if "_flash" in session:

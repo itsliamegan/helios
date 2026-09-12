@@ -1,4 +1,4 @@
-from helios.app import Component, Context, Next
+from helios.app import Context, Next
 from helios.auth.state import Authenticator
 from helios.http import Request, Response
 
@@ -6,8 +6,7 @@ from .config import Config
 from .limiter import RateLimiter
 
 
-class Component(Component[None]):
-	provides = None
+class Middleware:
 	requires = (Authenticator,)
 
 	def __init__(self, config: Config):

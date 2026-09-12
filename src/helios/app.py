@@ -1,24 +1,28 @@
 from collections.abc import Callable
 from contextlib import AbstractContextManager, ExitStack
+from enum import Enum
 from typing import Any, cast
 
-from helios.http import Method, Request, Response, Status
+from helios.http import Method, Request, Response, Status, URL
 from helios.http.error import HTTPError
-from helios.routing import Router
+from helios.routing import Router, URLs
 
 type Next = Callable[[Request, Any], Response]
 type Middleware = Callable[[Request, Any, Next], Response]
 
 
 class Context:
-	def __init__(self):
+	def __init__(self, parent: Context | None = None):
+		self.parent = parent
 		self.provided: dict[type[Any], Any] = {}
 		self.resources = ExitStack()
 
 	def get[T](self, key: type[T]) -> T:
-		if key not in self.provided:
-			raise ComponentError(f"nothing provides {key.__qualname__}")
-		return cast(T, self.provided[key])
+		if key in self.provided:
+			return cast(T, self.provided[key])
+		if self.parent is not None:
+			return self.parent.get(key)
+		raise ComponentError(f"nothing provides {key.__qualname__}")
 
 	def put[T](self, key: type[T], val: T):
 		self.provided[key] = val
@@ -31,14 +35,25 @@ class ComponentError(Exception):
 	pass
 
 
+class Lifetime(Enum):
+	APPLICATION = "application"
+	REQUEST = "request"
+
+
+class Config:
+	def __init__(self, base_url: URL | None = None):
+		self.base_url = base_url
+
+
 class Component[T]:
+	lifetime = Lifetime.REQUEST
 	provides: type[T] | None
 	requires: tuple[type[Any], ...] = ()
 
 	def boot(self):
 		pass
 
-	def provide(self, req: Request, ctx: Context) -> T:
+	def provide(self, ctx: Context) -> T:
 		raise NotImplementedError
 
 	def finish(self, res: Response, ctx: Context):
@@ -46,7 +61,7 @@ class Component[T]:
 
 	def __call__(self, req: Request, ctx: Context, next: Next) -> Response:
 		if self.provides is not None:
-			ctx.put(self.provides, self.provide(req, ctx))
+			ctx.put(self.provides, self.provide(ctx))
 		res = next(req, ctx)
 		self.finish(res, ctx)
 		return res
@@ -71,40 +86,70 @@ class Thread:
 class Application:
 	def __init__(
 		self,
+		config: Config,
 		router: Router,
 		components: list[Component[Any]],
+		middlewares: list[Middleware] | None = None,
 	):
-		verify(components)
-		middlewares: list[Middleware] = [
+		self.context = Context()
+		self.context.put(Router, router)
+		if config.base_url is not None:
+			self.context.put(URLs, URLs(router, config.base_url))
+		provided = verify(components, set(self.context.provided))
+		middlewares = middlewares or []
+		verify_middlewares(middlewares, provided)
+		request_components = [
+			component
+			for component in components
+			if component.lifetime is Lifetime.REQUEST
+		]
+		thread: list[Middleware] = [
 			ensure_content_length,
 			capture_errors,
 			manage_resources,
 			adapt_artificial_method,
-			*components,
+			*request_components,
+			*middlewares,
 			handle_http_errors,
 		]
-		self.thread = Thread.build(middlewares, router)
+		self.thread = Thread.build(thread, router)
 		self.components = components
 
 	def boot(self):
 		for component in self.components:
 			component.boot()
+			if (
+				component.lifetime is Lifetime.APPLICATION
+				and component.provides is not None
+			):
+				self.context.put(component.provides, component.provide(self.context))
 
 	def handle(self, req: Request) -> Response:
-		ctx = Context()
+		ctx = Context(self.context)
+		ctx.put(Request, req)
 		return self.thread(req, ctx)
 
 
-def verify(components: list[Component[Any]]):
-	provided: set[type[Any]] = set()
+def verify(
+	components: list[Component[Any]],
+	application_provided: set[type[Any]] | None = None,
+):
+	application_provided = application_provided or set()
+	request_provided = {*application_provided, Request}
+	provided = set(request_provided)
 	for component in components:
 		if not hasattr(component, "provides"):
 			raise ComponentError(
 				f"{type(component).__qualname__} does not declare what it provides"
 			)
 
+		available = (
+			application_provided
+			if component.lifetime is Lifetime.APPLICATION
+			else request_provided
+		)
 		for requirement in component.requires:
-			if requirement not in provided:
+			if requirement not in available:
 				raise ComponentError(
 					f"{type(component).__qualname__} requires "
 					f"{requirement.__qualname__}, which no earlier component provides"
@@ -117,6 +162,23 @@ def verify(components: list[Component[Any]]):
 				f"more than one component provides {component.provides.__qualname__}"
 			)
 		provided.add(component.provides)
+		if component.lifetime is Lifetime.APPLICATION:
+			application_provided.add(component.provides)
+		request_provided.add(component.provides)
+	return provided
+
+
+def verify_middlewares(
+	middlewares: list[Middleware],
+	provided: set[type[Any]],
+):
+	for middleware in middlewares:
+		for requirement in getattr(middleware, "requires", ()):
+			if requirement not in provided:
+				raise ComponentError(
+					f"{type(middleware).__qualname__} requires "
+					f"{requirement.__qualname__}, which no component provides"
+				)
 
 
 def manage_resources(req: Request, ctx: Context, next: Next) -> Response:

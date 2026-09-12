@@ -1,5 +1,5 @@
 from helios.app import Component, Context
-from helios.http import Request, Response
+from helios.http import Response
 from helios.persist.files import Files, Persistence
 
 from .config import Config
@@ -13,7 +13,7 @@ class Component(Component[Store]):
 	def __init__(self, config: Config, files: Files, schema: Schema):
 		self.file = files.json(config.store_file, Format(schema))
 
-	def provide(self, req: Request, ctx: Context) -> Store:
+	def provide(self, ctx: Context) -> Store:
 		persistence = ctx.get(Persistence)
 		return persistence.open(self.file).load()
 

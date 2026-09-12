@@ -1,9 +1,11 @@
 from collections.abc import Callable
 import re
 from typing import Any, Concatenate
+from urllib.parse import quote
 
 from helios.http import Method, Request, Response, URL
 from helios.http.error import NotFoundError as BaseNotFoundError
+from helios.http.url import Query
 
 from . import convert
 
@@ -13,6 +15,10 @@ class NotFoundError(BaseNotFoundError):
 
 
 class MethodNotAllowedError(Exception):
+	pass
+
+
+class RouteNotFoundError(LookupError):
 	pass
 
 
@@ -46,6 +52,29 @@ class Pattern:
 		else:
 			return None
 
+	def generate(self, params: dict[str, Any] | None = None) -> str:
+		params = params or {}
+		expected = set(self.converters)
+		supplied = set(params)
+		missing = expected - supplied
+		unexpected = supplied - expected
+		if missing:
+			raise ValueError(f"missing route parameters: {", ".join(sorted(missing))}")
+		if unexpected:
+			raise ValueError(
+				f"unexpected route parameters: {", ".join(sorted(unexpected))}"
+			)
+
+		def replace(match: re.Match[str]) -> str:
+			name = match.group(1)
+			value = str(self.converters[name](str(params[name])))
+			encoded = quote(value, safe="")
+			if re.fullmatch(PARAM_VALUE_REGEX, encoded) is None:
+				raise ValueError(f"invalid route parameter: {name}")
+			return encoded
+
+		return PARAM_REGEX.sub(replace, self.raw)
+
 	def convert(self, raw_params: dict[str, str]) -> dict[str, Any] | None:
 		try:
 			params = {}
@@ -70,11 +99,13 @@ class Route:
 		pattern: Pattern,
 		handler: Handler[...],
 		guards: list[Guard[...]] | None = None,
+		name: str | None = None,
 	):
 		self.method = method
 		self.pattern = pattern
 		self.handler = handler
 		self.guards = guards or []
+		self.name = name
 
 	def match(self, req: Request) -> dict[str, Any] | None:
 		if req.method is not self.method:
@@ -85,7 +116,10 @@ class Route:
 		return None
 
 	def __repr__(self) -> str:
-		return f"Route({self.method!r}, {self.pattern!r}, {self.handler!r})"
+		return (
+			f"Route({self.method!r}, {self.pattern!r}, {self.handler!r}, "
+			f"name={self.name!r})"
+		)
 
 
 class Group:
@@ -107,9 +141,9 @@ class Group:
 		guards: list[Guard[...]] | None = None,
 	) -> list[Route]:
 		guards = guards or []
-		routes = []
+		routes: list[Route] = []
 		for item in items:
-			if isinstance(item, cls):
+			if isinstance(item, Group):
 				routes.extend(
 					cls.flatten(
 						item.routes,
@@ -124,6 +158,7 @@ class Group:
 						Pattern(cls.join(prefix, item.pattern.raw)),
 						item.handler,
 						[*guards, *item.guards],
+						item.name,
 					)
 				)
 			else:
@@ -142,6 +177,18 @@ class Group:
 class Router:
 	def __init__(self, routes: list[Route | Group]):
 		self.routes = Group.flatten(routes)
+		self.named: dict[str, Route] = {}
+		for route in self.routes:
+			if route.name is None:
+				continue
+			if route.name in self.named:
+				raise ValueError(f"duplicate route name: {route.name}")
+			self.named[route.name] = route
+
+	def path(self, name: str, params: dict[str, Any] | None = None) -> str:
+		if name not in self.named:
+			raise RouteNotFoundError(f"route not found: {name}")
+		return self.named[name].pattern.generate(params)
 
 	def match(self, req: Request) -> tuple[Route, dict[str, Any]] | None:
 		for route in self.routes:
@@ -160,3 +207,30 @@ class Router:
 			if res is not None:
 				return res
 		return route.handler(req, ctx, **params)
+
+
+class URLs:
+	def __init__(self, router: Router, base_url: URL):
+		if base_url.scheme is None or base_url.host is None:
+			raise ValueError("base URL must be absolute")
+		self.router = router
+		self.base_url = base_url
+
+	def route(
+		self,
+		name: str,
+		params: dict[str, Any] | None = None,
+		query: Query | None = None,
+		*,
+		absolute: bool = True,
+	) -> URL:
+		path = self.router.path(name, params)
+		if not absolute:
+			return URL(path, query)
+		return URL(
+			path,
+			query,
+			scheme=self.base_url.scheme,
+			host=self.base_url.host,
+			port=self.base_url.port,
+		)
