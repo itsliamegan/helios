@@ -35,12 +35,14 @@ class Password:
 
 
 class Digest:
+	method: str = "scrypt"
+
 	def __init__(self, encoded: str):
 		self.encoded = encoded
 
 	@classmethod
 	def generate(cls, plaintext: str) -> Self:
-		return cls(generate_password_hash(plaintext))
+		return cls(generate_password_hash(plaintext, method=cls.method))
 
 	def matches(self, candidate: str) -> bool:
 		return check_password_hash(self.encoded, candidate)

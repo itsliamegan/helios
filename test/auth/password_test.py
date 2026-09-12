@@ -4,6 +4,8 @@ from helios.auth.password import Digest, Password
 from helios.data.model import Model, attr
 from helios.data.store import Schema, Store, decode, encode
 
+Digest.method = "pbkdf2:sha256:1"
+
 
 def test_creates_and_matches_password():
 	password = Password.from_plaintext("correct")
