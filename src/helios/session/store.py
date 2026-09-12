@@ -1,17 +1,26 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
 
 from helios.persist.files import JSONValue
 
+MAX_AGE = timedelta(days=30)
+
 
 class Session:
-	def __init__(self, id: UUID, items: dict[str, Any] | None = None):
+	def __init__(
+		self,
+		id: UUID,
+		items: dict[str, Any] | None = None,
+		last_active_at: datetime | None = None,
+	):
 		if items is None:
 			items = {}
 		self.id = id
 		self.items = items
+		self.last_active_at = last_active_at
 		self.dirty = False
 		self.sessions: Sessions | None = None
 
@@ -32,6 +41,20 @@ class Session:
 
 	def __contains__(self, key: str) -> bool:
 		return key in self.items
+
+	def touch(self):
+		self.last_active_at = datetime.now(UTC)
+		self.dirty = True
+
+	def is_expired(self) -> bool:
+		return (
+			self.last_active_at is not None
+			and self.last_active_at + MAX_AGE < datetime.now(UTC)
+		)
+
+	def invalidate(self):
+		if self.sessions is not None:
+			self.sessions.remove(self.id)
 
 	def rotate(self):
 		old_id = self.id
@@ -64,6 +87,18 @@ class Sessions:
 		session.sessions = self
 		self.dirty = True
 
+	def remove(self, id: UUID):
+		session = self.sessions.pop(id, None)
+		if session is None:
+			return
+		session.sessions = None
+		self.dirty = True
+
+	def purge(self):
+		for id, session in list(self.sessions.items()):
+			if session.is_expired():
+				self.remove(id)
+
 	def rotate(self, session: Session, old_id: UUID):
 		if old_id not in self.sessions:
 			return
@@ -89,22 +124,28 @@ class Sessions:
 
 class Format:
 	def encode(self, sessions: Sessions) -> JSONValue:
-		return cast(JSONValue, encode(sessions))
+		data = {}
+		for id, session in sessions.sessions.items():
+			data[str(id)] = {
+				"items": session.items,
+				"last_active_at": (
+					session.last_active_at.isoformat()
+					if session.last_active_at is not None
+					else None
+				),
+			}
+		return cast(JSONValue, data)
 
 	def decode(self, value: JSONValue) -> Sessions:
-		return decode(cast(dict[str, Any], value))
-
-
-def encode(sessions: Sessions) -> dict[str, Any]:
-	data = {}
-	for id in sessions.sessions:
-		data[str(id)] = sessions.sessions[id].items
-	return data
-
-
-def decode(data: dict[str, Any]) -> Sessions:
-	sessions = {}
-	for raw_id, session_data in data.items():
-		id = UUID(raw_id)
-		sessions[id] = Session(id, session_data)
-	return Sessions(sessions)
+		data = cast(dict[str, Any], value)
+		sessions = {}
+		for raw_id, session_data in data.items():
+			id = UUID(raw_id)
+			raw_last_active_at = session_data["last_active_at"]
+			last_active_at = (
+				datetime.fromisoformat(raw_last_active_at)
+				if raw_last_active_at is not None
+				else None
+			)
+			sessions[id] = Session(id, session_data["items"], last_active_at)
+		return Sessions(sessions)

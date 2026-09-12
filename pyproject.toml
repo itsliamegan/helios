@@ -38,5 +38,6 @@ luna = { path = "../luna", editable = true }
 [dependency-groups]
 dev = [
 	"luna",
+	"time-machine>=3.5.1",
 	"ty>=0.0.80",
 ]

@@ -1,7 +1,9 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
 from luna.test.assertion import assert_eq, assert_that
+import time_machine
 
 from helios.app import Context
 from helios.http import Headers, Input, Method, Request, Response, URL
@@ -9,7 +11,7 @@ import helios.persist.config
 from helios.persist.files import Files, Persistence
 from helios.session.component import Component
 from helios.session.config import Config
-from helios.session.store import Session, Sessions
+from helios.session.store import MAX_AGE, Session, Sessions
 from test.support import MemoryPersistence
 
 
@@ -65,15 +67,52 @@ def test_replaces_unknown_cookie_id():
 	assert_that(session.id in sessions)
 
 
-def test_reuses_known_cookie_id():
+def test_reuses_known_session():
 	id = uuid4()
+	now = datetime(2026, 10, 12, tzinfo=UTC)
 	existing = Session(id, {"message": "Hello"})
 	sessions = Sessions({id: existing})
 	component, _, ctx = setup(sessions)
 
-	session = component.provide(request(str(id)), ctx)
+	with time_machine.travel(now, tick=False):
+		session = component.provide(request(str(id)), ctx)
 
 	assert_that(session is existing)
+	assert_eq(session.id, id)
+	assert_eq(session.last_active_at, now)
+
+
+def test_renews_session_at_expiry_boundary():
+	id = uuid4()
+	now = datetime(2026, 10, 12, tzinfo=UTC)
+	existing = Session(id, last_active_at=now - MAX_AGE)
+	sessions = Sessions({id: existing})
+	component, _, ctx = setup(sessions)
+
+	with time_machine.travel(now, tick=False):
+		session = component.provide(request(str(id)), ctx)
+
+	assert_that(session is existing)
+	assert_eq(session.last_active_at, now)
+
+
+def test_removes_expired_session():
+	id = uuid4()
+	now = datetime(2026, 10, 12, tzinfo=UTC)
+	existing = Session(
+		id,
+		{"message": "Hello"},
+		last_active_at=now - MAX_AGE - timedelta(microseconds=1),
+	)
+	sessions = Sessions({id: existing})
+	component, _, ctx = setup(sessions)
+
+	with time_machine.travel(now, tick=False):
+		session = component.provide(request(str(id)), ctx)
+
+	assert_that(session.id != id)
+	assert_that(id not in sessions)
+	assert_that(session.id in sessions)
 
 
 def test_sets_cookie_policy():
@@ -92,7 +131,7 @@ def test_sets_cookie_policy():
 	assert_that(cookie.expires is not None)
 
 
-def test_persists_rotated_session():
+def test_rotates_session():
 	old_id = uuid4()
 	session = Session(old_id, {"message": "Hello"})
 	sessions = Sessions({old_id: session})

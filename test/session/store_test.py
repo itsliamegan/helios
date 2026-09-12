@@ -1,8 +1,10 @@
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from luna.test.assertion import assert_eq, assert_that
+import time_machine
 
-from helios.session.store import Format, Session, Sessions
+from helios.session.store import Format, MAX_AGE, Session, Sessions
 
 
 def test_finds_session_by_id():
@@ -80,6 +82,29 @@ def test_rotates_attached_session():
 	assert_that(sessions.is_dirty())
 
 
+def test_invalidates_attached_session():
+	session = Session(uuid4())
+	sessions = Sessions({session.id: session})
+
+	session.invalidate()
+
+	assert_that(session.id not in sessions)
+	assert_that(sessions.is_dirty())
+
+
+def test_purges_expired_sessions():
+	now = datetime(2026, 3, 15, tzinfo=UTC)
+	expired = Session(uuid4(), last_active_at=now - MAX_AGE - timedelta(microseconds=1))
+	active = Session(uuid4(), last_active_at=now - MAX_AGE)
+	sessions = Sessions({expired.id: expired, active.id: active})
+
+	with time_machine.travel(now, tick=False):
+		sessions.purge()
+
+	assert_that(expired.id not in sessions)
+	assert_that(active.id in sessions)
+
+
 def test_doesnt_rotate_detached_session():
 	old_id = uuid4()
 	session = Session(old_id)
@@ -93,9 +118,10 @@ def test_doesnt_rotate_detached_session():
 	assert_that(not sessions.is_dirty())
 
 
-def test_round_trips_sessions():
+def test_round_trips_sessions_with_activity():
 	id = uuid4()
-	session = Session(id)
+	last_active_at = datetime(2026, 3, 15, tzinfo=UTC)
+	session = Session(id, last_active_at=last_active_at)
 	session["message"] = "You do not have access."
 	sessions = Sessions({id: session})
 
@@ -103,3 +129,4 @@ def test_round_trips_sessions():
 	decoded = Format().decode(encoded)
 
 	assert_eq(decoded.get(id)["message"], "You do not have access.")
+	assert_eq(decoded.get(id).last_active_at, last_active_at)
