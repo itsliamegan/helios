@@ -7,11 +7,9 @@ from .limiter import RateLimiter
 
 
 class Middleware:
-	requires = (Authenticator,)
-
 	def __init__(self, config: Config):
-		self.limiter = RateLimiter(config.limit, config.window)
 		self.header = config.header
+		self.limiter = RateLimiter(config.limit, config.window)
 
 	def __call__(self, req: Request, ctx: Context, next: Next) -> Response:
 		auth = ctx.get(Authenticator)

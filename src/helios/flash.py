@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from helios.app import Component, Context
-from helios.http import Response
+from helios.app import Application, Container, Context, Next, Provider
+from helios.http import Request, Response
 from helios.session.store import Session
 
 
@@ -49,23 +49,24 @@ class Flash:
 		self.is_dirty = False
 
 
-class Component(Component[Flashes]):
-	provides = Flashes
-	requires = (Session,)
+class Provider(Provider):
+	def register(self, container: Container):
+		container.scoped(Flashes, self.flashes)
 
-	def provide(self, ctx: Context) -> Flashes:
-		session = ctx.get(Session)
+	def boot(self, application: Application):
+		application.use(self.middleware)
 
+	def flashes(self, context: Context) -> Flashes:
+		session = context.get(Session)
 		if "_flash" in session:
 			flashes = Flashes(session["_flash"])
 			del session["_flash"]
-		else:
-			flashes = Flashes()
-		return flashes
+			return flashes
+		return Flashes()
 
-	def finish(self, res: Response, ctx: Context):
-		flashes = ctx.get(Flashes)
-		session = ctx.get(Session)
-
-		if flashes.is_dirty():
-			session["_flash"] = flashes.dirty()
+	def middleware(self, request: Request, context: Context, next: Next) -> Response:
+		response = next(request, context)
+		flashes = context.resolved(Flashes)
+		if flashes is not None and flashes.is_dirty():
+			context.get(Session)["_flash"] = flashes.dirty()
+		return response

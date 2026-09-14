@@ -1,20 +1,18 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq, assert_raises
+from luna.test.assertion import assert_eq
 
 import helios.app
-from helios.app import Application, ComponentError, Context
-from helios.data.component import Component
+from helios.app import Application
 from helios.data.config import Config
 from helios.data.model import Model, attr
 from helios.data.store import Format, Schema, Store
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
-import helios.persist.component
+import helios.persist
 import helios.persist.config
-from helios.persist.files import Files, JSONFile, Persistence
+from helios.persist.files import Files, JSONFile
 from helios.routing import NotFoundError, Pattern, Route, Router
-from test.support import MemoryPersistence
 
 
 class Post(Model):
@@ -37,8 +35,8 @@ def application(path: Path, handler) -> Application:
 		helios.app.Config(),
 		Router([Route(Method.GET, Pattern("/"), handler)]),
 		[
-			helios.persist.component.Component(files),
-			Component(Config(path), files, Schema([Post])),
+			helios.persist.Provider(files),
+			helios.data.Provider(Config(path), files, Schema([Post])),
 		],
 	)
 
@@ -47,21 +45,6 @@ def load_store(path: Path) -> Store:
 	files, file = persistence(path)
 	with files.lock() as scope:
 		return scope.open(file).load()
-
-
-def test_uses_persistence_protocol():
-	persistence = MemoryPersistence(Store())
-	files = Files(helios.persist.config.Config(Path("persistence.lock")))
-	component = Component(Config(Path("store.json")), files, Schema([Post]))
-	ctx = Context()
-	ctx.put(Persistence, persistence)
-
-	store = component.provide(ctx)
-	ctx.put(Store, store)
-	store.create(Post, title="Intro")
-	component.finish(Response.empty(), ctx)
-
-	assert_eq(persistence.handle.saved, store)
 
 
 def test_skips_write_for_unchanged_store():
@@ -77,17 +60,6 @@ def test_skips_write_for_unchanged_store():
 		app.handle(request())
 
 		assert_eq(path.read_text(), "[]\n")
-
-
-def test_requires_persistence():
-	with TemporaryDirectory() as dir:
-		path = Path(dir, "store.json")
-		path.write_text("[]")
-		files, _ = persistence(path)
-		component = Component(Config(path), files, Schema([Post]))
-
-		with assert_raises(ComponentError):
-			component.provide(Context())
 
 
 def test_redirect_saves():

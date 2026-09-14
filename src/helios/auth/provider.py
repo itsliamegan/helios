@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from helios.app import Component, Context
+from helios.app import Container, Context, Provider
 from helios.data.model import Model
 from helios.data.store import NotFoundError, Store
 from helios.session.store import Session
@@ -8,16 +8,16 @@ from helios.session.store import Session
 from .state import Authenticator, SESSION_KEY
 
 
-class Component(Component[Authenticator]):
-	provides = Authenticator
-	requires = (Session, Store)
-
+class Provider(Provider):
 	def __init__(self, user_type: type[Model]):
 		self.user_type = user_type
 
-	def provide(self, ctx: Context) -> Authenticator:
-		session = ctx.get(Session)
-		store = ctx.get(Store)
+	def register(self, container: Container):
+		container.scoped(Authenticator, self.authenticator)
+
+	def authenticator(self, context: Context) -> Authenticator:
+		session = context.get(Session)
+		store = context.get(Store)
 
 		if SESSION_KEY in session:
 			raw_id = session[SESSION_KEY]

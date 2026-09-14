@@ -7,9 +7,9 @@ from luna.test.assertion import assert_eq, assert_raises, assert_that
 import helios.app
 from helios.app import Application
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
-from helios.persist.component import Component
+from helios.persist import Provider
 from helios.persist.config import Config
-from helios.persist.files import Files
+from helios.persist.files import Files, Persistence
 from helios.routing import Pattern, Route, Router
 
 
@@ -187,6 +187,7 @@ def run_request(
 	release,
 ):
 	def hold(req, ctx):
+		ctx.get(Persistence)
 		entered.set()
 		release.wait()
 		return Response.empty(Status.OK)
@@ -194,7 +195,7 @@ def run_request(
 	app = Application(
 		helios.app.Config(),
 		Router([Route(Method.GET, Pattern("/"), hold)]),
-		[Component(Files(Config(lock_path)))],
+		[Provider(Files(Config(lock_path)))],
 	)
 	res = app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
 	if res.status is not Status.OK:

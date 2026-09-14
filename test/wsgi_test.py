@@ -224,5 +224,4 @@ def test_client_submits_method_override():
 
 def make_client(routes):
 	app = Application(helios.app.Config(), Router(routes), [])
-	app.boot()
 	return TestClient(app)

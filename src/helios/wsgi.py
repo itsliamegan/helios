@@ -2,17 +2,17 @@ from collections.abc import Iterable
 from typing import Any
 from urllib.parse import parse_qs as parse_query
 from urllib.parse import urlparse as parse_url
-from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
+from wsgiref.types import StartResponse, WSGIEnvironment
 
 from werkzeug.http import parse_options_header
 from werkzeug.test import Client, Cookie, TestResponse
 from werkzeug.wsgi import get_current_url, get_input_stream
 
-from helios.app import Application
+import helios.app
 from helios.http import Headers, Input, Method, Request, Response, URL
 
 
-class Application(Application, WSGIApplication):
+class Application(helios.app.Application):
 	def __call__(
 		self,
 		env: WSGIEnvironment,

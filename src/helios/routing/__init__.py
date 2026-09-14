@@ -1,6 +1,6 @@
 from collections.abc import Callable
 import re
-from typing import Any, Concatenate
+from typing import Any, Concatenate, TYPE_CHECKING
 from urllib.parse import quote
 
 from helios.http import Method, Request, Response, URL
@@ -8,6 +8,9 @@ from helios.http.error import NotFoundError as BaseNotFoundError
 from helios.http.url import Query
 
 from . import convert
+
+if TYPE_CHECKING:
+	from helios.app import Context
 
 
 class NotFoundError(BaseNotFoundError):
@@ -88,8 +91,8 @@ class Pattern:
 		return f"Pattern({self.raw!r})"
 
 
-type Handler[**P] = Callable[Concatenate[Request, Any, P], Response]
-type Guard[**P] = Callable[Concatenate[Request, Any, P], Response | None]
+type Handler[**P] = Callable[Concatenate[Request, Context, P], Response]
+type Guard[**P] = Callable[Concatenate[Request, Context, P], Response | None]
 
 
 class Route:
@@ -197,7 +200,7 @@ class Router:
 				return route, params
 		return None
 
-	def __call__(self, req: Request, ctx: Any) -> Response:
+	def __call__(self, req: Request, ctx: Context) -> Response:
 		match = self.match(req)
 		if not match:
 			raise NotFoundError()

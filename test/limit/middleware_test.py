@@ -1,16 +1,17 @@
 from datetime import timedelta
 from uuid import uuid4
 
-from luna.test.assertion import assert_raises
+from luna.test.assertion import assert_eq
 
-from helios.app import Context
+from helios.app import Application, Container, Provider
+from helios.app import Config as AppConfig
 from helios.auth.state import Authenticator
 from helios.data.model import Model, attr
 from helios.data.store import Store
 from helios.http import Headers, Input, Method, Request, Response, Status, URL
-from helios.limit import RateLimitedError
+import helios.limit
 from helios.limit.config import Config
-from helios.limit.middleware import Middleware
+from helios.routing import Pattern, Route, Router
 from helios.session.store import Session
 
 
@@ -18,17 +19,20 @@ class User(Model):
 	name = attr(str)
 
 
-def context(signed_in: bool = False) -> Context:
-	ctx = Context()
-	session = Session(uuid4())
-	if signed_in:
-		store = Store()
-		user = store.create(User, name="Alice")
-		auth = Authenticator(session, user)
-	else:
-		auth = Authenticator(session)
-	ctx.put(Authenticator, auth)
-	return ctx
+class Authentication(Provider):
+	def __init__(self, signed_in: bool):
+		self.signed_in = signed_in
+
+	def register(self, container: Container):
+		container.scoped(Authenticator, self.authenticator)
+
+	def authenticator(self, context):
+		session = Session(uuid4())
+		if self.signed_in:
+			store = Store()
+			user = store.create(User, name="Alice")
+			return Authenticator(session, user)
+		return Authenticator(session)
 
 
 HEADER = "X-Forwarded-For"
@@ -38,41 +42,48 @@ def config(header: str = HEADER) -> Config:
 	return Config(header=header, limit=1, window=timedelta(seconds=900))
 
 
-def request(ip: str = "1.2.3.4") -> Request:
-	return Request(Method.GET, URL("/"), Headers({HEADER: ip}), Input())
+def request(ip: str = "1.2.3.4", header: str = HEADER) -> Request:
+	return Request(Method.GET, URL("/"), Headers({header: ip}), Input())
 
 
-def ok(req: Request, ctx) -> Response:
-	return Response.empty(Status.OK)
+def application(signed_in: bool = False, limit_config: Config | None = None):
+	def index(request, context):
+		return Response.empty(Status.OK)
+
+	return Application(
+		AppConfig(),
+		Router([Route(Method.GET, Pattern("/"), index)]),
+		[Authentication(signed_in)],
+		[helios.limit.Middleware(limit_config or config())],
+	)
 
 
 def test_limits_unauthenticated_requests():
-	middleware = Middleware(config())
-	middleware(request(), context(), ok)
+	app = application()
 
-	with assert_raises(RateLimitedError):
-		middleware(request(), context(), ok)
+	assert_eq(app.handle(request()).status, Status.OK)
+	assert_eq(app.handle(request()).status, Status.TOO_MANY_REQUESTS)
 
 
 def test_skips_authenticated_requests():
-	middleware = Middleware(config())
-	middleware(request(), context(), ok)
+	app = application(signed_in=True)
 
-	middleware(request(), context(signed_in=True), ok)
+	assert_eq(app.handle(request()).status, Status.OK)
+	assert_eq(app.handle(request()).status, Status.OK)
 
 
 def test_tracks_by_ip():
-	middleware = Middleware(config())
-	middleware(request("1.2.3.4"), context(), ok)
+	app = application()
 
-	middleware(request("5.6.7.8"), context(), ok)
+	assert_eq(app.handle(request("1.2.3.4")).status, Status.OK)
+	assert_eq(app.handle(request("5.6.7.8")).status, Status.OK)
 
 
 def test_uses_configured_header():
-	middleware = Middleware(config(header="X-Real-Ip"))
-	req = Request(Method.GET, URL("/"), Headers({"X-Real-Ip": "1.2.3.4"}), Input())
-	middleware(req, context(), ok)
+	app = application(limit_config=config(header="X-Real-Ip"))
 
-	with assert_raises(RateLimitedError):
-		req = Request(Method.GET, URL("/"), Headers({"X-Real-Ip": "1.2.3.4"}), Input())
-		middleware(req, context(), ok)
+	assert_eq(app.handle(request(header="X-Real-Ip")).status, Status.OK)
+	assert_eq(
+		app.handle(request(header="X-Real-Ip")).status,
+		Status.TOO_MANY_REQUESTS,
+	)
