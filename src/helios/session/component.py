@@ -35,21 +35,38 @@ class Component(Component[Session]):
 					return session
 				sessions.remove(id)
 
-		session = Session(uuid4())
-		session.touch()
-		sessions.put(session)
-		return session
+		return Session(uuid4())
 
 	def finish(self, res: Response, ctx: Context):
 		session = ctx.get(Session)
 		persistence = ctx.get(Persistence)
+		handle = persistence.open(self.file)
+		sessions = handle.load()
 
+		if session.invalidated:
+			self.expire_cookie(res)
+		elif session.items:
+			if session.sessions is None:
+				session.touch()
+				sessions.put(session)
+			self.set_cookie(res, session)
+		elif session.sessions is not None:
+			sessions.remove(session.id)
+			self.expire_cookie(res)
+
+		if sessions.is_dirty():
+			handle.save(sessions)
+
+	def set_cookie(self, res: Response, session: Session):
 		res.cookies["session_id"] = str(session.id)
 		res.cookies["session_id"].expires = datetime.now(UTC) + MAX_AGE
 		res.cookies["session_id"].http_only = True
 		res.cookies["session_id"].secure = self.secure
 		res.cookies["session_id"].same_site = "Lax"
-		handle = persistence.open(self.file)
-		sessions = handle.load()
-		if sessions.is_dirty():
-			handle.save(sessions)
+
+	def expire_cookie(self, res: Response):
+		res.cookies["session_id"] = ""
+		res.cookies["session_id"].expires = datetime(1970, 1, 1, tzinfo=UTC)
+		res.cookies["session_id"].http_only = True
+		res.cookies["session_id"].secure = self.secure
+		res.cookies["session_id"].same_site = "Lax"

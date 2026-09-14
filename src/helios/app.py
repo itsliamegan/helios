@@ -109,8 +109,8 @@ class Application:
 			manage_resources,
 			adapt_artificial_method,
 			*request_components,
-			*middlewares,
 			handle_http_errors,
+			*middlewares,
 		]
 		self.thread = Thread.build(thread, router)
 		self.components = components

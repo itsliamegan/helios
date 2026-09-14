@@ -39,28 +39,48 @@ def provide(component: Component, req: Request, ctx: Context) -> Session:
 	return component.provide(ctx)
 
 
-def test_generates_id_without_cookie():
+def test_doesnt_persist_empty_session():
 	sessions = Sessions()
 	component, persistence, ctx = setup(sessions)
+	response = Response.empty()
 
 	session = provide(component, request(), ctx)
 	ctx.put(Session, session)
-	component.finish(Response.empty(), ctx)
+	component.finish(response, ctx)
+
+	assert_that(session.id not in sessions)
+	assert_that("session_id" not in response.cookies)
+	assert_that(persistence.handle.saved is None)
+
+
+def test_persists_session_after_storing_data():
+	sessions = Sessions()
+	component, persistence, ctx = setup(sessions)
+	response = Response.empty()
+	now = datetime(2026, 10, 12, tzinfo=UTC)
+
+	with time_machine.travel(now, tick=False):
+		session = provide(component, request(), ctx)
+		session["message"] = "Hello"
+		ctx.put(Session, session)
+		component.finish(response, ctx)
 
 	assert_that(session.id in sessions)
+	assert_eq(session.last_active_at, now)
+	assert_eq(response.cookies["session_id"].val, str(session.id))
 	assert_eq(persistence.handle.saved, sessions)
 
 
-def test_replaces_malformed_cookie_id():
+def test_replaces_malformed_cookie_with_unpersisted_session():
 	sessions = Sessions()
 	component, _, ctx = setup(sessions)
 
 	session = provide(component, request("not-a-uuid"), ctx)
 
-	assert_that(session.id in sessions)
+	assert_that(session.id not in sessions)
 
 
-def test_replaces_unknown_cookie_id():
+def test_replaces_unknown_cookie_with_unpersisted_session():
 	unknown_id = uuid4()
 	sessions = Sessions()
 	component, _, ctx = setup(sessions)
@@ -69,7 +89,7 @@ def test_replaces_unknown_cookie_id():
 
 	assert_that(session.id != unknown_id)
 	assert_that(unknown_id not in sessions)
-	assert_that(session.id in sessions)
+	assert_that(session.id not in sessions)
 
 
 def test_reuses_known_session():
@@ -90,7 +110,11 @@ def test_reuses_known_session():
 def test_renews_session_at_expiry_boundary():
 	id = uuid4()
 	now = datetime(2026, 10, 12, tzinfo=UTC)
-	existing = Session(id, last_active_at=now - MAX_AGE)
+	existing = Session(
+		id,
+		{"message": "Hello"},
+		last_active_at=now - MAX_AGE,
+	)
 	sessions = Sessions({id: existing})
 	component, _, ctx = setup(sessions)
 
@@ -117,12 +141,12 @@ def test_removes_expired_session():
 
 	assert_that(session.id != id)
 	assert_that(id not in sessions)
-	assert_that(session.id in sessions)
+	assert_that(session.id not in sessions)
 
 
 def test_removes_other_expired_sessions():
 	now = datetime(2026, 10, 12, tzinfo=UTC)
-	active = Session(uuid4(), last_active_at=now)
+	active = Session(uuid4(), {"message": "Hello"}, last_active_at=now)
 	expired = Session(
 		uuid4(),
 		last_active_at=now - MAX_AGE - timedelta(microseconds=1),
@@ -140,10 +164,44 @@ def test_removes_other_expired_sessions():
 	assert_eq(persistence.handle.saved, sessions)
 
 
+def test_removes_session_after_its_data_is_cleared():
+	session = Session(uuid4(), {"message": "Hello"})
+	sessions = Sessions({session.id: session})
+	component, persistence, ctx = setup(sessions)
+	provided = provide(component, request(str(session.id)), ctx)
+	provided.clear()
+	ctx.put(Session, provided)
+	response = Response.empty()
+
+	component.finish(response, ctx)
+
+	assert_that(session.id not in sessions)
+	assert_eq(response.cookies["session_id"].val, "")
+	assert_eq(response.cookies["session_id"].expires, datetime(1970, 1, 1, tzinfo=UTC))
+	assert_eq(persistence.handle.saved, sessions)
+
+
+def test_doesnt_restore_invalidated_session():
+	session = Session(uuid4(), {"message": "Hello"})
+	sessions = Sessions({session.id: session})
+	component, persistence, ctx = setup(sessions)
+	provided = provide(component, request(str(session.id)), ctx)
+	provided.invalidate()
+	ctx.put(Session, provided)
+	response = Response.empty()
+
+	component.finish(response, ctx)
+
+	assert_that(session.id not in sessions)
+	assert_eq(response.cookies["session_id"].val, "")
+	assert_eq(persistence.handle.saved, sessions)
+
+
 def test_sets_cookie_policy():
 	sessions = Sessions()
 	component, _, ctx = setup(sessions, secure=True)
 	session = provide(component, request(), ctx)
+	session["message"] = "Hello"
 	ctx.put(Session, session)
 	response = Response.empty()
 

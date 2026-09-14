@@ -22,6 +22,7 @@ class Session:
 		self.items = items
 		self.last_active_at = last_active_at
 		self.dirty = False
+		self.invalidated = False
 		self.sessions: Sessions | None = None
 
 	def __getitem__(self, key: str) -> Any:
@@ -53,6 +54,7 @@ class Session:
 		)
 
 	def invalidate(self):
+		self.invalidated = True
 		if self.sessions is not None:
 			self.sessions.remove(self.id)
 
@@ -84,6 +86,7 @@ class Sessions:
 
 	def put(self, session: Session):
 		self.sessions[session.id] = session
+		session.invalidated = False
 		session.sessions = self
 		self.dirty = True
 

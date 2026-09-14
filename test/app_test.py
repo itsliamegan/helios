@@ -360,6 +360,22 @@ def test_runs_component_finish_hooks_for_http_errors():
 	assert_eq(str(missing_model_res.headers["X-Finish"]), "ran")
 
 
+def test_handles_http_errors_from_configured_middleware():
+	def missing(req, ctx, next):
+		raise NotFoundError()
+
+	app = Application(
+		helios.app.Config(),
+		Router([]),
+		[],
+		middlewares=[missing],
+	)
+
+	res = app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
+
+	assert_eq(res.status, Status.NOT_FOUND)
+
+
 def test_runs_configured_middleware_inside_components():
 	events = []
 
