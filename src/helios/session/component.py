@@ -22,6 +22,7 @@ class Component(Component[Session]):
 		persistence = ctx.get(Persistence)
 
 		sessions = persistence.open(self.file).load()
+		sessions.purge()
 		if "session_id" in req.cookies:
 			try:
 				id = UUID(req.cookies["session_id"].val)

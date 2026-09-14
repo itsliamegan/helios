@@ -120,6 +120,26 @@ def test_removes_expired_session():
 	assert_that(session.id in sessions)
 
 
+def test_removes_other_expired_sessions():
+	now = datetime(2026, 10, 12, tzinfo=UTC)
+	active = Session(uuid4(), last_active_at=now)
+	expired = Session(
+		uuid4(),
+		last_active_at=now - MAX_AGE - timedelta(microseconds=1),
+	)
+	sessions = Sessions({active.id: active, expired.id: expired})
+	component, persistence, ctx = setup(sessions)
+
+	with time_machine.travel(now, tick=False):
+		session = provide(component, request(str(active.id)), ctx)
+		ctx.put(Session, session)
+		component.finish(Response.empty(), ctx)
+
+	assert_that(active.id in sessions)
+	assert_that(expired.id not in sessions)
+	assert_eq(persistence.handle.saved, sessions)
+
+
 def test_sets_cookie_policy():
 	sessions = Sessions()
 	component, _, ctx = setup(sessions, secure=True)
