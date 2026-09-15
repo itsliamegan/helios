@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import Any, ClassVar, Literal, cast, overload
 from uuid import UUID, uuid4
 
+from helios.http import URL
+
 from . import types
 
 
@@ -125,6 +127,8 @@ def resolve_type[T](typ: type[T] | types.Type[T]) -> types.Type[T]:
 		return cast(types.Type[T], types.UUID())
 	if typ is datetime:
 		return cast(types.Type[T], types.Date())
+	if typ is URL:
+		return cast(types.Type[T], types.URL())
 	if isinstance(typ, types.Type):
 		return typ
 	raise TypeError(f"unsupported attribute type: {typ!r}")

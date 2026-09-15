@@ -4,6 +4,7 @@ from luna.test.assertion import assert_eq, assert_raises, assert_that
 
 from helios.form import parser
 from helios.form.parser import ParseError
+from helios.http import URL
 
 
 def test_parses_strings_without_coercion():
@@ -19,6 +20,18 @@ def test_parses_uuid():
 
 	assert_eq(value_parser.parse(raw), UUID(raw))
 	assert_parse_error(value_parser, "not-a-uuid", "must be a valid UUID")
+
+
+def test_parses_url():
+	value_parser = parser.URL()
+	raw = "https://example.com:8443/search?q=today"
+
+	value = value_parser.parse(raw)
+	assert_that(isinstance(value, URL))
+	assert_eq(str(value), raw)
+	assert_parse_error(
+		value_parser, "https://example.com:invalid", "must be a valid URL"
+	)
 
 
 def test_parses_required_value():

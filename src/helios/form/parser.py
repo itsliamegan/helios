@@ -1,6 +1,8 @@
 from typing import Any, Protocol
 import uuid
 
+from helios import http
+
 type RawValue = str | list[str] | None
 
 
@@ -31,6 +33,15 @@ class UUID(Scalar):
 			return uuid.UUID(raw)
 		except ValueError as err:
 			raise ParseError("must be a valid UUID") from err
+
+
+class URL(Scalar):
+	def parse(self, value: RawValue) -> http.URL:
+		raw = super().parse(value)
+		try:
+			return http.URL(raw)
+		except ValueError as err:
+			raise ParseError("must be a valid URL") from err
 
 
 class Required[T]:

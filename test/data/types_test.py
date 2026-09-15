@@ -3,7 +3,8 @@ from uuid import uuid4
 
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.data.types import Bool, Date, Int, Str, UUID
+from helios import http
+from helios.data.types import Bool, Date, Int, Str, URL, UUID
 
 
 def test_checks_canonical_values():
@@ -52,6 +53,19 @@ def test_checks_and_decodes_uuid():
 		UUID().decode("not-a-uuid")
 
 
+def test_checks_and_decodes_url():
+	value = http.URL("https://example.com:8443/search?q=today")
+
+	assert_eq(URL().check(value), None)
+	assert_eq(str(URL().decode(str(value))), str(value))
+	with assert_raises(TypeError):
+		URL().check(str(value))
+	with assert_raises(TypeError):
+		URL().decode(value)
+	with assert_raises(ValueError):
+		URL().decode("https://example.com:invalid")
+
+
 def test_date_requires_aware_datetime():
 	aware = datetime.now(UTC)
 	naive = aware.replace(tzinfo=None)
@@ -78,6 +92,7 @@ def test_encodes_canonical_values():
 	assert_eq(Bool().encode(True), True)
 	assert_eq(Int().encode(3), 3)
 	assert_eq(UUID().encode(id), str(id))
+	assert_eq(URL().encode(http.URL("/about")), "/about")
 	assert_eq(Date().encode(date), date.isoformat())
 
 
@@ -92,5 +107,7 @@ def test_rejects_noncanonical_encoding():
 		Int().encode(True)
 	with assert_raises(TypeError):
 		UUID().encode(str(uuid4()))
+	with assert_raises(TypeError):
+		URL().encode("/about")
 	with assert_raises(TypeError):
 		Date().encode(naive)
