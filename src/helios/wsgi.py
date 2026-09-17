@@ -4,12 +4,13 @@ from urllib.parse import parse_qs as parse_query
 from urllib.parse import urlparse as parse_url
 from wsgiref.types import StartResponse, WSGIEnvironment
 
+from werkzeug.formparser import FormDataParser
 from werkzeug.http import parse_options_header
 from werkzeug.test import Client, Cookie, TestResponse
-from werkzeug.wsgi import get_current_url, get_input_stream
+from werkzeug.wsgi import get_current_url
 
 import helios.app
-from helios.http import Headers, Input, Method, Request, Response, URL
+from helios.http import File, Files, Headers, Input, Method, Request, Response, URL
 
 
 class Application(helios.app.Application):
@@ -24,11 +25,13 @@ class Application(helios.app.Application):
 
 
 def adapt_env(env: WSGIEnvironment) -> Request:
+	input, files = adapt_input(env)
 	return Request(
 		adapt_method(env),
 		adapt_url(env),
 		adapt_headers(env),
-		adapt_input(env),
+		input,
+		files,
 	)
 
 
@@ -36,7 +39,7 @@ def adapt_res(res: Response, start_res: StartResponse) -> Iterable[bytes]:
 	headers = list(res.headers)
 	headers += list(res.cookies.to_headers())
 	start_res(str(res.status), headers)
-	return [str(res.body).encode("utf8")]
+	return [res.body.to_bytes()]
 
 
 def adapt_method(env: WSGIEnvironment) -> Method:
@@ -80,23 +83,35 @@ def adapt_headers(env: WSGIEnvironment) -> Headers:
 	return Headers(pairs)
 
 
-def adapt_input(env: WSGIEnvironment) -> Input:
+def adapt_input(env: WSGIEnvironment) -> tuple[Input, Files]:
 	if "CONTENT_TYPE" not in env:
-		return Input()
-	else:
-		mime_type, _ = parse_options_header(env["CONTENT_TYPE"])
-		if mime_type == "application/x-www-form-urlencoded":
-			stream = get_input_stream(env)
-			raw = stream.read().decode("latin_1")
-			items = {}
-			for name, vals in parse_query(raw, True).items():
-				if isinstance(vals, list) and len(vals) == 1:
-					items[name] = vals[0]
-				else:
-					items[name] = vals
-			return Input(items)
-		else:
-			return Input()
+		return Input(), Files()
+
+	mime_type, _ = parse_options_header(env["CONTENT_TYPE"])
+	if mime_type not in {
+		"application/x-www-form-urlencoded",
+		"multipart/form-data",
+	}:
+		return Input(), Files()
+
+	_, form, uploads = FormDataParser().parse_from_environ(env)
+	input_items: dict[str, str | list[str]] = {}
+	for name, values in form.lists():
+		input_items[name] = values[0] if len(values) == 1 else values
+
+	file_items: dict[str, File | list[File]] = {}
+	for name, storages in uploads.lists():
+		files = [
+			File(
+				storage.read(),
+				storage.filename or "",
+				storage.content_type or "application/octet-stream",
+			)
+			for storage in storages
+		]
+		file_items[name] = files[0] if len(files) == 1 else files
+
+	return Input(input_items), Files(file_items)
 
 
 class TestClient:

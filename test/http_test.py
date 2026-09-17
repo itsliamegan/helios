@@ -2,7 +2,20 @@ from typing import cast
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.http import Cookie, Cookies, Headers, Input, Method, Request, SameSite, URL
+from helios.http import (
+	Body,
+	Cookie,
+	Cookies,
+	File,
+	Files,
+	Headers,
+	Input,
+	Method,
+	Request,
+	Response,
+	SameSite,
+	URL,
+)
 
 
 def test_encodes_url_path():
@@ -30,6 +43,23 @@ def test_preserves_absolute_url_port():
 	assert_eq(url.host, "example.com")
 	assert_eq(url.port, 8443)
 	assert_eq(str(url), "https://example.com:8443/search")
+
+
+def test_encodes_text_and_binary_bodies():
+	assert_eq(Body("Hello, world!").to_bytes(), b"Hello, world!")
+	assert_eq(Body(b"\x00\xff").to_bytes(), b"\x00\xff")
+
+
+def test_creates_file_response():
+	response = Response.file(b"\x00\xff", "report.pdf", "application/pdf")
+
+	assert_eq(response.body.to_bytes(), b"\x00\xff")
+	assert_eq(str(response.headers["Content-Type"]), "application/pdf")
+	assert_eq(
+		str(response.headers["Content-Disposition"]),
+		'attachment; filename="report.pdf"',
+	)
+	assert_eq(str(response.headers["Content-Length"]), "2")
 
 
 def test_gets_request_referrer():
@@ -142,3 +172,16 @@ def test_adapts_cookies_to_headers():
 			"csrf_token=fd3e6aff6360af4d6ba905d4299cff81; Path=/",
 		],
 	)
+
+
+def test_stores_uploaded_files():
+	avatar = File(b"image bytes", "avatar.png", "image/png")
+	attachments = [
+		File(b"first", "first.txt", "text/plain"),
+		File(b"second", "second.txt", "text/plain"),
+	]
+	files = Files({"avatar": avatar, "attachments": attachments})
+
+	assert_that("avatar" in files)
+	assert_that(files["avatar"] is avatar)
+	assert_eq(files["attachments"], attachments)

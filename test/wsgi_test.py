@@ -1,3 +1,5 @@
+from io import BytesIO
+
 from luna.test.assertion import assert_eq, assert_that
 from werkzeug.test import EnvironBuilder
 
@@ -52,6 +54,42 @@ def test_adapts_form_input():
 	assert_eq(req.input["content"], "An interesting article.")
 
 
+def test_adapts_multipart_input_and_files():
+	env = EnvironBuilder(
+		data={
+			"title": "Summer",
+			"photo": (BytesIO(b"image bytes"), "beach.jpg", "image/jpeg"),
+		}
+	).get_environ()
+
+	req = adapt_env(env)
+
+	assert_eq(req.input["title"], "Summer")
+	photo = req.files["photo"]
+	assert_eq(photo.content, b"image bytes")
+	assert_eq(photo.filename, "beach.jpg")
+	assert_eq(photo.content_type, "image/jpeg")
+
+
+def test_adapts_repeated_multipart_input_and_files():
+	env = EnvironBuilder(
+		data={
+			"tag": ["summer", "holiday"],
+			"photo": [
+				(BytesIO(b"first"), "first.jpg"),
+				(BytesIO(b"second"), "second.jpg"),
+			],
+		}
+	).get_environ()
+
+	req = adapt_env(env)
+
+	assert_eq(req.input["tag"], ["summer", "holiday"])
+	photos = req.files["photo"]
+	assert_eq([photo.content for photo in photos], [b"first", b"second"])
+	assert_eq([photo.filename for photo in photos], ["first.jpg", "second.jpg"])
+
+
 def test_adapts_res():
 	res = Response(
 		Status.OK,
@@ -76,6 +114,17 @@ def test_adapts_res():
 	body = adapt_res(res, start_res)
 
 	assert_eq(list(body), [b"<h1>Index</h1>"])
+
+
+def test_adapts_binary_res():
+	res = Response.file(b"\x00\xff", "data.bin", "application/octet-stream")
+
+	def start_res(status, pairs):
+		assert_eq(status, "200 OK")
+
+	body = adapt_res(res, start_res)
+
+	assert_eq(list(body), [b"\x00\xff"])
 
 
 def test_adapts_multiple_cookies():
@@ -143,6 +192,41 @@ def test_client_sends_scalar_and_repeated_form_values():
 	res = client.post("/pins", form=form)
 
 	assert_eq(res.text, "Reading|first,second")
+
+
+def test_client_uploads_files():
+	def upload(req, ctx):
+		photo = req.files["photo"]
+		return Response.text(
+			f"{req.input["caption"]}|{photo.filename}|{photo.content_type}|"
+			f"{photo.content.decode()}"
+		)
+
+	client = make_client([Route(Method.POST, Pattern("/photos"), upload)])
+
+	res = client.post(
+		"/photos",
+		form={
+			"caption": "Beach",
+			"photo": (BytesIO(b"image bytes"), "beach.jpg", "image/jpeg"),
+		},
+	)
+
+	assert_eq(res.text, "Beach|beach.jpg|image/jpeg|image bytes")
+
+
+def test_client_downloads_files():
+	def download(req, ctx):
+		return Response.file(b"\x00\xff", "data.bin", "application/octet-stream")
+
+	client = make_client([Route(Method.GET, Pattern("/data"), download)])
+
+	res = client.get("/data")
+
+	assert_eq(res.data, b"\x00\xff")
+	assert_eq(res.headers["Content-Type"], "application/octet-stream")
+	assert_eq(res.headers["Content-Disposition"], 'attachment; filename="data.bin"')
+	assert_eq(res.headers["Content-Length"], "2")
 
 
 def test_client_retains_response_cookies():

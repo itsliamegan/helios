@@ -3,6 +3,8 @@ from enum import Enum
 from .cookie import Cookie as Cookie
 from .cookie import Cookies as Cookies
 from .cookie import SameSite as SameSite
+from .file import File as File
+from .file import Files as Files
 from .headers import Headers
 from .url import URL
 
@@ -59,8 +61,13 @@ class Input:
 
 
 class Body:
-	def __init__(self, content: str | None = ""):
+	def __init__(self, content: str | bytes | None = ""):
 		self.content = content
+
+	def to_bytes(self) -> bytes:
+		if isinstance(self.content, bytes):
+			return self.content
+		return str(self.content).encode("utf8")
 
 	def __str__(self) -> str:
 		return str(self.content)
@@ -70,11 +77,19 @@ class Body:
 
 
 class Request:
-	def __init__(self, method: Method, url: URL, headers: Headers, input: Input):
+	def __init__(
+		self,
+		method: Method,
+		url: URL,
+		headers: Headers,
+		input: Input,
+		files: Files | None = None,
+	):
 		self.method = method
 		self.url = url
 		self.headers = headers
 		self.input = input
+		self.files = files if files is not None else Files()
 		self.cookies = Cookies.from_headers(headers)
 
 	@property
@@ -86,7 +101,8 @@ class Request:
 
 	def __repr__(self) -> str:
 		return (
-			f"Request({self.method!r}, {self.url!r}, {self.headers!r}, {self.input!r})"
+			f"Request({self.method!r}, {self.url!r}, {self.headers!r}, "
+			f"{self.input!r}, {self.files!r})"
 		)
 
 
@@ -111,6 +127,21 @@ class Response:
 	def html(cls, html: str, status: Status = Status.OK) -> Response:
 		return cls(
 			status, Headers({"Content-Type": "text/html"}), Cookies(), Body(html)
+		)
+
+	@classmethod
+	def file(cls, content: bytes, filename: str, content_type: str) -> Response:
+		return cls(
+			Status.OK,
+			Headers(
+				{
+					"Content-Type": content_type,
+					"Content-Disposition": f'attachment; filename="{filename}"',
+					"Content-Length": str(len(content)),
+				}
+			),
+			Cookies(),
+			Body(content),
 		)
 
 	@classmethod

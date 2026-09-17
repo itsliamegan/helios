@@ -3,7 +3,17 @@ from contextlib import contextmanager
 from luna.test.assertion import assert_eq
 
 from helios.app import Container, Kernel
-from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.http import (
+	Body,
+	Cookies,
+	Headers,
+	Input,
+	Method,
+	Request,
+	Response,
+	Status,
+	URL,
+)
 from helios.routing import NotFoundError, Pattern, Route, Router
 
 
@@ -25,6 +35,21 @@ def test_records_handled_errors_for_outer_middleware():
 	assert_eq(response.status, Status.NOT_FOUND)
 	assert isinstance(seen[0], NotFoundError)
 	assert_eq(str(response.headers["Content-Length"]), "13")
+
+
+def test_content_length_uses_encoded_body_size():
+	def index(request, context):
+		return Response(Status.OK, Headers(), Cookies(), Body(b"\x00\xff"))
+
+	kernel = Kernel(
+		Container(),
+		Router([Route(Method.GET, Pattern("/"), index)]),
+		[],
+	)
+
+	response = kernel.handle(request())
+
+	assert_eq(str(response.headers["Content-Length"]), "2")
 
 
 def test_unexpected_errors_skip_response_middleware_and_close_resources():

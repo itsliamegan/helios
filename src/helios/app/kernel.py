@@ -64,7 +64,7 @@ class Kernel:
 	) -> Response:
 		response = next(request, context)
 		if "Content-Length" not in response.headers:
-			response.headers["Content-Length"] = str(len(str(response.body)))
+			response.headers["Content-Length"] = str(len(response.body.to_bytes()))
 		return response
 
 	@staticmethod
