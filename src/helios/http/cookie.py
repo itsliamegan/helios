@@ -1,30 +1,22 @@
+from dataclasses import dataclass
 from datetime import datetime
 from email.utils import formatdate
 from typing import Literal
 
-from .headers import Headers
+from .header import Headers
 
 type SameSite = Literal["Lax", "Strict", "None"]
 
 
+@dataclass
 class Cookie:
-	def __init__(
-		self,
-		name: str,
-		val: str,
-		path: str = "/",
-		expires: datetime | None = None,
-		http_only: bool = False,
-		secure: bool = False,
-		same_site: SameSite | None = None,
-	):
-		self.name = name
-		self.val = val
-		self.path = path
-		self.expires = expires
-		self.http_only = http_only
-		self.secure = secure
-		self.same_site = same_site
+	name: str
+	val: str
+	path: str = "/"
+	expires: datetime | None = None
+	http_only: bool = False
+	secure: bool = False
+	same_site: SameSite | None = None
 
 	def __setattr__(self, name: str, value: object):
 		if name == "same_site" and value not in (None, "Lax", "Strict", "None"):
@@ -43,11 +35,11 @@ class Cookie:
 			res += f"; SameSite={self.same_site}"
 		return res
 
-	def __repr__(self) -> str:
-		return f"Cookie(name={self.name}, val={self.val})"
 
-
+@dataclass(init=False)
 class Cookies:
+	cookies: dict[str, Cookie]
+
 	def __init__(self, pairs: dict[str, str] | None = None):
 		if pairs is None:
 			pairs = {}
@@ -86,6 +78,3 @@ class Cookies:
 
 	def __contains__(self, name: str) -> bool:
 		return name in self.cookies
-
-	def __repr__(self) -> str:
-		return f"Cookies({ {name: self.cookies[name].val for name in self.cookies}!r})"

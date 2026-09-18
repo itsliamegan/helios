@@ -1,7 +1,12 @@
 from collections.abc import Iterator
+from dataclasses import dataclass
 
 
+@dataclass(init=False)
 class Header:
+	name: str
+	vals: list[str]
+
 	def __init__(self, name: str, vals: str | list[str]):
 		self.name = name
 		self.vals = vals if isinstance(vals, list) else [vals]
@@ -21,11 +26,11 @@ class Header:
 	def __str__(self) -> str:
 		return ", ".join(self.vals)
 
-	def __repr__(self) -> str:
-		return f"Header({self.name!r}, {self.vals!r})"
 
-
+@dataclass(init=False)
 class Headers:
+	headers: dict[str, Header]
+
 	def __init__(self, pairs: dict[str, str | list[str]] | None = None):
 		if pairs is None:
 			pairs = {}
@@ -56,9 +61,6 @@ class Headers:
 					yield name, val
 			else:
 				yield name, str(header)
-
-	def __repr__(self) -> str:
-		return f"Headers({self.headers!r})"
 
 
 def normalize(raw_name: str) -> str:
