@@ -1,4 +1,4 @@
-from helios.data.model import Model
+from helios.database import Model
 from helios.session.store import Session
 
 SESSION_KEY = "_user_id"

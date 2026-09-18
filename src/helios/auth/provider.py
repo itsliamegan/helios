@@ -1,8 +1,7 @@
 from uuid import UUID
 
 from helios.app import Container, Context, Provider
-from helios.data.model import Model
-from helios.data.store import NotFoundError, Store
+from helios.database import Model, NotFoundError, Store
 from helios.session.store import Session
 
 from .state import Authenticator, SESSION_KEY

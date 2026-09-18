@@ -1,8 +1,12 @@
+from pathlib import Path
+import sqlite3
+from tempfile import TemporaryDirectory
+
 from luna.test.assertion import assert_eq, assert_not, assert_raises, assert_that
 
 from helios.auth.password import Digest, Password
-from helios.data.model import Model, attr
-from helios.data.store import Schema, Store, decode, encode
+from helios.database import Config, Model, Store, attr
+from helios.database.sqlite import connect
 
 Digest.method = "pbkdf2:sha256:1"
 
@@ -24,22 +28,46 @@ def test_redacts_password_representation():
 
 def test_round_trips_password_attrs():
 	class Account(Model):
+		table = "accounts"
+
 		password = attr(Password)
 		backup_password = attr(Password, nullable=True)
 
-	store = Store()
-	created = store.create(
-		Account,
-		password=Password.from_plaintext("secret"),
-	)
+	with TemporaryDirectory() as directory:
+		path = Path(directory) / "app.sqlite"
+		raw = sqlite3.connect(path, autocommit=True)
+		raw.execute(
+			"""
+			CREATE TABLE accounts (
+				id TEXT PRIMARY KEY,
+				created_at TEXT NOT NULL,
+				password TEXT NOT NULL,
+				backup_password TEXT
+			)
+			"""
+		)
+		raw.close()
+		connection = connect(Config(path))
+		connection.begin()
+		store = Store(connection, [Account])
+		created = store.create(
+			Account,
+			password=Password.from_plaintext("secret"),
+		)
+		connection.commit()
+		connection.close()
 
-	decoded = decode(encode(store), Schema([Account]))
-	found = decoded.find_one(Account, created.id)
-	password: Password = found.password
-	backup_password: Password | None = found.backup_password
+		connection = connect(Config(path))
+		connection.begin()
+		try:
+			found = Store(connection, [Account]).find_one(Account, created.id)
+			password: Password = found.password
+			backup_password: Password | None = found.backup_password
 
-	assert_that(password.matches("secret"))
-	assert_that(backup_password is None)
+			assert_that(password.matches("secret"))
+			assert_that(backup_password is None)
+		finally:
+			connection.close()
 
 
 def test_rejects_malformed_encoded_password():
