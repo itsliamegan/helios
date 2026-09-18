@@ -92,5 +92,11 @@ def test_rejects_non_scalar_custom_encoding():
 		def decode(self, value: types.Scalar):
 			return value
 
+	class InvalidDictionary(Invalid):
+		def encode(self, value: str):
+			return {"value": value}
+
 	with assert_raises(TypeError):
 		types.encode(Invalid(), "secret")
+	with assert_raises(TypeError):
+		types.encode(InvalidDictionary(), "secret")

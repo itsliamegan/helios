@@ -76,6 +76,9 @@ class Attribute[StoredT, ValueT = StoredT]:
 		instance.values[self.name] = value
 		if instance.tracking:
 			instance.dirty_names.add(self.name)
+			instance.change_counts[self.name] = (
+				instance.change_counts.get(self.name, 0) + 1
+			)
 
 	def __repr__(self) -> str:
 		return f"Attribute({self.name!r}, {self.type!r}, default={self.default!r}, nullable={self.nullable!r})"
@@ -181,6 +184,7 @@ class Model(metaclass=ModelMeta):
 		self.values["id"] = uuid4()
 		self.values["created_at"] = None
 		self.dirty_names: set[str] = set()
+		self.change_counts: dict[str, int] = {}
 		self.state: Literal["new", "persisted", "deleted"] = "new"
 		self.tracking = True
 
@@ -189,6 +193,7 @@ class Model(metaclass=ModelMeta):
 		model = cls.__new__(cls)
 		model.values = dict(values)
 		model.dirty_names = set()
+		model.change_counts = {}
 		model.state = "persisted"
 		model.tracking = True
 		return model

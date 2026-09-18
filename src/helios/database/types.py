@@ -46,7 +46,7 @@ class Bool:
 
 	def encode(self, value: bool) -> Scalar:
 		self.check(value)
-		return 1 if value else 0
+		return check_scalar(1 if value else 0)
 
 	def decode(self, value: Scalar) -> bool:
 		if not isinstance(value, int) or isinstance(value, bool) or value not in (0, 1):

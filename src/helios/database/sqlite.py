@@ -14,6 +14,11 @@ class DatabaseBusy(DatabaseError):
 	pass
 
 
+def quote_identifier(identifier: str) -> str:
+	escaped = identifier.replace('"', '""')
+	return f'"{escaped}"'
+
+
 def translate(error: sqlite3.Error, operation: str) -> DatabaseError:
 	code = getattr(error, "sqlite_errorcode", None)
 	if isinstance(code, int) and code & 0xFF in (
