@@ -87,6 +87,26 @@ def test_queries_headers_without_case():
 	assert_eq(str(headers["Content-Type"]), "text/html")
 
 
+def test_preserves_header_name_spelling():
+	headers = Headers({"ETag": '"abc123"'})
+
+	assert_eq(list(headers), [("ETag", '"abc123"')])
+	assert_eq(str(headers["etag"]), '"abc123"')
+
+
+def test_rejects_newlines_in_header_values():
+	with assert_raises(ValueError):
+		Headers({"X-Message": "hello\r\nX-Injected: true"})
+
+	headers = Headers({"X-Message": "hello"})
+	with assert_raises(ValueError):
+		headers["X-Message"] = "hello\nworld"
+	with assert_raises(ValueError):
+		headers["X-Message"] += "hello\rworld"
+
+	assert_eq(list(headers["X-Message"]), ["hello"])
+
+
 def test_stores_multiple_headers():
 	headers = Headers()
 
@@ -95,6 +115,16 @@ def test_stores_multiple_headers():
 
 	assert_eq(list(headers["Accept"]), ["text/html", "text/plain"])
 	assert_eq(str(headers["Accept"]), "text/html, text/plain")
+
+
+def test_updates_header_through_reference():
+	headers = Headers({"Accept": "text/html"})
+	header = headers["Accept"]
+
+	header += "text/plain"
+
+	assert_that(header is headers["Accept"])
+	assert_eq(list(headers["Accept"]), ["text/html", "text/plain"])
 
 
 def test_iterates_header_pairs():
