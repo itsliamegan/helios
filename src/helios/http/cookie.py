@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime
-from email.utils import formatdate
 from typing import Literal
+
+from werkzeug.http import dump_cookie, parse_cookie
 
 from .header import Headers
 
@@ -24,16 +25,15 @@ class Cookie:
 		super().__setattr__(name, value)
 
 	def __str__(self) -> str:
-		res = f"{self.name}={self.val}; Path={self.path}"
-		if self.expires is not None:
-			res += f"; Expires={formatdate(self.expires.timestamp(), usegmt=True)}"
-		if self.secure:
-			res += "; Secure"
-		if self.http_only:
-			res += "; HttpOnly"
-		if self.same_site is not None:
-			res += f"; SameSite={self.same_site}"
-		return res
+		return dump_cookie(
+			self.name,
+			self.val,
+			path=self.path,
+			expires=self.expires,
+			secure=self.secure,
+			httponly=self.http_only,
+			samesite=self.same_site,
+		)
 
 
 @dataclass(init=False)
@@ -53,9 +53,7 @@ class Cookies:
 		cookies = cls()
 		if "Cookie" not in headers:
 			return cookies
-		cookie_pairs = str(headers["Cookie"]).split("; ")
-		for cookie_pair in cookie_pairs:
-			name, val = cookie_pair.split("=", 1)
+		for name, val in parse_cookie(str(headers["Cookie"])).items():
 			cookies[name] = val
 		return cookies
 
