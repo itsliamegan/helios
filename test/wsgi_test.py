@@ -6,13 +6,15 @@ from werkzeug.test import EnvironBuilder
 import helios.app
 from helios.http import Body, Cookies, Headers, Method, Response, Status, URL
 from helios.routing import Pattern, Route, Router
-from helios.wsgi import Application, TestClient, adapt_env, adapt_res
+from helios.wsgi import Application
+from helios.wsgi.adapt import RequestAdapter, ResponseAdapter
+from helios.wsgi.test import TestClient
 
 
 def test_adapts_method():
 	env = EnvironBuilder(method="GET").get_environ()
 
-	req = adapt_env(env)
+	req = RequestAdapter(env).adapt()
 
 	assert_that(req.method is Method.GET)
 
@@ -20,7 +22,7 @@ def test_adapts_method():
 def test_adapts_url():
 	env = EnvironBuilder(path="/search?q=Intro").get_environ()
 
-	req = adapt_env(env)
+	req = RequestAdapter(env).adapt()
 
 	assert_eq(req.url.path, "/search")
 	assert_eq(req.url.query, {"q": "Intro"})
@@ -31,7 +33,7 @@ def test_adapts_headers():
 		headers=[("Accept", "text/html"), ("User-Agent", "Mozilla/5.0")]
 	).get_environ()
 
-	req = adapt_env(env)
+	req = RequestAdapter(env).adapt()
 
 	assert_eq(str(req.headers["Accept"]), "text/html")
 	assert_eq(str(req.headers["User-Agent"]), "Mozilla/5.0")
@@ -40,7 +42,7 @@ def test_adapts_headers():
 def test_adapts_content_info():
 	env = EnvironBuilder(content_type="text/html", content_length="100").get_environ()
 
-	req = adapt_env(env)
+	req = RequestAdapter(env).adapt()
 
 	assert_eq(str(req.headers["Content-Type"]), "text/html")
 	assert_eq(str(req.headers["Content-Length"]), "100")
@@ -49,7 +51,7 @@ def test_adapts_content_info():
 def test_adapts_form_input():
 	env = EnvironBuilder(data={"content": "An interesting article."}).get_environ()
 
-	req = adapt_env(env)
+	req = RequestAdapter(env).adapt()
 
 	assert_eq(req.input["content"], "An interesting article.")
 
@@ -62,7 +64,7 @@ def test_adapts_multipart_input_and_files():
 		}
 	).get_environ()
 
-	req = adapt_env(env)
+	req = RequestAdapter(env).adapt()
 
 	assert_eq(req.input["title"], "Summer")
 	photo = req.files["photo"]
@@ -82,7 +84,7 @@ def test_adapts_repeated_multipart_input_and_files():
 		}
 	).get_environ()
 
-	req = adapt_env(env)
+	req = RequestAdapter(env).adapt()
 
 	assert_eq(req.input["tag"], ["summer", "holiday"])
 	photos = req.files["photo"]
@@ -111,7 +113,7 @@ def test_adapts_res():
 			],
 		)
 
-	body = adapt_res(res, start_res)
+	body = ResponseAdapter(res, start_res).adapt()
 
 	assert_eq(list(body), [b"<h1>Index</h1>"])
 
@@ -122,7 +124,7 @@ def test_adapts_binary_res():
 	def start_res(status, pairs):
 		assert_eq(status, "200 OK")
 
-	body = adapt_res(res, start_res)
+	body = ResponseAdapter(res, start_res).adapt()
 
 	assert_eq(list(body), [b"\x00\xff"])
 
@@ -144,7 +146,7 @@ def test_adapts_multiple_cookies():
 			],
 		)
 
-	adapt_res(res, start_res)
+	ResponseAdapter(res, start_res).adapt()
 
 
 def test_client_routes_get_and_exposes_response():
