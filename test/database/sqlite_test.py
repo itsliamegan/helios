@@ -80,7 +80,9 @@ def test_enforces_foreign_keys():
 				connection.execute(
 					"INSERT INTO posts (author_id) VALUES (?)", ("missing",)
 				)
-			assert_that(isinstance(raised.exception.__cause__, sqlite3.IntegrityError))
+			exception = raised.exception
+			assert exception is not None
+			assert_that(isinstance(exception.__cause__, sqlite3.IntegrityError))
 		finally:
 			connection.close()
 
@@ -95,9 +97,9 @@ def test_translates_writer_contention_to_database_busy():
 			first.begin()
 			with assert_raises(DatabaseBusy) as raised:
 				second.begin()
-			assert_that(
-				isinstance(raised.exception.__cause__, sqlite3.OperationalError)
-			)
+			exception = raised.exception
+			assert exception is not None
+			assert_that(isinstance(exception.__cause__, sqlite3.OperationalError))
 		finally:
 			second.close()
 			first.close()
@@ -113,7 +115,9 @@ def test_translates_statement_errors_without_bound_values():
 			with assert_raises(DatabaseError) as raised:
 				connection.execute("INSERT INTO missing (value) VALUES (?)", (secret,))
 
-			assert_that(isinstance(raised.exception.__cause__, sqlite3.Error))
-			assert_that(secret not in str(raised.exception))
+			exception = raised.exception
+			assert exception is not None
+			assert_that(isinstance(exception.__cause__, sqlite3.Error))
+			assert_that(secret not in str(exception))
 		finally:
 			connection.close()

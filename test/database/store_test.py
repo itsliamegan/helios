@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
@@ -102,8 +103,9 @@ def test_crud_and_scalar_round_trip():
 			assert_eq(store.find_all(Record), [created])
 			assert_eq(store.find_by(Record, active=True), [created])
 			assert_that(isinstance(found.id, UUID))
-			assert_that(found.created_at is not None)
-			assert_eq(found.created_at.tzinfo, UTC)
+			created_at = found.created_at
+			assert created_at is not None
+			assert_eq(created_at.tzinfo, UTC)
 			assert_eq(found.count, 3)
 			assert_eq(found.active, True)
 			assert_that(isinstance(found.owner_id, UUID))
@@ -301,9 +303,10 @@ def test_deletes_model_and_reports_missing_lookup():
 
 			with assert_raises(NotFoundError) as raised:
 				store.find_one(Record, model.id)
-			assert_that(raised.exception is not None)
-			assert_that(raised.exception.model_type is Record)
-			assert_eq(raised.exception.id, model.id)
+			exception = raised.exception
+			assert exception is not None
+			assert_that(exception.model_type is Record)
+			assert_eq(exception.id, model.id)
 		finally:
 			connection.close()
 
@@ -347,7 +350,7 @@ def test_malformed_stored_scalar_is_database_error():
 def test_quotes_declared_table_and_column_identifiers():
 	class OddRecord(Model):
 		table = 'odd"records'
-		locals()["select"] = attr(str)
+		select = attr(str)
 
 	with TemporaryDirectory() as directory:
 		path = Path(directory) / "app.sqlite"
@@ -394,7 +397,7 @@ def test_validates_registry_and_rejects_unregistered_models():
 			with assert_raises(ModelError):
 				Store(connection, [InheritedTable])
 			with assert_raises(ModelError):
-				Store(connection, [object])
+				Store(connection, cast(Any, [object]))
 
 			store = Store(connection, [Record])
 			with assert_raises(ModelError):
