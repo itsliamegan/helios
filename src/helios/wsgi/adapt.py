@@ -3,6 +3,7 @@ from urllib.parse import parse_qs as parse_query
 from urllib.parse import urlparse as parse_url
 from wsgiref.types import StartResponse, WSGIEnvironment
 
+from werkzeug.datastructures import EnvironHeaders
 from werkzeug.formparser import FormDataParser
 from werkzeug.http import parse_options_header
 from werkzeug.wsgi import get_current_url
@@ -55,7 +56,7 @@ class RequestAdapter:
 		raw = get_current_url(self.environment)
 		parsed = parse_url(raw)
 		query = {}
-		for name, vals in parse_query(parsed.query).items():
+		for name, vals in parse_query(parsed.query, keep_blank_values=True).items():
 			if isinstance(vals, list) and len(vals) == 1:
 				query[name] = vals[0]
 			else:
@@ -63,16 +64,7 @@ class RequestAdapter:
 		return URL(parsed.path, query)
 
 	def headers(self) -> Headers:
-		pairs = {}
-		if "CONTENT_TYPE" in self.environment:
-			pairs["Content-Type"] = self.environment["CONTENT_TYPE"]
-		if "CONTENT_LENGTH" in self.environment:
-			pairs["Content-Length"] = self.environment["CONTENT_LENGTH"]
-		for raw_name in self.environment:
-			if raw_name.startswith("HTTP_"):
-				name = raw_name.replace("HTTP_", "").replace("_", "-")
-				pairs[name] = self.environment[raw_name]
-		return Headers(pairs)
+		return Headers(dict(EnvironHeaders(self.environment)))
 
 	def data(self) -> tuple[Input, Files]:
 		if "CONTENT_TYPE" not in self.environment:
@@ -85,7 +77,11 @@ class RequestAdapter:
 		}:
 			return Input(), Files()
 
-		_, form, uploads = FormDataParser().parse_from_environ(self.environment)
+		parser = FormDataParser(
+			max_form_memory_size=500_000,
+			max_form_parts=1_000,
+		)
+		_, form, uploads = parser.parse_from_environ(self.environment)
 		input_items: dict[str, str | list[str]] = {}
 		for name, values in form.lists():
 			input_items[name] = values[0] if len(values) == 1 else values

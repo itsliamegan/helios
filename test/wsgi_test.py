@@ -1,6 +1,8 @@
 from io import BytesIO
 
-from luna.test.assertion import assert_eq, assert_that
+from luna.test.assertion import assert_eq, assert_raises, assert_that
+from werkzeug.datastructures import MultiDict
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.test import EnvironBuilder
 
 import helios.app
@@ -28,6 +30,14 @@ def test_adapts_url():
 	assert_eq(req.url.query, {"q": "Intro"})
 
 
+def test_adapts_blank_query_value():
+	env = EnvironBuilder(path="/search?q=").get_environ()
+
+	req = RequestAdapter(env).adapt()
+
+	assert_eq(req.url.query, {"q": ""})
+
+
 def test_adapts_headers():
 	env = EnvironBuilder(
 		headers=[("Accept", "text/html"), ("User-Agent", "Mozilla/5.0")]
@@ -37,6 +47,7 @@ def test_adapts_headers():
 
 	assert_eq(str(req.headers["Accept"]), "text/html")
 	assert_eq(str(req.headers["User-Agent"]), "Mozilla/5.0")
+	assert_eq(str(req.headers["Host"]), "localhost")
 
 
 def test_adapts_content_info():
@@ -54,6 +65,22 @@ def test_adapts_form_input():
 	req = RequestAdapter(env).adapt()
 
 	assert_eq(req.input["content"], "An interesting article.")
+
+
+def test_rejects_form_input_over_memory_limit():
+	env = EnvironBuilder(data={"content": "x" * 500_001}).get_environ()
+
+	with assert_raises(RequestEntityTooLarge):
+		RequestAdapter(env).adapt()
+
+
+def test_rejects_multipart_input_over_part_limit():
+	data = MultiDict((f"field-{index}", "x") for index in range(1_001))
+	builder = EnvironBuilder(data=data, content_type="multipart/form-data")
+	env = builder.get_environ()
+
+	with assert_raises(RequestEntityTooLarge):
+		RequestAdapter(env).adapt()
 
 
 def test_adapts_multipart_input_and_files():
