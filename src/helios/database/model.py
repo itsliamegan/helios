@@ -1,4 +1,6 @@
+from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum, auto
 from typing import Any, ClassVar, Literal, cast, overload
 from uuid import UUID, uuid4
 
@@ -11,10 +13,44 @@ class ModelError(RuntimeError):
 	pass
 
 
+class Status(Enum):
+	NEW = auto()
+	PERSISTED = auto()
+	DELETED = auto()
+
+
+@dataclass
+class Changes:
+	revisions: dict[str, int]
+
+	def __init__(self):
+		self.revisions = {}
+
+	def mark(self, name: str):
+		self.revisions[name] = self.revisions.get(name, 0) + 1
+
+	def snapshot(self) -> dict[str, int]:
+		return dict(self.revisions)
+
+	def accept(self, snapshot: dict[str, int]):
+		for name, revision in snapshot.items():
+			if self.revisions.get(name) == revision:
+				del self.revisions[name]
+
+
 MISSING: Any = object()
 
 
+@dataclass
 class Attribute[StoredT, ValueT = StoredT]:
+	name: str | None
+	owner: type[Model] | None
+	type: types.Type[StoredT]
+	default: ValueT | None
+	required: bool
+	nullable: bool
+	init: bool
+
 	def __init__(
 		self,
 		typ: types.Type[StoredT],
@@ -74,14 +110,7 @@ class Attribute[StoredT, ValueT = StoredT]:
 			raise AttributeError("attribute has not been assigned to a model")
 		self.check(value, type(instance))
 		instance.values[self.name] = value
-		if instance.tracking:
-			instance.dirty_names.add(self.name)
-			instance.change_counts[self.name] = (
-				instance.change_counts.get(self.name, 0) + 1
-			)
-
-	def __repr__(self) -> str:
-		return f"Attribute({self.name!r}, {self.type!r}, default={self.default!r}, nullable={self.nullable!r})"
+		instance.changes.mark(self.name)
 
 
 @overload
@@ -183,19 +212,15 @@ class Model(metaclass=ModelMeta):
 		self.values = type(self).initialize(attrs)
 		self.values["id"] = uuid4()
 		self.values["created_at"] = None
-		self.dirty_names: set[str] = set()
-		self.change_counts: dict[str, int] = {}
-		self.state: Literal["new", "persisted", "deleted"] = "new"
-		self.tracking = True
+		self.changes = Changes()
+		self.status = Status.NEW
 
 	@classmethod
 	def hydrate(cls, values: dict[str, Any]) -> Model:
 		model = cls.__new__(cls)
 		model.values = dict(values)
-		model.dirty_names = set()
-		model.change_counts = {}
-		model.state = "persisted"
-		model.tracking = True
+		model.changes = Changes()
+		model.status = Status.PERSISTED
 		return model
 
 	@classmethod

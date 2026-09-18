@@ -50,7 +50,7 @@ def names(items: list[Item]) -> list[str]:
 
 def test_filters_by_equality_conjunction_and_null():
 	with TemporaryDirectory() as directory:
-		connection, store = open_store(Path(directory) / "app.sqlite")
+		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
 			assert_eq(
 				set(names(store.query(Item).where(group="one").all())),
@@ -71,7 +71,7 @@ def test_filters_by_equality_conjunction_and_null():
 
 def test_orders_limits_and_finds_first():
 	with TemporaryDirectory() as directory:
-		connection, store = open_store(Path(directory) / "app.sqlite")
+		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
 			ascending = store.query(Item).order_by("rank").all()
 			descending = store.query(Item).order_by("rank", "desc").all()
@@ -92,7 +92,7 @@ def test_orders_limits_and_finds_first():
 
 def test_derived_queries_are_independent_and_reusable():
 	with TemporaryDirectory() as directory:
-		connection, store = open_store(Path(directory) / "app.sqlite")
+		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
 			base = store.query(Item).where(group="one")
 			first = base.order_by("rank").limit(1)
@@ -112,7 +112,7 @@ def test_derived_queries_are_independent_and_reusable():
 
 def test_rejects_invalid_query_construction_before_execution():
 	with TemporaryDirectory() as directory:
-		connection, store = open_store(Path(directory) / "app.sqlite")
+		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
 			with assert_raises(ModelError):
 				store.query(Item).where(missing="value")
@@ -132,7 +132,7 @@ def test_rejects_invalid_query_construction_before_execution():
 
 def test_binds_sql_looking_filter_values_as_data():
 	with TemporaryDirectory() as directory:
-		connection, store = open_store(Path(directory) / "app.sqlite")
+		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
 			value = "Alpha' OR 1 = 1 --"
 			store.create(Item, name=value, group="two", rank=4)
@@ -144,7 +144,7 @@ def test_binds_sql_looking_filter_values_as_data():
 
 def test_raw_select_preserves_order_and_identity():
 	with TemporaryDirectory() as directory:
-		connection, store = open_store(Path(directory) / "app.sqlite")
+		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
 			alpha = store.find_by(Item, name="Alpha")[0]
 			connection.execute(
@@ -170,7 +170,7 @@ def test_raw_select_preserves_order_and_identity():
 
 def test_raw_select_rejects_malformed_shape_and_value():
 	with TemporaryDirectory() as directory:
-		connection, store = open_store(Path(directory) / "app.sqlite")
+		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
 			with assert_raises(DatabaseError):
 				store.select(Item, "SELECT items.*, 1 AS extra FROM items", ())

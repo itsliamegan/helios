@@ -59,8 +59,8 @@ def user_names(path: Path) -> list[str]:
 def test_session_and_database_resources_persist_and_recover_together():
 	with TemporaryDirectory() as directory:
 		directory_path = Path(directory)
-		database_path = directory_path / "app.sqlite"
-		session_path = directory_path / "sessions.json"
+		database_path = Path(directory_path, "app.sqlite")
+		session_path = Path(directory_path, "sessions.json")
 		session_path.write_text("{}")
 		connection = sqlite3.connect(database_path, autocommit=True)
 		connection.execute(

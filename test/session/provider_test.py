@@ -84,7 +84,7 @@ def session_data(
 
 def test_unused_and_empty_sessions_do_not_write():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "sessions.json"
+		path = Path(directory, "sessions.json")
 		write_sessions(path)
 		before = path.stat().st_mtime_ns
 
@@ -100,7 +100,7 @@ def test_unused_and_empty_sessions_do_not_write():
 
 def test_stores_data_and_sets_cookie_policy():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "sessions.json"
+		path = Path(directory, "sessions.json")
 		write_sessions(path)
 		now = datetime(2026, 10, 12, tzinfo=UTC)
 		with time_machine.travel(now, tick=False):
@@ -123,7 +123,7 @@ def test_stores_data_and_sets_cookie_policy():
 
 def test_reuses_touches_and_rotates_known_session():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "sessions.json"
+		path = Path(directory, "sessions.json")
 		old_id = uuid4()
 		write_sessions(path, {str(old_id): session_data({"message": "Hello"})})
 		now = datetime(2026, 10, 12, tzinfo=UTC)
@@ -142,7 +142,7 @@ def test_reuses_touches_and_rotates_known_session():
 
 def test_replaces_malformed_and_unknown_cookies():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "sessions.json"
+		path = Path(directory, "sessions.json")
 		write_sessions(path)
 		malformed, _ = exercise(path, request("not-a-uuid"))
 		unknown_id = uuid4()
@@ -155,7 +155,7 @@ def test_replaces_malformed_and_unknown_cookies():
 
 def test_purges_expired_sessions_and_renews_boundary():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "sessions.json"
+		path = Path(directory, "sessions.json")
 		now = datetime(2026, 10, 12, tzinfo=UTC)
 		active_id = uuid4()
 		expired_id = uuid4()
@@ -179,7 +179,7 @@ def test_purges_expired_sessions_and_renews_boundary():
 
 def test_clear_and_invalidate_remove_persisted_session():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "sessions.json"
+		path = Path(directory, "sessions.json")
 		first_id = uuid4()
 		write_sessions(path, {str(first_id): session_data({"message": "Hello"})})
 		_, response = exercise(
@@ -202,7 +202,7 @@ def test_clear_and_invalidate_remove_persisted_session():
 
 def test_unexpected_exception_does_not_save_and_releases_lock():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "sessions.json"
+		path = Path(directory, "sessions.json")
 		id = uuid4()
 		initial = {str(id): session_data({"message": "Before"})}
 		write_sessions(path, initial)
@@ -230,7 +230,7 @@ def test_unexpected_exception_does_not_save_and_releases_lock():
 
 def test_handled_http_error_saves_mutation():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "sessions.json"
+		path = Path(directory, "sessions.json")
 		write_sessions(path)
 
 		def fail(request, context):
@@ -268,7 +268,7 @@ def lock_worker(path: str, lock_path: str, queue):
 
 def test_file_driver_serializes_processes():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "sessions.json"
+		path = Path(directory, "sessions.json")
 		lock_path = path.with_suffix(".lock")
 		write_sessions(path)
 		context = multiprocessing.get_context("fork")

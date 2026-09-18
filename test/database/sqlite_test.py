@@ -19,7 +19,7 @@ def create_database(path: Path, schema: str):
 
 def test_commits_transaction_visible_to_separate_connection():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
 		connection = connect(Config(path))
 		try:
@@ -42,7 +42,7 @@ def test_commits_transaction_visible_to_separate_connection():
 
 def test_rolls_back_transaction():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
 		connection = connect(Config(path))
 		try:
@@ -63,7 +63,7 @@ def test_rolls_back_transaction():
 
 def test_enforces_foreign_keys():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(
 			path,
 			"""
@@ -89,7 +89,7 @@ def test_enforces_foreign_keys():
 
 def test_translates_writer_contention_to_database_busy():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
 		first = connect(Config(path))
 		second = connect(Config(path, timedelta(milliseconds=10)))
@@ -107,7 +107,7 @@ def test_translates_writer_contention_to_database_busy():
 
 def test_translates_statement_errors_without_bound_values():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		secret = "distinctive-secret-value"
 		connection = connect(Config(path))
 		try:

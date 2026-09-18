@@ -70,7 +70,7 @@ def resolve(store: Store, session: Session) -> Authenticator:
 
 def test_finds_no_user():
 	with TemporaryDirectory() as directory:
-		connection, store = create_store(Path(directory) / "app.sqlite")
+		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
 			provided = resolve(store, Session(uuid4()))
 		finally:
@@ -82,7 +82,7 @@ def test_finds_no_user():
 
 def test_finds_user_from_session():
 	with TemporaryDirectory() as directory:
-		connection, store = create_store(Path(directory) / "app.sqlite")
+		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
 			user = store.create(User, name="Alice")
 			session = Session(uuid4())
@@ -98,7 +98,7 @@ def test_finds_user_from_session():
 
 def test_removes_stale_user_id():
 	with TemporaryDirectory() as directory:
-		connection, store = create_store(Path(directory) / "app.sqlite")
+		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
 			session = Session(uuid4())
 			session["_user_id"] = str(uuid4())
@@ -112,7 +112,7 @@ def test_removes_stale_user_id():
 
 def test_removes_malformed_user_id():
 	with TemporaryDirectory() as directory:
-		connection, store = create_store(Path(directory) / "app.sqlite")
+		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
 			session = Session(uuid4())
 			session["_user_id"] = "not-a-uuid"

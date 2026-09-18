@@ -91,7 +91,7 @@ def record_values(name: str = "Intro"):
 
 def test_crud_and_scalar_round_trip():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(path)
 		connection = connect(Config(path))
 		connection.begin()
@@ -137,7 +137,7 @@ def test_crud_and_scalar_round_trip():
 
 def test_failed_insert_leaves_model_new_for_later_save():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(path)
 		connection = connect(Config(path))
 		connection.begin()
@@ -158,7 +158,7 @@ def test_failed_insert_leaves_model_new_for_later_save():
 
 def test_failed_update_preserves_assignment_for_retry():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(
 			path,
 			SCHEMA
@@ -200,7 +200,7 @@ def test_failed_update_preserves_assignment_for_retry():
 
 def test_unchanged_save_issues_no_update():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(
 			path,
 			SCHEMA
@@ -233,7 +233,7 @@ def test_unchanged_save_issues_no_update():
 
 def test_save_updates_only_assigned_columns():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(
 			path,
 			SCHEMA
@@ -273,7 +273,7 @@ def test_save_updates_only_assigned_columns():
 
 def test_identity_map_preserves_unsaved_assignment():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(path)
 		connection = connect(Config(path))
 		connection.begin()
@@ -292,7 +292,7 @@ def test_identity_map_preserves_unsaved_assignment():
 
 def test_deletes_model_and_reports_missing_lookup():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(path)
 		connection = connect(Config(path))
 		connection.begin()
@@ -313,7 +313,7 @@ def test_deletes_model_and_reports_missing_lookup():
 
 def test_malformed_stored_scalar_is_database_error():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(path, SCHEMA.replace(" CHECK (active IN (0, 1))", ""))
 		values = record_values()
 		raw = sqlite3.connect(path, autocommit=True)
@@ -353,7 +353,7 @@ def test_quotes_declared_table_and_column_identifiers():
 		select = attr(str)
 
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(
 			path,
 			"""CREATE TABLE "odd""records" (
@@ -388,7 +388,7 @@ def test_validates_registry_and_rejects_unregistered_models():
 		table = "others"
 
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_database(path)
 		connection = connect(Config(path))
 		try:

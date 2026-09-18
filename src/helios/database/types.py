@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 import uuid
 
 from helios import http
@@ -10,28 +10,27 @@ type Scalar = int | float | str | bytes
 @runtime_checkable
 class Type[T](Protocol):
 	def check(self, value: object): ...
-	def encode(self, value: T) -> Scalar: ...
+
+	def encode(self, value: Any) -> Scalar:
+		if isinstance(value, bool) or not isinstance(value, int | float | str | bytes):
+			raise TypeError(f"expected a SQLite scalar, got {type(value).__name__}")
+		return value
+
 	def decode(self, value: Scalar) -> T: ...
 
 
-def check_scalar(value: object) -> Scalar:
-	if isinstance(value, bool) or not isinstance(value, int | float | str | bytes):
-		raise TypeError(f"expected a SQLite scalar, got {type(value).__name__}")
-	return value
-
-
 def encode[T](codec: Type[T], value: T) -> Scalar:
-	return check_scalar(codec.encode(value))
+	return Type.encode(codec, codec.encode(value))
 
 
-class Str:
+class Str(Type[str]):
 	def check(self, value: object):
 		if not isinstance(value, str):
 			raise TypeError(f"expected a string, got {type(value).__name__}")
 
 	def encode(self, value: str) -> Scalar:
 		self.check(value)
-		return check_scalar(value)
+		return super().encode(value)
 
 	def decode(self, value: Scalar) -> str:
 		if not isinstance(value, str):
@@ -39,14 +38,14 @@ class Str:
 		return value
 
 
-class Bool:
+class Bool(Type[bool]):
 	def check(self, value: object):
 		if not isinstance(value, bool):
 			raise TypeError(f"expected a boolean, got {type(value).__name__}")
 
 	def encode(self, value: bool) -> Scalar:
 		self.check(value)
-		return check_scalar(1 if value else 0)
+		return super().encode(1 if value else 0)
 
 	def decode(self, value: Scalar) -> bool:
 		if not isinstance(value, int) or isinstance(value, bool) or value not in (0, 1):
@@ -54,14 +53,14 @@ class Bool:
 		return bool(value)
 
 
-class Int:
+class Int(Type[int]):
 	def check(self, value: object):
 		if not isinstance(value, int) or isinstance(value, bool):
 			raise TypeError(f"expected an integer, got {type(value).__name__}")
 
 	def encode(self, value: int) -> Scalar:
 		self.check(value)
-		return check_scalar(value)
+		return super().encode(value)
 
 	def decode(self, value: Scalar) -> int:
 		if not isinstance(value, int) or isinstance(value, bool):
@@ -69,14 +68,14 @@ class Int:
 		return value
 
 
-class UUID:
+class UUID(Type[uuid.UUID]):
 	def check(self, value: object):
 		if not isinstance(value, uuid.UUID):
 			raise TypeError(f"expected a UUID, got {type(value).__name__}")
 
 	def encode(self, value: uuid.UUID) -> Scalar:
 		self.check(value)
-		return check_scalar(str(value))
+		return super().encode(str(value))
 
 	def decode(self, value: Scalar) -> uuid.UUID:
 		if not isinstance(value, str):
@@ -87,8 +86,8 @@ class UUID:
 		return decoded
 
 
-class Date:
-	format = "%Y-%m-%dT%H:%M:%S.%fZ"
+class Date(Type[datetime]):
+	FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 	def check(self, value: object):
 		if (
@@ -100,25 +99,25 @@ class Date:
 
 	def encode(self, value: datetime) -> Scalar:
 		self.check(value)
-		return check_scalar(value.astimezone(UTC).strftime(self.format))
+		return super().encode(value.astimezone(UTC).strftime(self.FORMAT))
 
 	def decode(self, value: Scalar) -> datetime:
 		if not isinstance(value, str):
 			raise TypeError(f"expected a datetime string, got {type(value).__name__}")
-		decoded = datetime.strptime(value, self.format).replace(tzinfo=UTC)
-		if decoded.strftime(self.format) != value:
+		decoded = datetime.strptime(value, self.FORMAT).replace(tzinfo=UTC)
+		if decoded.strftime(self.FORMAT) != value:
 			raise ValueError("expected a canonical UTC datetime string")
 		return decoded
 
 
-class URL:
+class URL(Type[http.URL]):
 	def check(self, value: object):
 		if not isinstance(value, http.URL):
 			raise TypeError(f"expected a URL, got {type(value).__name__}")
 
 	def encode(self, value: http.URL) -> Scalar:
 		self.check(value)
-		return check_scalar(str(value))
+		return super().encode(str(value))
 
 	def decode(self, value: Scalar) -> http.URL:
 		if not isinstance(value, str):

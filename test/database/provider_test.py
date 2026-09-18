@@ -59,7 +59,7 @@ def titles(path: Path) -> list[str]:
 
 def test_unused_provider_does_not_touch_database_target():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "missing" / "app.sqlite"
+		path = Path(directory, "missing", "app.sqlite")
 		app = application(path, lambda request, context: Response.empty(Status.OK))
 		try:
 			response = app.handle(request())
@@ -72,7 +72,7 @@ def test_unused_provider_does_not_touch_database_target():
 
 def test_normal_and_redirect_responses_commit():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_schema(path)
 
 		def create(request, context):
@@ -91,7 +91,7 @@ def test_normal_and_redirect_responses_commit():
 
 def test_handled_and_returned_error_responses_commit():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_schema(path)
 
 		def handled(request, context):
@@ -121,7 +121,7 @@ def test_handled_and_returned_error_responses_commit():
 
 def test_unexpected_exception_rolls_back_and_next_request_can_use_database():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_schema(path)
 
 		def fail(request, context):
@@ -151,7 +151,7 @@ def test_unexpected_exception_rolls_back_and_next_request_can_use_database():
 
 def test_request_shares_transaction_and_identity_map():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_schema(path)
 
 		def create(request, context):
@@ -176,7 +176,7 @@ def test_request_shares_transaction_and_identity_map():
 
 def test_commit_failure_returns_error_and_leaves_no_row():
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		create_schema(
 			path,
 			"""

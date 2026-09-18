@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import Any, Literal, TYPE_CHECKING
 
 from . import types
 from .model import Model
@@ -10,18 +10,21 @@ if TYPE_CHECKING:
 	from .store import Store
 
 
-@dataclass(frozen=True)
+type Direction = Literal["asc", "desc"]
+
+
+@dataclass
 class Filter:
 	name: str
 	value: types.Scalar | None
 
 
-@dataclass(frozen=True)
+@dataclass
 class Query[T: Model]:
 	store: Store
 	model_type: type[T]
 	filters: tuple[Filter, ...] = ()
-	ordering: tuple[str, str] | None = None
+	ordering: tuple[str, Direction] | None = None
 	count: int | None = None
 
 	def where(self, **attrs: Any) -> Query[T]:
@@ -39,7 +42,7 @@ class Query[T: Model]:
 			self.count,
 		)
 
-	def order_by(self, name: str, direction: str = "asc") -> Query[T]:
+	def order_by(self, name: str, direction: Direction = "asc") -> Query[T]:
 		self.store.attribute(self.model_type, name)
 		if direction not in ("asc", "desc"):
 			raise ValueError("direction must be 'asc' or 'desc'")

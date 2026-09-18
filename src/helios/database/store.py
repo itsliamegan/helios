@@ -6,7 +6,7 @@ from uuid import UUID
 from helios.http.error import NotFoundError as BaseNotFoundError
 
 from . import types
-from .model import Attribute, Model, ModelError
+from .model import Attribute, Model, ModelError, Status
 from .query import Filter, Query
 from .sqlite import Connection, DatabaseError, quote_identifier
 
@@ -57,7 +57,7 @@ class Store:
 
 	def save(self, model: Model):
 		model_type = self.registry.get(type(model))
-		if model.state == "new":
+		if model.status is Status.NEW:
 			self.insert(model_type, model)
 			return
 		self.update(model_type, model)
@@ -66,7 +66,7 @@ class Store:
 		created_at = datetime.now(UTC)
 		values = dict(model.values)
 		values["created_at"] = created_at
-		change_counts = dict(model.change_counts)
+		changes = model.changes.snapshot()
 		names = tuple(model_type.attrs)
 		columns = ", ".join(quote_identifier(name) for name in names)
 		placeholders = ", ".join("?" for _ in names)
@@ -78,16 +78,16 @@ class Store:
 		self.connection.execute(sql, parameters).close()
 
 		model.values["created_at"] = created_at
-		model.state = "persisted"
-		self.clear_changes(model, change_counts)
+		model.status = Status.PERSISTED
+		model.changes.accept(changes)
 		self.identity[(model_type, model.id)] = model
 
 	def update[T: Model](self, model_type: type[T], model: T):
-		names = tuple(name for name in model_type.attrs if name in model.dirty_names)
+		changes = model.changes.snapshot()
+		names = tuple(name for name in model_type.attrs if name in changes)
 		if not names:
 			return
 		values = {name: model.values[name] for name in names}
-		change_counts = {name: model.change_counts[name] for name in names}
 		assignments = ", ".join(f"{quote_identifier(name)} = ?" for name in names)
 		parameters = [self.encode(model_type, name, values[name]) for name in names]
 		parameters.append(types.encode(model_type.attrs["id"].type, model.id))
@@ -96,12 +96,7 @@ class Store:
 			f"WHERE {quote_identifier("id")} = ?"
 		)
 		self.connection.execute(sql, parameters).close()
-		self.clear_changes(model, change_counts)
-
-	def clear_changes(self, model: Model, change_counts: dict[str, int]):
-		for name, count in change_counts.items():
-			if model.change_counts.get(name) == count:
-				model.dirty_names.discard(name)
+		model.changes.accept(changes)
 
 	def delete(self, model: Model):
 		model_type = self.registry.get(type(model))
@@ -111,7 +106,7 @@ class Store:
 			f"WHERE {quote_identifier("id")} = ?"
 		)
 		self.connection.execute(sql, (identifier,)).close()
-		model.state = "deleted"
+		model.status = Status.DELETED
 		key = (model_type, model.id)
 		if self.identity.get(key) is model:
 			del self.identity[key]

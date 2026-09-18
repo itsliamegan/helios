@@ -92,7 +92,7 @@ class Connection:
 	def configure(self, config: Config):
 		self.control("PRAGMA foreign_keys = ON", "configuration")
 		self.control(
-			f"PRAGMA busy_timeout = {config.busy_timeout_milliseconds}",
+			f"PRAGMA busy_timeout = {config.busy_timeout.total_seconds() * 1000}",
 			"configuration",
 		)
 

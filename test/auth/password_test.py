@@ -34,7 +34,7 @@ def test_round_trips_password_attrs():
 		backup_password = attr(Password, nullable=True)
 
 	with TemporaryDirectory() as directory:
-		path = Path(directory) / "app.sqlite"
+		path = Path(directory, "app.sqlite")
 		raw = sqlite3.connect(path, autocommit=True)
 		raw.execute(
 			"""
