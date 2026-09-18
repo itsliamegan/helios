@@ -7,6 +7,7 @@ from helios.http.error import NotFoundError as BaseNotFoundError
 
 from . import types
 from .model import Attribute, Model, ModelError
+from .query import Filter, Query
 from .sqlite import Connection, DatabaseError, quote_identifier
 
 
@@ -116,36 +117,67 @@ class Store:
 			del self.identity[key]
 
 	def find_one[T: Model](self, model_type: type[T], id: UUID) -> T:
-		found = self.select_where(model_type, {"id": id})
-		if not found:
+		found = self.query(model_type).where(id=id).first()
+		if found is None:
 			raise NotFoundError(model_type, id)
-		return found[0]
+		return found
 
 	def find_all[T: Model](self, model_type: type[T]) -> list[T]:
-		return self.select_where(model_type, {})
+		return self.query(model_type).all()
 
 	def find_by[T: Model](self, model_type: type[T], **attrs: Any) -> list[T]:
-		return self.select_where(model_type, attrs)
+		return self.query(model_type).where(**attrs).all()
 
-	def select_where[T: Model](
+	def query[T: Model](self, model_type: type[T]) -> Query[T]:
+		self.registry.get(model_type)
+		return Query(self, model_type)
+
+	def execute_query[T: Model](
 		self,
 		model_type: type[T],
-		filters: dict[str, Any],
+		filters: tuple[Filter, ...],
+		ordering: tuple[str, str] | None,
+		count: int | None,
 	) -> list[T]:
-		self.registry.get(model_type)
 		columns = ", ".join(quote_identifier(name) for name in model_type.attrs)
 		predicates: list[str] = []
-		parameters: list[types.Scalar] = []
-		for name, value in filters.items():
-			attribute = self.attribute(model_type, name)
-			attribute.check(value, model_type)
-			if value is None:
-				predicates.append(f"{quote_identifier(name)} IS NULL")
+		parameters: list[Any] = []
+		for filter in filters:
+			if filter.value is None:
+				predicates.append(f"{quote_identifier(filter.name)} IS NULL")
 			else:
-				predicates.append(f"{quote_identifier(name)} = ?")
-				parameters.append(types.encode(attribute.type, value))
+				predicates.append(f"{quote_identifier(filter.name)} = ?")
+				parameters.append(filter.value)
 		where = f" WHERE {" AND ".join(predicates)}" if predicates else ""
-		sql = f"SELECT {columns} FROM {quote_identifier(model_type.table)}{where}"
+		order = ""
+		if ordering is not None:
+			name, direction = ordering
+			order = f" ORDER BY {quote_identifier(name)} {direction.upper()}"
+		limit = ""
+		if count is not None:
+			limit = " LIMIT ?"
+			parameters.append(count)
+		sql = (
+			f"SELECT {columns} FROM {quote_identifier(model_type.table)}"
+			f"{where}{order}{limit}"
+		)
+		return self.execute_select(model_type, sql, parameters)
+
+	def select[T: Model](
+		self,
+		model_type: type[T],
+		sql: str,
+		parameters: Iterable[Any],
+	) -> list[T]:
+		self.registry.get(model_type)
+		return self.execute_select(model_type, sql, parameters)
+
+	def execute_select[T: Model](
+		self,
+		model_type: type[T],
+		sql: str,
+		parameters: Iterable[Any],
+	) -> list[T]:
 		cursor = self.connection.execute(sql, parameters)
 		try:
 			column_names = cursor.columns
