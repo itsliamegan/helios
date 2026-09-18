@@ -23,14 +23,14 @@ def encode[T](codec: Type[T], value: T) -> Scalar:
 	return Type.encode(codec, codec.encode(value))
 
 
-class Str(Type[str]):
+class Str:
 	def check(self, value: object):
 		if not isinstance(value, str):
 			raise TypeError(f"expected a string, got {type(value).__name__}")
 
 	def encode(self, value: str) -> Scalar:
 		self.check(value)
-		return super().encode(value)
+		return Type.encode(self, value)
 
 	def decode(self, value: Scalar) -> str:
 		if not isinstance(value, str):
@@ -38,14 +38,14 @@ class Str(Type[str]):
 		return value
 
 
-class Bool(Type[bool]):
+class Bool:
 	def check(self, value: object):
 		if not isinstance(value, bool):
 			raise TypeError(f"expected a boolean, got {type(value).__name__}")
 
 	def encode(self, value: bool) -> Scalar:
 		self.check(value)
-		return super().encode(1 if value else 0)
+		return Type.encode(self, 1 if value else 0)
 
 	def decode(self, value: Scalar) -> bool:
 		if not isinstance(value, int) or isinstance(value, bool) or value not in (0, 1):
@@ -53,14 +53,14 @@ class Bool(Type[bool]):
 		return bool(value)
 
 
-class Int(Type[int]):
+class Int:
 	def check(self, value: object):
 		if not isinstance(value, int) or isinstance(value, bool):
 			raise TypeError(f"expected an integer, got {type(value).__name__}")
 
 	def encode(self, value: int) -> Scalar:
 		self.check(value)
-		return super().encode(value)
+		return Type.encode(self, value)
 
 	def decode(self, value: Scalar) -> int:
 		if not isinstance(value, int) or isinstance(value, bool):
@@ -68,14 +68,14 @@ class Int(Type[int]):
 		return value
 
 
-class UUID(Type[uuid.UUID]):
+class UUID:
 	def check(self, value: object):
 		if not isinstance(value, uuid.UUID):
 			raise TypeError(f"expected a UUID, got {type(value).__name__}")
 
 	def encode(self, value: uuid.UUID) -> Scalar:
 		self.check(value)
-		return super().encode(str(value))
+		return Type.encode(self, str(value))
 
 	def decode(self, value: Scalar) -> uuid.UUID:
 		if not isinstance(value, str):
@@ -86,7 +86,7 @@ class UUID(Type[uuid.UUID]):
 		return decoded
 
 
-class Date(Type[datetime]):
+class Date:
 	FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 	def check(self, value: object):
@@ -99,7 +99,7 @@ class Date(Type[datetime]):
 
 	def encode(self, value: datetime) -> Scalar:
 		self.check(value)
-		return super().encode(value.astimezone(UTC).strftime(self.FORMAT))
+		return Type.encode(self, value.astimezone(UTC).strftime(self.FORMAT))
 
 	def decode(self, value: Scalar) -> datetime:
 		if not isinstance(value, str):
@@ -110,14 +110,14 @@ class Date(Type[datetime]):
 		return decoded
 
 
-class URL(Type[http.URL]):
+class URL:
 	def check(self, value: object):
 		if not isinstance(value, http.URL):
 			raise TypeError(f"expected a URL, got {type(value).__name__}")
 
 	def encode(self, value: http.URL) -> Scalar:
 		self.check(value)
-		return super().encode(str(value))
+		return Type.encode(self, str(value))
 
 	def decode(self, value: Scalar) -> http.URL:
 		if not isinstance(value, str):
