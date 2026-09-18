@@ -57,7 +57,7 @@ class Store:
 
 	def save(self, model: Model):
 		model_type = self.registry.get(type(model))
-		if model.status is Status.NEW:
+		if model._status is Status.NEW:
 			self.insert(model_type, model)
 			return
 		self.update(model_type, model)
@@ -66,7 +66,7 @@ class Store:
 		created_at = datetime.now(UTC)
 		values = dict(model.values)
 		values["created_at"] = created_at
-		changes = model.changes.snapshot()
+		changes = model._changes.snapshot()
 		names = tuple(model_type.attrs)
 		columns = ", ".join(quote_identifier(name) for name in names)
 		placeholders = ", ".join("?" for _ in names)
@@ -78,12 +78,12 @@ class Store:
 		self.connection.execute(sql, parameters).close()
 
 		model.values["created_at"] = created_at
-		model.status = Status.PERSISTED
-		model.changes.accept(changes)
+		model._status = Status.PERSISTED
+		model._changes.accept(changes)
 		self.identity[(model_type, model.id)] = model
 
 	def update[T: Model](self, model_type: type[T], model: T):
-		changes = model.changes.snapshot()
+		changes = model._changes.snapshot()
 		names = tuple(name for name in model_type.attrs if name in changes)
 		if not names:
 			return
@@ -96,7 +96,7 @@ class Store:
 			f"WHERE {quote_identifier("id")} = ?"
 		)
 		self.connection.execute(sql, parameters).close()
-		model.changes.accept(changes)
+		model._changes.accept(changes)
 
 	def delete(self, model: Model):
 		model_type = self.registry.get(type(model))
@@ -106,7 +106,7 @@ class Store:
 			f"WHERE {quote_identifier("id")} = ?"
 		)
 		self.connection.execute(sql, (identifier,)).close()
-		model.status = Status.DELETED
+		model._status = Status.DELETED
 		key = (model_type, model.id)
 		if self.identity.get(key) is model:
 			del self.identity[key]

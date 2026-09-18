@@ -110,7 +110,7 @@ class Attribute[StoredT, ValueT = StoredT]:
 			raise AttributeError("attribute has not been assigned to a model")
 		self.check(value, type(instance))
 		instance.values[self.name] = value
-		instance.changes.mark(self.name)
+		instance._changes.mark(self.name)
 
 
 @overload
@@ -212,15 +212,15 @@ class Model(metaclass=ModelMeta):
 		self.values = type(self).initialize(attrs)
 		self.values["id"] = uuid4()
 		self.values["created_at"] = None
-		self.changes = Changes()
-		self.status = Status.NEW
+		self._changes = Changes()
+		self._status = Status.NEW
 
 	@classmethod
 	def hydrate(cls, values: dict[str, Any]) -> Model:
 		model = cls.__new__(cls)
 		model.values = dict(values)
-		model.changes = Changes()
-		model.status = Status.PERSISTED
+		model._changes = Changes()
+		model._status = Status.PERSISTED
 		return model
 
 	@classmethod
