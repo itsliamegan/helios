@@ -4,7 +4,7 @@ from luna.test.assertion import assert_eq, assert_that
 
 from helios.auth.state import Authenticator
 from helios.database import Model, attr
-from helios.session.store import Session, Sessions
+from helios.session.store import Session, Store
 
 
 class User(Model):
@@ -16,7 +16,7 @@ class User(Model):
 def test_signs_in():
 	user = User(name="Alice")
 	session = Session(uuid4())
-	sessions = Sessions({session.id: session})
+	sessions = Store({session.id: session})
 	old_id = session.id
 	auth = Authenticator(session)
 
@@ -31,7 +31,7 @@ def test_signs_in():
 def test_signs_out():
 	user = User(name="Alice")
 	session = Session(uuid4())
-	sessions = Sessions({session.id: session})
+	sessions = Store({session.id: session})
 	old_id = session.id
 	auth = Authenticator(session, user)
 

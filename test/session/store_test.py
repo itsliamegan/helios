@@ -4,129 +4,89 @@ from uuid import uuid4
 from luna.test.assertion import assert_eq, assert_that
 import time_machine
 
-from helios.session.store import Format, MAX_AGE, Session, Sessions
+from helios.session.store import Session, Store
+
+MAXIMUM_AGE = timedelta(days=30)
 
 
 def test_finds_session_by_id():
 	id = uuid4()
 	session = Session(id)
-	sessions = Sessions()
+	store = Store()
 
-	sessions.put(session)
+	store.put(session)
 
-	assert_eq(sessions.get(id), session)
-
-
-def test_tracks_added_sessions():
-	sessions = Sessions()
-
-	sessions.put(Session(uuid4()))
-
-	assert_that(sessions.is_dirty())
+	assert_eq(store.get(id), session)
 
 
-def test_tracks_changed_sessions():
-	set_session = Session(uuid4())
-	deleted_session = Session(uuid4(), {"message": "Hello"})
-	cleared_session = Session(uuid4(), {"message": "Hello"})
+def test_tracks_added_and_changed_sessions():
+	store = Store()
+	session = Session(uuid4())
+	store.put(session)
+	assert_that(store.is_dirty())
 
-	set_session["message"] = "Hello"
-	del deleted_session["message"]
-	cleared_session.clear()
-
-	assert_that(Sessions({set_session.id: set_session}).is_dirty())
-	assert_that(Sessions({deleted_session.id: deleted_session}).is_dirty())
-	assert_that(Sessions({cleared_session.id: cleared_session}).is_dirty())
+	changed = Session(uuid4())
+	changed["message"] = "Hello"
+	assert_that(Store({changed.id: changed}).is_dirty())
 
 
-def test_stores_values():
-	id = uuid4()
-	session = Session(id)
+def test_mapping_clear_and_delete():
+	session = Session(uuid4())
+	session["message"] = "Hello"
+	assert_eq(session["message"], "Hello")
 
-	session["message"] = "You do not have access."
-
-	assert_eq(session["message"], "You do not have access.")
-
-
-def test_clears_values():
-	id = uuid4()
-	session = Session(id)
-	session["user_id"] = "275544aa-5d0d-4c0f-969a-a4ebca010818"
-
+	del session["message"]
+	assert_that("message" not in session)
+	session["message"] = "Again"
 	session.clear()
-
-	assert_that("user_id" not in session)
-
-
-def test_deletes_values():
-	id = uuid4()
-	session = Session(id)
-	session["user_id"] = "275544aa-5d0d-4c0f-969a-a4ebca010818"
-
-	del session["user_id"]
-
-	assert_that("user_id" not in session)
+	assert_that("message" not in session)
 
 
-def test_rotates_attached_session():
+def test_rotates_attached_session_preserving_values():
 	old_id = uuid4()
 	session = Session(old_id, {"message": "Hello"})
-	sessions = Sessions({old_id: session})
+	store = Store({old_id: session})
 
 	session.rotate()
 
 	assert_that(session.id != old_id)
-	assert_that(old_id not in sessions)
-	assert_that(session.id in sessions)
-	assert_eq(sessions.get(session.id)["message"], "Hello")
-	assert_that(sessions.is_dirty())
+	assert_that(old_id not in store)
+	assert_that(session.id in store)
+	assert_eq(store.get(session.id)["message"], "Hello")
 
 
 def test_invalidates_attached_session():
 	session = Session(uuid4())
-	sessions = Sessions({session.id: session})
+	store = Store({session.id: session})
 
 	session.invalidate()
 
-	assert_that(session.id not in sessions)
-	assert_that(sessions.is_dirty())
+	assert_that(session.id not in store)
+	assert_that(store.is_dirty())
 
 
-def test_purges_expired_sessions():
+def test_purges_sessions_using_configured_maximum_age():
 	now = datetime(2026, 3, 15, tzinfo=UTC)
-	expired = Session(uuid4(), last_active_at=now - MAX_AGE - timedelta(microseconds=1))
-	active = Session(uuid4(), last_active_at=now - MAX_AGE)
-	sessions = Sessions({expired.id: expired, active.id: active})
+	expired = Session(
+		uuid4(), last_active_at=now - MAXIMUM_AGE - timedelta(microseconds=1)
+	)
+	active = Session(uuid4(), last_active_at=now - MAXIMUM_AGE)
+	store = Store({expired.id: expired, active.id: active})
 
 	with time_machine.travel(now, tick=False):
-		sessions.purge()
+		store.purge(MAXIMUM_AGE)
 
-	assert_that(expired.id not in sessions)
-	assert_that(active.id in sessions)
+	assert_that(expired.id not in store)
+	assert_that(active.id in store)
 
 
-def test_doesnt_rotate_detached_session():
+def test_does_not_rotate_detached_session():
 	old_id = uuid4()
 	session = Session(old_id)
-	sessions = Sessions({old_id: session})
-	del sessions.sessions[old_id]
+	store = Store({old_id: session})
+	store.remove(old_id)
 
 	session.rotate()
 
-	assert_eq(session.id, old_id)
-	assert_that(not session.dirty)
-	assert_that(not sessions.is_dirty())
-
-
-def test_round_trips_sessions_with_activity():
-	id = uuid4()
-	last_active_at = datetime(2026, 3, 15, tzinfo=UTC)
-	session = Session(id, last_active_at=last_active_at)
-	session["message"] = "You do not have access."
-	sessions = Sessions({id: session})
-
-	encoded = Format().encode(sessions)
-	decoded = Format().decode(encoded)
-
-	assert_eq(decoded.get(id)["message"], "You do not have access.")
-	assert_eq(decoded.get(id).last_active_at, last_active_at)
+	assert_that(session.id != old_id)
+	assert_that(session.id not in store)

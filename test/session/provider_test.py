@@ -1,20 +1,23 @@
 from datetime import UTC, datetime, timedelta
+import json
+import multiprocessing
 from pathlib import Path
+from tempfile import TemporaryDirectory
+import time
 from uuid import uuid4
 
 from luna.test.assertion import assert_eq, assert_that
 import time_machine
 
-from helios.app import Application, Container, Provider
+from helios.app import Application
 from helios.app import Config as AppConfig
-from helios.http import Headers, Input, Method, Request, Response, URL
-import helios.persist.config
-from helios.persist.files import Files, Persistence
-from helios.routing import Pattern, Route, Router
+from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.routing import NotFoundError, Pattern, Route, Router
 import helios.session
-from helios.session.config import Config
-from helios.session.store import MAX_AGE, Session, Sessions
-from test.support import MemoryPersistence
+from helios.session.file import Driver
+from helios.session.store import Session
+
+MAXIMUM_AGE = timedelta(days=30)
 
 
 def request(session_id: str | None = None) -> Request:
@@ -24,23 +27,22 @@ def request(session_id: str | None = None) -> Request:
 	return Request(Method.GET, URL("/"), headers, Input())
 
 
-class PersistenceProvider(Provider):
-	def __init__(self, persistence: MemoryPersistence):
-		self.persistence = persistence
+def write_sessions(path: Path, sessions: dict | None = None):
+	path.write_text(json.dumps(sessions or {}))
 
-	def register(self, container: Container):
-		container.scoped(Persistence, lambda context: self.persistence)
+
+def read_sessions(path: Path):
+	return json.loads(path.read_text())
 
 
 def exercise(
-	sessions: Sessions,
+	path: Path,
 	request: Request,
 	change=None,
 	secure: bool = False,
 	resolve: bool = True,
+	maximum_age: timedelta = MAXIMUM_AGE,
 ):
-	files = Files(helios.persist.config.Config(Path("persistence.lock")))
-	persistence = MemoryPersistence(sessions)
 	seen = []
 
 	def index(request, context):
@@ -55,149 +57,238 @@ def exercise(
 		AppConfig(),
 		Router([Route(Method.GET, Pattern("/"), index)]),
 		[
-			PersistenceProvider(persistence),
 			helios.session.Provider(
-				Config(Path("sessions.json"), secure=secure), files
-			),
+				helios.session.Config(secure=secure, maximum_age=maximum_age),
+				Driver(path, path.with_suffix(".lock")),
+			)
 		],
 	)
-	response = app.handle(request)
-	return (seen[0] if seen else None), response, persistence
+	try:
+		response = app.handle(request)
+	finally:
+		app.close()
+	return (seen[0] if seen else None), response
 
 
-def test_doesnt_load_or_persist_unused_session():
-	sessions = Sessions()
-	_, response, persistence = exercise(sessions, request(), resolve=False)
-
-	assert_that("session_id" not in response.cookies)
-	assert_that(persistence.handle.saved is None)
-
-
-def test_doesnt_persist_empty_session():
-	sessions = Sessions()
-	session, response, persistence = exercise(sessions, request())
-
-	assert_that(session.id not in sessions)
-	assert_that("session_id" not in response.cookies)
-	assert_that(persistence.handle.saved is None)
+def session_data(
+	items: dict | None = None,
+	last_active_at: datetime | None = None,
+):
+	return {
+		"items": items or {},
+		"last_active_at": (
+			last_active_at.isoformat() if last_active_at is not None else None
+		),
+	}
 
 
-def test_persists_session_after_storing_data():
-	sessions = Sessions()
-	now = datetime(2026, 10, 12, tzinfo=UTC)
-	with time_machine.travel(now, tick=False):
-		session, response, persistence = exercise(
-			sessions, request(), lambda session: session.__setitem__("message", "Hello")
-		)
+def test_unused_and_empty_sessions_do_not_write():
+	with TemporaryDirectory() as directory:
+		path = Path(directory) / "sessions.json"
+		write_sessions(path)
+		before = path.stat().st_mtime_ns
 
-	assert_that(session.id in sessions)
-	assert_eq(session.last_active_at, now)
-	assert_eq(response.cookies["session_id"].val, str(session.id))
-	assert_eq(persistence.handle.saved, sessions)
+		_, unused_response = exercise(path, request(), resolve=False)
+		empty, empty_response = exercise(path, request())
+
+		assert_that("session_id" not in unused_response.cookies)
+		assert_that("session_id" not in empty_response.cookies)
+		assert_that(empty is not None)
+		assert_eq(path.stat().st_mtime_ns, before)
+		assert_eq(read_sessions(path), {})
+
+
+def test_stores_data_and_sets_cookie_policy():
+	with TemporaryDirectory() as directory:
+		path = Path(directory) / "sessions.json"
+		write_sessions(path)
+		now = datetime(2026, 10, 12, tzinfo=UTC)
+		with time_machine.travel(now, tick=False):
+			session, response = exercise(
+				path,
+				request(),
+				lambda session: session.__setitem__("message", "Hello"),
+				secure=True,
+			)
+
+		stored = read_sessions(path)
+		cookie = response.cookies["session_id"]
+		assert_eq(stored[str(session.id)]["items"], {"message": "Hello"})
+		assert_eq(cookie.val, str(session.id))
+		assert_that(cookie.http_only)
+		assert_that(cookie.secure)
+		assert_eq(cookie.same_site, "Lax")
+		assert_eq(cookie.expires, now + MAXIMUM_AGE)
+
+
+def test_reuses_touches_and_rotates_known_session():
+	with TemporaryDirectory() as directory:
+		path = Path(directory) / "sessions.json"
+		old_id = uuid4()
+		write_sessions(path, {str(old_id): session_data({"message": "Hello"})})
+		now = datetime(2026, 10, 12, tzinfo=UTC)
+		with time_machine.travel(now, tick=False):
+			session, response = exercise(
+				path, request(str(old_id)), lambda session: session.rotate()
+			)
+
+		stored = read_sessions(path)
+		assert_that(session.id != old_id)
+		assert_that(str(old_id) not in stored)
+		assert_eq(stored[str(session.id)]["items"], {"message": "Hello"})
+		assert_eq(stored[str(session.id)]["last_active_at"], now.isoformat())
+		assert_eq(response.cookies["session_id"].val, str(session.id))
 
 
 def test_replaces_malformed_and_unknown_cookies():
-	sessions = Sessions()
-	malformed, _, _ = exercise(sessions, request("not-a-uuid"))
-	unknown_id = uuid4()
-	unknown, _, _ = exercise(sessions, request(str(unknown_id)))
+	with TemporaryDirectory() as directory:
+		path = Path(directory) / "sessions.json"
+		write_sessions(path)
+		malformed, _ = exercise(path, request("not-a-uuid"))
+		unknown_id = uuid4()
+		unknown, _ = exercise(path, request(str(unknown_id)))
 
-	assert_that(malformed.id not in sessions)
-	assert_that(unknown.id != unknown_id)
-	assert_that(unknown_id not in sessions)
-
-
-def test_reuses_known_session():
-	id = uuid4()
-	now = datetime(2026, 10, 12, tzinfo=UTC)
-	existing = Session(id, {"message": "Hello"})
-	sessions = Sessions({id: existing})
-	with time_machine.travel(now, tick=False):
-		session, _, _ = exercise(sessions, request(str(id)))
-
-	assert_that(session is existing)
-	assert_eq(session.last_active_at, now)
+		assert_that(malformed.id != unknown_id)
+		assert_that(unknown.id != unknown_id)
+		assert_eq(read_sessions(path), {})
 
 
-def test_renews_session_at_expiry_boundary():
-	id = uuid4()
-	now = datetime(2026, 10, 12, tzinfo=UTC)
-	existing = Session(id, {"message": "Hello"}, last_active_at=now - MAX_AGE)
-	with time_machine.travel(now, tick=False):
-		session, _, _ = exercise(Sessions({id: existing}), request(str(id)))
+def test_purges_expired_sessions_and_renews_boundary():
+	with TemporaryDirectory() as directory:
+		path = Path(directory) / "sessions.json"
+		now = datetime(2026, 10, 12, tzinfo=UTC)
+		active_id = uuid4()
+		expired_id = uuid4()
+		write_sessions(
+			path,
+			{
+				str(active_id): session_data({"message": "Hello"}, now - MAXIMUM_AGE),
+				str(expired_id): session_data(
+					last_active_at=now - MAXIMUM_AGE - timedelta(microseconds=1)
+				),
+			},
+		)
+		with time_machine.travel(now, tick=False):
+			session, _ = exercise(path, request(str(active_id)))
 
-	assert_that(session is existing)
-	assert_eq(session.last_active_at, now)
-
-
-def test_removes_expired_sessions():
-	now = datetime(2026, 10, 12, tzinfo=UTC)
-	active = Session(uuid4(), {"message": "Hello"}, last_active_at=now)
-	expired = Session(
-		uuid4(),
-		last_active_at=now - MAX_AGE - timedelta(microseconds=1),
-	)
-	sessions = Sessions({active.id: active, expired.id: expired})
-	with time_machine.travel(now, tick=False):
-		session, _, persistence = exercise(sessions, request(str(active.id)))
-
-	assert_that(session is active)
-	assert_that(expired.id not in sessions)
-	assert_eq(persistence.handle.saved, sessions)
+		stored = read_sessions(path)
+		assert_eq(session.id, active_id)
+		assert_eq(stored[str(active_id)]["last_active_at"], now.isoformat())
+		assert_that(str(expired_id) not in stored)
 
 
-def test_removes_session_after_its_data_is_cleared():
-	session = Session(uuid4(), {"message": "Hello"})
-	sessions = Sessions({session.id: session})
-	provided, response, persistence = exercise(
-		sessions, request(str(session.id)), lambda session: session.clear()
-	)
+def test_clear_and_invalidate_remove_persisted_session():
+	with TemporaryDirectory() as directory:
+		path = Path(directory) / "sessions.json"
+		first_id = uuid4()
+		write_sessions(path, {str(first_id): session_data({"message": "Hello"})})
+		_, response = exercise(
+			path, request(str(first_id)), lambda session: session.clear()
+		)
+		assert_eq(read_sessions(path), {})
+		assert_eq(response.cookies["session_id"].val, "")
+		assert_eq(
+			response.cookies["session_id"].expires, datetime(1970, 1, 1, tzinfo=UTC)
+		)
 
-	assert_that(provided.id not in sessions)
-	assert_eq(response.cookies["session_id"].val, "")
-	assert_eq(response.cookies["session_id"].expires, datetime(1970, 1, 1, tzinfo=UTC))
-	assert_eq(persistence.handle.saved, sessions)
-
-
-def test_doesnt_restore_invalidated_session():
-	session = Session(uuid4(), {"message": "Hello"})
-	sessions = Sessions({session.id: session})
-	provided, response, persistence = exercise(
-		sessions, request(str(session.id)), lambda session: session.invalidate()
-	)
-
-	assert_that(provided.id not in sessions)
-	assert_eq(response.cookies["session_id"].val, "")
-	assert_eq(persistence.handle.saved, sessions)
+		second_id = uuid4()
+		write_sessions(path, {str(second_id): session_data({"message": "Hello"})})
+		_, response = exercise(
+			path, request(str(second_id)), lambda session: session.invalidate()
+		)
+		assert_eq(read_sessions(path), {})
+		assert_eq(response.cookies["session_id"].val, "")
 
 
-def test_sets_cookie_policy():
-	session, response, _ = exercise(
-		Sessions(),
-		request(),
-		lambda session: session.__setitem__("message", "Hello"),
-		secure=True,
-	)
+def test_unexpected_exception_does_not_save_and_releases_lock():
+	with TemporaryDirectory() as directory:
+		path = Path(directory) / "sessions.json"
+		id = uuid4()
+		initial = {str(id): session_data({"message": "Before"})}
+		write_sessions(path, initial)
 
-	cookie = response.cookies["session_id"]
-	assert_eq(cookie.val, str(session.id))
-	assert_that(cookie.http_only)
-	assert_that(cookie.secure)
-	assert_eq(cookie.same_site, "Lax")
-	assert_that(cookie.expires is not None)
+		def fail(request, context):
+			context.get(Session)["message"] = "After"
+			raise RuntimeError("failure")
+
+		driver = Driver(path, path.with_suffix(".lock"))
+		app = Application(
+			AppConfig(),
+			Router([Route(Method.GET, Pattern("/"), fail)]),
+			[helios.session.Provider(helios.session.Config(), driver)],
+		)
+		try:
+			response = app.handle(request(str(id)))
+		finally:
+			app.close()
+
+		assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
+		assert_eq(read_sessions(path), initial)
+		with driver.open() as store:
+			assert_eq(store.get(id)["message"], "Before")
 
 
-def test_rotates_session():
-	old_id = uuid4()
-	session = Session(old_id, {"message": "Hello"})
-	sessions = Sessions({old_id: session})
-	provided, response, persistence = exercise(
-		sessions, request(str(old_id)), lambda session: session.rotate()
-	)
+def test_handled_http_error_saves_mutation():
+	with TemporaryDirectory() as directory:
+		path = Path(directory) / "sessions.json"
+		write_sessions(path)
 
-	assert_that(provided.id != old_id)
-	assert_that(old_id not in sessions)
-	assert_that(provided.id in sessions)
-	assert_eq(sessions.get(provided.id)["message"], "Hello")
-	assert_eq(response.cookies["session_id"].val, str(provided.id))
-	assert_eq(persistence.handle.saved, sessions)
+		def fail(request, context):
+			context.get(Session)["message"] = "Saved"
+			raise NotFoundError()
+
+		app = Application(
+			AppConfig(),
+			Router([Route(Method.GET, Pattern("/"), fail)]),
+			[
+				helios.session.Provider(
+					helios.session.Config(),
+					Driver(path, path.with_suffix(".lock")),
+				)
+			],
+		)
+		try:
+			response = app.handle(request())
+		finally:
+			app.close()
+
+		assert_eq(response.status, Status.NOT_FOUND)
+		assert_eq(
+			next(iter(read_sessions(path).values()))["items"], {"message": "Saved"}
+		)
+
+
+def lock_worker(path: str, lock_path: str, queue):
+	driver = Driver(Path(path), Path(lock_path))
+	with driver.open():
+		queue.put(("entered", time.monotonic()))
+		time.sleep(0.15)
+		queue.put(("leaving", time.monotonic()))
+
+
+def test_file_driver_serializes_processes():
+	with TemporaryDirectory() as directory:
+		path = Path(directory) / "sessions.json"
+		lock_path = path.with_suffix(".lock")
+		write_sessions(path)
+		context = multiprocessing.get_context("fork")
+		queue = context.Queue()
+		first = context.Process(
+			target=lock_worker, args=(str(path), str(lock_path), queue)
+		)
+		second = context.Process(
+			target=lock_worker, args=(str(path), str(lock_path), queue)
+		)
+		first.start()
+		first_event = queue.get(timeout=5)
+		second.start()
+		events = [first_event, *(queue.get(timeout=5) for _ in range(3))]
+		first.join(timeout=5)
+		second.join(timeout=5)
+
+		assert_eq(first.exitcode, 0)
+		assert_eq(second.exitcode, 0)
+		assert_eq(
+			[event[0] for event in events], ["entered", "leaving", "entered", "leaving"]
+		)
+		assert_that(events[2][1] >= events[1][1])

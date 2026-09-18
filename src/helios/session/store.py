@@ -1,12 +1,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Any, cast
+from typing import Any
 from uuid import UUID, uuid4
-
-from helios.persist.files import JSONValue
-
-MAX_AGE = timedelta(days=30)
 
 
 class Session:
@@ -16,20 +12,18 @@ class Session:
 		items: dict[str, Any] | None = None,
 		last_active_at: datetime | None = None,
 	):
-		if items is None:
-			items = {}
 		self.id = id
-		self.items = items
+		self.items = items if items is not None else {}
 		self.last_active_at = last_active_at
 		self.dirty = False
 		self.invalidated = False
-		self.sessions: Sessions | None = None
+		self.store: Store | None = None
 
 	def __getitem__(self, key: str) -> Any:
 		return self.items[key]
 
-	def __setitem__(self, key: str, val: Any):
-		self.items[key] = val
+	def __setitem__(self, key: str, value: Any):
+		self.items[key] = value
 		self.dirty = True
 
 	def __delitem__(self, key: str):
@@ -47,23 +41,23 @@ class Session:
 		self.last_active_at = datetime.now(UTC)
 		self.dirty = True
 
-	def is_expired(self) -> bool:
+	def is_expired(self, maximum_age: timedelta) -> bool:
 		return (
 			self.last_active_at is not None
-			and self.last_active_at + MAX_AGE < datetime.now(UTC)
+			and self.last_active_at + maximum_age < datetime.now(UTC)
 		)
 
 	def invalidate(self):
 		self.invalidated = True
-		if self.sessions is not None:
-			self.sessions.remove(self.id)
+		if self.store is not None:
+			self.store.remove(self.id)
 
 	def rotate(self):
 		old_id = self.id
-		if self.sessions is None:
+		if self.store is None:
 			self.id = uuid4()
 		else:
-			self.sessions.rotate(self, old_id)
+			self.store.rotate(self, old_id)
 			if self.id == old_id:
 				return
 		self.dirty = True
@@ -72,13 +66,11 @@ class Session:
 		return f"Session({self.id!r}, {self.items!r})"
 
 
-class Sessions:
+class Store:
 	def __init__(self, sessions: dict[UUID, Session] | None = None):
-		if sessions is None:
-			sessions = {}
-		self.sessions = sessions
+		self.sessions = sessions if sessions is not None else {}
 		for session in self.sessions.values():
-			session.sessions = self
+			session.store = self
 		self.dirty = False
 
 	def get(self, id: UUID) -> Session:
@@ -87,26 +79,26 @@ class Sessions:
 	def put(self, session: Session):
 		self.sessions[session.id] = session
 		session.invalidated = False
-		session.sessions = self
+		session.store = self
 		self.dirty = True
 
 	def remove(self, id: UUID):
 		session = self.sessions.pop(id, None)
 		if session is None:
 			return
-		session.sessions = None
+		session.store = None
 		self.dirty = True
 
-	def purge(self):
+	def purge(self, maximum_age: timedelta):
 		for id, session in list(self.sessions.items()):
-			if session.is_expired():
+			if session.is_expired(maximum_age):
 				self.remove(id)
 
 	def rotate(self, session: Session, old_id: UUID):
 		if old_id not in self.sessions:
 			return
 		if self.sessions[old_id] is not session:
-			raise RuntimeError("session does not belong to this collection")
+			raise RuntimeError("session does not belong to this store")
 		new_id = uuid4()
 		while new_id in self.sessions:
 			new_id = uuid4()
@@ -122,33 +114,4 @@ class Sessions:
 		return id in self.sessions
 
 	def __repr__(self) -> str:
-		return f"Sessions({self.sessions!r})"
-
-
-class Format:
-	def encode(self, sessions: Sessions) -> JSONValue:
-		data = {}
-		for id, session in sessions.sessions.items():
-			data[str(id)] = {
-				"items": session.items,
-				"last_active_at": (
-					session.last_active_at.isoformat()
-					if session.last_active_at is not None
-					else None
-				),
-			}
-		return cast(JSONValue, data)
-
-	def decode(self, value: JSONValue) -> Sessions:
-		data = cast(dict[str, Any], value)
-		sessions = {}
-		for raw_id, session_data in data.items():
-			id = UUID(raw_id)
-			raw_last_active_at = session_data["last_active_at"]
-			last_active_at = (
-				datetime.fromisoformat(raw_last_active_at)
-				if raw_last_active_at is not None
-				else None
-			)
-			sessions[id] = Session(id, session_data["items"], last_active_at)
-		return Sessions(sessions)
+		return f"Store({self.sessions!r})"
