@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 import sqlite3
-from typing import Any
+from typing import Any, Self
 
 from .config import Config
 from .types import Scalar
@@ -78,6 +78,12 @@ class Connection:
 			except DatabaseError:
 				pass
 			raise
+
+	def __enter__(self) -> Self:
+		return self
+
+	def __exit__(self, exception_type, exception, traceback):
+		self.close()
 
 	@property
 	def in_transaction(self) -> bool:
