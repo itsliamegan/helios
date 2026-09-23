@@ -2,7 +2,7 @@ from uuid import UUID
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.http import Method, Request, Response, Status, URL
 from helios.routing import (
 	Group,
 	Pattern,
@@ -18,7 +18,7 @@ def test_dispatches_directly():
 		return Response.empty(Status.OK)
 
 	router = Router([Route(Method.GET, Pattern("/"), handler)])
-	res = router(Request(Method.GET, URL("/"), Headers(), Input()), None)
+	res = router(Request(Method.GET, URL("/")), None)
 
 	assert_eq(res.status, Status.OK)
 
@@ -28,7 +28,7 @@ def test_routes_to_root():
 	route = Route(Method.GET, Pattern("/"), handler)
 	router = Router([route])
 
-	match = router.match(Request(Method.GET, URL("/"), Headers(), Input()))
+	match = router.match(Request(Method.GET, URL("/")))
 
 	assert_eq(match, (route, {}))
 
@@ -38,12 +38,8 @@ def test_routes_by_path():
 	comments = Route(Method.GET, Pattern("/comments/"), object())
 	router = Router([articles, comments])
 
-	articles_match = router.match(
-		Request(Method.GET, URL("/articles/"), Headers(), Input())
-	)
-	comments_match = router.match(
-		Request(Method.GET, URL("/comments/"), Headers(), Input())
-	)
+	articles_match = router.match(Request(Method.GET, URL("/articles/")))
+	comments_match = router.match(Request(Method.GET, URL("/comments/")))
 
 	assert_eq(articles_match, (articles, {}))
 	assert_eq(comments_match, (comments, {}))
@@ -54,12 +50,8 @@ def test_routes_by_method():
 	store = Route(Method.POST, Pattern("/articles/"), object())
 	router = Router([index, store])
 
-	index_match = router.match(
-		Request(Method.GET, URL("/articles/"), Headers(), Input())
-	)
-	store_match = router.match(
-		Request(Method.POST, URL("/articles/"), Headers(), Input())
-	)
+	index_match = router.match(Request(Method.GET, URL("/articles/")))
+	store_match = router.match(Request(Method.POST, URL("/articles/")))
 
 	assert_eq(index_match, (index, {}))
 	assert_eq(store_match, (store, {}))
@@ -69,9 +61,7 @@ def test_routes_with_params():
 	route = Route(Method.GET, Pattern("/articles/{slug}"), object())
 	router = Router([route])
 
-	match = router.match(
-		Request(Method.GET, URL("/articles/intro"), Headers(), Input())
-	)
+	match = router.match(Request(Method.GET, URL("/articles/intro")))
 
 	assert_eq(match, (route, {"slug": "intro"}))
 
@@ -80,9 +70,7 @@ def test_routes_with_explicit_str_converter():
 	route = Route(Method.GET, Pattern("/articles/{slug:str}"), object())
 	router = Router([route])
 
-	match = router.match(
-		Request(Method.GET, URL("/articles/intro"), Headers(), Input())
-	)
+	match = router.match(Request(Method.GET, URL("/articles/intro")))
 
 	assert_eq(match, (route, {"slug": "intro"}))
 
@@ -92,9 +80,7 @@ def test_routes_with_uuid_converter():
 	route = Route(Method.GET, Pattern("/articles/{id:uuid}"), object())
 	router = Router([route])
 
-	match = router.match(
-		Request(Method.GET, URL(f"/articles/{id}"), Headers(), Input())
-	)
+	match = router.match(Request(Method.GET, URL(f"/articles/{id}")))
 
 	assert_eq(match, (route, {"id": id}))
 
@@ -109,7 +95,7 @@ def test_passes_converted_params_to_handler_by_name():
 
 	router = Router([Route(Method.GET, Pattern("/articles/{id:uuid}/{slug}"), handler)])
 
-	router(Request(Method.GET, URL(f"/articles/{id}/intro"), Headers(), Input()), None)
+	router(Request(Method.GET, URL(f"/articles/{id}/intro")), None)
 
 	assert_eq(called_with, [("intro", id)])
 
@@ -127,7 +113,7 @@ def test_routes_instead_of_param():
 	show = Route(Method.GET, Pattern("/articles/{slug}"), object())
 	router = Router([new, show])
 
-	match = router.match(Request(Method.GET, URL("/articles/new"), Headers(), Input()))
+	match = router.match(Request(Method.GET, URL("/articles/new")))
 
 	assert_eq(match, (new, {}))
 
@@ -136,9 +122,7 @@ def test_routes_with_param_to_subroute():
 	route = Route(Method.POST, Pattern("/articles/{slug}/read"), object())
 	router = Router([route])
 
-	match = router.match(
-		Request(Method.POST, URL("/articles/intro/read"), Headers(), Input())
-	)
+	match = router.match(Request(Method.POST, URL("/articles/intro/read")))
 
 	assert_eq(match, (route, {"slug": "intro"}))
 
@@ -157,7 +141,7 @@ def test_runs_route_guards_in_order_before_handler():
 		return Response.empty(Status.OK)
 
 	router = Router([Route(Method.GET, Pattern("/"), handler, guards=[first, second])])
-	router(Request(Method.GET, URL("/"), Headers(), Input()), None)
+	router(Request(Method.GET, URL("/")), None)
 
 	assert_eq(calls, ["first", "second", "handler"])
 
@@ -177,7 +161,7 @@ def test_guard_response_stops_dispatch():
 		return Response.empty(Status.OK)
 
 	router = Router([Route(Method.GET, Pattern("/"), handler, guards=[stop, later])])
-	res = router(Request(Method.GET, URL("/"), Headers(), Input()), None)
+	res = router(Request(Method.GET, URL("/")), None)
 
 	assert_eq(res.status, Status.FORBIDDEN)
 	assert_eq(calls, ["stop"])
@@ -196,7 +180,7 @@ def test_passes_converted_params_to_guards_by_name():
 	router = Router(
 		[Route(Method.GET, Pattern("/articles/{id:uuid}"), handler, guards=[guard])]
 	)
-	router(Request(Method.GET, URL(f"/articles/{id}"), Headers(), Input()), None)
+	router(Request(Method.GET, URL(f"/articles/{id}")), None)
 
 	assert_eq(called_with, [id])
 
@@ -208,7 +192,7 @@ def test_doesnt_run_guards_for_unmatched_routes():
 		calls.append("guard")
 
 	router = Router([Route(Method.GET, Pattern("/articles"), object(), guards=[guard])])
-	match = router.match(Request(Method.GET, URL("/missing"), Headers(), Input()))
+	match = router.match(Request(Method.GET, URL("/missing")))
 
 	assert_that(match is None)
 	assert_eq(calls, [])
@@ -294,7 +278,7 @@ def test_converts_params_in_grouped_patterns():
 			)
 		]
 	)
-	router(Request(Method.GET, URL(f"/articles/{id}"), Headers(), Input()), None)
+	router(Request(Method.GET, URL(f"/articles/{id}")), None)
 
 	assert_eq(called_with, [id])
 
@@ -352,7 +336,7 @@ def test_runs_nested_and_route_guards_outermost_first():
 			)
 		]
 	)
-	router(Request(Method.GET, URL("/"), Headers(), Input()), None)
+	router(Request(Method.GET, URL("/")), None)
 
 	assert_eq(calls, ["outer", "inner", "route", "handler"])
 
@@ -381,7 +365,7 @@ def test_inherited_guard_response_stops_dispatch():
 			)
 		]
 	)
-	res = router(Request(Method.GET, URL("/"), Headers(), Input()), None)
+	res = router(Request(Method.GET, URL("/")), None)
 
 	assert_eq(res.status, Status.FORBIDDEN)
 	assert_eq(calls, ["outer"])
@@ -404,7 +388,7 @@ def test_group_flattening_preserves_declaration_and_matching_order():
 	)
 
 	assert_eq([route.handler for route in router.routes], [first, second, third])
-	match = router.match(Request(Method.GET, URL("/new"), Headers(), Input()))
+	match = router.match(Request(Method.GET, URL("/new")))
 	assert_that(match[0].handler is first)
 
 

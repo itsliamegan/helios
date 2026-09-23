@@ -11,7 +11,7 @@ import time_machine
 
 from helios.app import Application
 from helios.app import Config as AppConfig
-from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.http import Headers, Method, Request, Response, Status, URL
 from helios.routing import NotFoundError, Pattern, Route, Router
 import helios.session
 from helios.session.file import Driver
@@ -24,7 +24,7 @@ def request(session_id: str | None = None) -> Request:
 	headers = Headers()
 	if session_id is not None:
 		headers["Cookie"] = f"session_id={session_id}"
-	return Request(Method.GET, URL("/"), headers, Input())
+	return Request(Method.GET, URL("/"), headers)
 
 
 def write_sessions(path: Path, sessions: dict | None = None):

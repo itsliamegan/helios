@@ -7,7 +7,6 @@ from helios.http import (
 	Buffered,
 	Cookies,
 	Headers,
-	Input,
 	Method,
 	Request,
 	Response,
@@ -18,7 +17,7 @@ from helios.routing import NotFoundError, Pattern, Route, Router
 
 
 def request() -> Request:
-	return Request(Method.GET, URL("/"), Headers(), Input())
+	return Request(Method.GET, URL("/"))
 
 
 def test_records_handled_errors_for_outer_middleware():

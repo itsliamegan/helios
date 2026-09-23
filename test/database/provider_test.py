@@ -7,7 +7,7 @@ from luna.test.assertion import assert_eq, assert_that
 import helios.app
 from helios.app import Application
 from helios.database import Config, Model, Provider, Store, attr
-from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.http import Method, Request, Response, Status, URL
 from helios.routing import NotFoundError, Pattern, Route, Router
 
 
@@ -24,7 +24,7 @@ class Child(Model):
 
 
 def request() -> Request:
-	return Request(Method.GET, URL("/"), Headers(), Input())
+	return Request(Method.GET, URL("/"))
 
 
 def application(path: Path, handler, model_types=None) -> Application:

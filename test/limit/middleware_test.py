@@ -7,7 +7,7 @@ from helios.app import Application, Container, Provider
 from helios.app import Config as AppConfig
 from helios.auth.state import Authenticator
 from helios.database import Model, attr
-from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.http import Headers, Method, Request, Response, Status, URL
 import helios.limit
 from helios.limit.config import Config
 from helios.routing import Pattern, Route, Router
@@ -42,7 +42,7 @@ def config(header: str = HEADER) -> Config:
 
 
 def request(ip: str = "1.2.3.4", header: str = HEADER) -> Request:
-	return Request(Method.GET, URL("/"), Headers({header: ip}), Input())
+	return Request(Method.GET, URL("/"), Headers({header: ip}))
 
 
 def application(signed_in: bool = False, limit_config: Config | None = None):

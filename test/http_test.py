@@ -9,7 +9,6 @@ from helios.http import (
 	File,
 	Files,
 	Headers,
-	Input,
 	Method,
 	Request,
 	Response,
@@ -67,14 +66,13 @@ def test_gets_request_referrer():
 		Method.GET,
 		URL("/boards/123456/edit"),
 		Headers({"Referer": "/boards/"}),
-		Input(),
 	)
 
 	assert_eq(request.referrer, "/boards/")
 
 
 def test_doesnt_get_empty_referrer():
-	request = Request(Method.GET, URL("/boards/example/edit"), Headers(), Input())
+	request = Request(Method.GET, URL("/boards/example/edit"))
 
 	assert_that(request.referrer is None)
 

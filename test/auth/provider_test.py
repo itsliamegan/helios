@@ -11,7 +11,7 @@ from helios.auth import Authenticator
 from helios.database import Config as DatabaseConfig
 from helios.database import Model, Store, attr
 from helios.database.sqlite import connect
-from helios.http import Headers, Input, Method, Request, Response, URL
+from helios.http import Method, Request, Response, URL
 from helios.routing import Pattern, Route, Router
 from helios.session.store import Session
 
@@ -62,7 +62,7 @@ def resolve(store: Store, session: Session) -> Authenticator:
 		[Values(store, session), helios.auth.Provider(User)],
 	)
 	try:
-		app.handle(Request(Method.GET, URL("/"), Headers(), Input()))
+		app.handle(Request(Method.GET, URL("/")))
 	finally:
 		app.close()
 	return resolved[0]

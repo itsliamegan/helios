@@ -3,12 +3,12 @@ from contextlib import contextmanager
 from luna.test.assertion import assert_eq
 
 from helios.app import Application, Config, Provider
-from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.http import Method, Request, Response, Status, URL
 from helios.routing import Pattern, Route, Router, URLs
 
 
 def request(path: str = "/") -> Request:
-	return Request(Method.GET, URL(path), Headers(), Input())
+	return Request(Method.GET, URL(path))
 
 
 def test_registers_all_providers_before_booting_in_order():

@@ -1,11 +1,11 @@
 from luna.test.assertion import assert_eq
 
 from helios.app import Container, Context
-from helios.http import Headers, Input, Method, Request, URL
+from helios.http import Method, Request, URL
 
 
 def request() -> Request:
-	return Request(Method.GET, URL("/"), Headers(), Input())
+	return Request(Method.GET, URL("/"))
 
 
 def test_resolves_each_binding_lifetime():

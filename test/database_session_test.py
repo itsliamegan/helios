@@ -9,7 +9,7 @@ import helios.app
 import helios.auth
 import helios.database
 from helios.database import Model, Store, attr
-from helios.http import Headers, Input, Method, Request, Response, Status, URL
+from helios.http import Headers, Method, Request, Response, Status, URL
 from helios.routing import Pattern, Route, Router
 import helios.session
 from helios.session.file import Driver
@@ -25,7 +25,7 @@ def request(session_id: str | None = None) -> Request:
 	headers = Headers()
 	if session_id is not None:
 		headers["Cookie"] = f"session_id={session_id}"
-	return Request(Method.GET, URL("/"), headers, Input())
+	return Request(Method.GET, URL("/"), headers)
 
 
 def application(database_path: Path, session_path: Path, handler):
