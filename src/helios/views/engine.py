@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from jinja2 import DictLoader, Environment, select_autoescape
+from jinja2 import DictLoader, Environment
 
 from . import helpers
 
@@ -10,9 +10,7 @@ class Views:
 	def __init__(self, tmpls: dict[str, str] | None = None):
 		if tmpls is None:
 			tmpls = {}
-		self.jinja = Environment(
-			loader=DictLoader(tmpls), autoescape=select_autoescape()
-		)
+		self.jinja = Environment(loader=DictLoader(tmpls), autoescape=True)
 		self.jinja.filters["date"] = helpers.date
 		self.jinja.filters["url"] = helpers.url
 		self.jinja.filters["elapsed"] = helpers.elapsed

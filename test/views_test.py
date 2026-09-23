@@ -54,6 +54,25 @@ def test_load_ignores_hidden_directories():
 		assert_eq(views.render("index"), "<h1>Index</h1>")
 
 
+def test_escapes_assigns():
+	views = Views({"posts.index": "<h1>{{ title }}</h1>"})
+
+	html = views.render("posts.index", {"title": "<script>alert(1)</script>"})
+
+	assert_eq(html, "<h1>&lt;script&gt;alert(1)&lt;/script&gt;</h1>")
+
+
+def test_escapes_assigns_in_loaded_templates():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("boards").mkdir()
+		views_dir.joinpath("boards", "index.html").write_text("{{ title }}")
+
+		views = load(views_dir)
+
+		assert_eq(views.render("boards.index", {"title": "<b>"}), "&lt;b&gt;")
+
+
 def test_formats_elapsed_seconds():
 	then = datetime(year=2025, month=9, day=1, hour=12, minute=0, second=0, tzinfo=UTC)
 	now = datetime(year=2025, month=9, day=1, hour=12, minute=0, second=25, tzinfo=UTC)
