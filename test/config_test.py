@@ -80,6 +80,63 @@ def test_defaults_url():
 	assert_eq(loaded.url("BASE_URL", default), default)
 
 
+def test_loads_true_boolean():
+	loaded = Config.load({"EXAMPLE_RELOAD": "true"})
+
+	assert_eq(loaded.boolean("EXAMPLE_RELOAD"), True)
+
+
+def test_loads_false_boolean():
+	loaded = Config.load({"EXAMPLE_RELOAD": "false"})
+
+	assert_eq(loaded.boolean("EXAMPLE_RELOAD"), False)
+
+
+def test_loads_boolean_aliases():
+	loaded = Config.load(
+		{
+			"EXAMPLE_YES": "Yes",
+			"EXAMPLE_ON": "ON",
+			"EXAMPLE_ONE": "1",
+			"EXAMPLE_NO": "no",
+			"EXAMPLE_OFF": "off",
+			"EXAMPLE_ZERO": "0",
+		}
+	)
+
+	assert_eq(
+		[
+			loaded.boolean("EXAMPLE_YES"),
+			loaded.boolean("EXAMPLE_ON"),
+			loaded.boolean("EXAMPLE_ONE"),
+			loaded.boolean("EXAMPLE_NO"),
+			loaded.boolean("EXAMPLE_OFF"),
+			loaded.boolean("EXAMPLE_ZERO"),
+		],
+		[True, True, True, False, False, False],
+	)
+
+
+def test_defaults_boolean():
+	loaded = Config.load({"EXAMPLE_RELOAD": " "})
+
+	assert_eq(loaded.boolean("EXAMPLE_RELOAD", False), False)
+
+
+def test_raises_for_invalid_boolean():
+	loaded = Config.load({"EXAMPLE_RELOAD": "ture"})
+
+	with assert_raises(ConfigError):
+		loaded.boolean("EXAMPLE_RELOAD", False)
+
+
+def test_raises_for_missing_boolean():
+	loaded = Config.load({})
+
+	with assert_raises(ConfigError):
+		loaded.boolean("EXAMPLE_RELOAD")
+
+
 def test_requires_value():
 	loaded = Config.load({"EXAMPLE_BUCKET": " example-backups "})
 

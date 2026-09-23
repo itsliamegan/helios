@@ -12,6 +12,10 @@ class ConfigError(Exception):
 	pass
 
 
+TRUE_VALUES = {"true", "yes", "on", "1"}
+FALSE_VALUES = {"false", "no", "off", "0"}
+
+
 class Config:
 	def __init__(self, values: dict[str, str]):
 		self.values = values
@@ -54,6 +58,16 @@ class Config:
 		if self.value(name) is None and default is not None:
 			return default
 		return URL(self.require(name))
+
+	def boolean(self, name: str, default: bool | None = None) -> bool:
+		if self.value(name) is None and default is not None:
+			return default
+		value = self.require(name).lower()
+		if value in TRUE_VALUES:
+			return True
+		if value in FALSE_VALUES:
+			return False
+		raise ConfigError(f"configuration value {name} must be true or false")
 
 	def require(self, name: str) -> str:
 		value = self.value(name)

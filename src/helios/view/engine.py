@@ -1,45 +1,57 @@
-from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
-from jinja2 import DictLoader, Environment
+from jinja2 import BaseLoader, Environment, TemplateNotFound
 
 from .helpers import Helpers
+from .source import Driver
 
 
 class Views:
 	def __init__(
 		self,
-		tmpls: dict[str, str] | None = None,
+		driver: Driver,
 		helpers: Helpers | None = None,
+		reload: bool = False,
 	):
-		if tmpls is None:
-			tmpls = {}
-		self.jinja = Environment(loader=DictLoader(tmpls), autoescape=True)
+		self.jinja = Environment(
+			loader=Loader(driver),
+			autoescape=True,
+			auto_reload=reload,
+			cache_size=-1,
+		)
 		self.helpers = Helpers.defaults()
 		self.helpers.update(helpers or Helpers())
 		self.jinja.filters.update(self.helpers.filters)
 		self.jinja.globals.update(self.helpers.globals)
+		for name in self.jinja.list_templates():
+			self.jinja.get_template(name)
 
 	def render(self, name: str, assigns: dict[str, Any] | None = None) -> str:
 		if assigns is None:
 			assigns = {}
-		tmpl = self.jinja.get_template(name)
-		return tmpl.render(**assigns)
+		template = self.jinja.get_template(name)
+		return template.render(**assigns)
 
 
-def load(views_dir: Path, helpers: Helpers | None = None) -> Views:
-	tmpls = {}
-	for dir, _, files in views_dir.walk():
-		if dir.name.startswith("."):
-			continue
-		parts = dir.relative_to(views_dir).parts
-		for file in files:
-			if file.startswith("."):
-				continue
-			path = dir.joinpath(file)
-			if path.suffix == ".html":
-				name = ".".join(parts + (path.stem,))
-				with open(path, "r") as stream:
-					src = stream.read()
-					tmpls[name] = src
-	return Views(tmpls, helpers)
+class Loader(BaseLoader):
+	def __init__(self, driver: Driver):
+		self.driver = driver
+
+	def get_source(
+		self,
+		environment: Environment,
+		template: str,
+	) -> tuple[str, str | None, Callable[[], bool]]:
+		source = self.driver.source(template)
+		if source is None:
+			raise TemplateNotFound(template)
+		else:
+			return (
+				source.text,
+				source.path,
+				lambda: self.driver.is_current(template, source),
+			)
+
+	def list_templates(self) -> list[str]:
+		return self.driver.names()
