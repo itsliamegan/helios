@@ -1,8 +1,33 @@
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from markupsafe import Markup, escape
 
 from helios.http import URL
+
+
+@dataclass(init=False)
+class Helpers:
+	filters: dict[str, Callable[..., Any]]
+	globals: dict[str, Any]
+
+	def __init__(
+		self,
+		filters: dict[str, Callable[..., Any]] | None = None,
+		globals: dict[str, Any] | None = None,
+	):
+		self.filters = filters or {}
+		self.globals = globals or {}
+
+	@classmethod
+	def defaults(cls) -> Helpers:
+		return cls(filters={"date": date, "url": url, "elapsed": elapsed})
+
+	def update(self, other: Helpers):
+		self.filters.update(other.filters)
+		self.globals.update(other.globals)
 
 
 def date(date: datetime) -> str:

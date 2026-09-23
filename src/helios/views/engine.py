@@ -3,17 +3,22 @@ from typing import Any
 
 from jinja2 import DictLoader, Environment
 
-from . import helpers
+from .helpers import Helpers
 
 
 class Views:
-	def __init__(self, tmpls: dict[str, str] | None = None):
+	def __init__(
+		self,
+		tmpls: dict[str, str] | None = None,
+		helpers: Helpers | None = None,
+	):
 		if tmpls is None:
 			tmpls = {}
 		self.jinja = Environment(loader=DictLoader(tmpls), autoescape=True)
-		self.jinja.filters["date"] = helpers.date
-		self.jinja.filters["url"] = helpers.url
-		self.jinja.filters["elapsed"] = helpers.elapsed
+		self.helpers = Helpers.defaults()
+		self.helpers.update(helpers or Helpers())
+		self.jinja.filters.update(self.helpers.filters)
+		self.jinja.globals.update(self.helpers.globals)
 
 	def render(self, name: str, assigns: dict[str, Any] | None = None) -> str:
 		if assigns is None:
@@ -22,7 +27,7 @@ class Views:
 		return tmpl.render(**assigns)
 
 
-def load(views_dir: Path) -> Views:
+def load(views_dir: Path, helpers: Helpers | None = None) -> Views:
 	tmpls = {}
 	for dir, _, files in views_dir.walk():
 		if dir.name.startswith("."):
@@ -37,4 +42,4 @@ def load(views_dir: Path) -> Views:
 				with open(path, "r") as stream:
 					src = stream.read()
 					tmpls[name] = src
-	return Views(tmpls)
+	return Views(tmpls, helpers)

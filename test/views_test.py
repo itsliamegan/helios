@@ -3,9 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq
+from markupsafe import Markup
 
 from helios.http import URL
-from helios.views import helpers
+from helios.views import Helpers, helpers
 from helios.views.engine import Views, load
 
 
@@ -28,6 +29,82 @@ def test_renders_inherited():
 	html = views.render("show", {"title": "Intro"})
 
 	assert_eq(html, "<h1>Intro</h1><p>An article.</p>")
+
+
+def test_renders_application_filters():
+	views = Views(
+		{"index": "{{ title | shout }}"},
+		Helpers(filters={"shout": lambda text: text.upper() + "!"}),
+	)
+
+	html = views.render("index", {"title": "hello"})
+
+	assert_eq(html, "HELLO!")
+
+
+def test_renders_application_globals():
+	views = Views(
+		{"index": "{{ greet(name) }} from {{ site }}"},
+		Helpers(globals={"greet": lambda name: f"Hi {name}", "site": "Cork"}),
+	)
+
+	html = views.render("index", {"name": "Ada"})
+
+	assert_eq(html, "Hi Ada from Cork")
+
+
+def test_keeps_default_filters_alongside_application_filters():
+	views = Views(
+		{"index": "{{ day | date }}"},
+		Helpers(filters={"shout": lambda text: text.upper()}),
+	)
+
+	html = views.render("index", {"day": datetime(2026, 4, 7, tzinfo=UTC)})
+
+	assert_eq(html, "Apr 7, 2026")
+
+
+def test_application_filters_override_defaults():
+	views = Views(
+		{"index": "{{ day | date }}"},
+		Helpers(filters={"date": lambda day: day.strftime("%Y-%m-%d")}),
+	)
+
+	html = views.render("index", {"day": datetime(2026, 4, 7, tzinfo=UTC)})
+
+	assert_eq(html, "2026-04-07")
+
+
+def test_escapes_plain_string_helper_output():
+	views = Views(
+		{"index": "{{ title | bold }}"},
+		Helpers(filters={"bold": lambda text: f"<b>{text}</b>"}),
+	)
+
+	html = views.render("index", {"title": "Hi"})
+
+	assert_eq(html, "&lt;b&gt;Hi&lt;/b&gt;")
+
+
+def test_renders_markup_helper_output_unescaped():
+	views = Views(
+		{"index": "{{ title | bold }}"},
+		Helpers(filters={"bold": lambda text: Markup("<b>{}</b>").format(text)}),
+	)
+
+	html = views.render("index", {"title": "<i>"})
+
+	assert_eq(html, "<b>&lt;i&gt;</b>")
+
+
+def test_load_renders_application_helpers():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("index.html").write_text("{{ site }}")
+
+		views = load(views_dir, Helpers(globals={"site": "Cork"}))
+
+		assert_eq(views.render("index"), "Cork")
 
 
 def test_load_ignores_hidden_files():

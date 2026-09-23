@@ -3,14 +3,16 @@ from typing import TYPE_CHECKING
 from helios.app import Application, Container, Provider
 
 from .config import Config
+from .helpers import Helpers
 
 if TYPE_CHECKING:
 	from .engine import Views
 
 
 class Provider(Provider):
-	def __init__(self, config: Config):
+	def __init__(self, config: Config, helpers: Helpers | None = None):
 		self.dir = config.dir
+		self.helpers = helpers
 
 	def register(self, container: Container):
 		from .engine import Views
@@ -25,4 +27,4 @@ class Provider(Provider):
 	def views(self, container: Container) -> Views:
 		from .engine import load
 
-		return load(self.dir)
+		return load(self.dir, self.helpers)
