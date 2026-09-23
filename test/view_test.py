@@ -6,8 +6,8 @@ from luna.test.assertion import assert_eq
 from markupsafe import Markup
 
 from helios.http import URL
-from helios.views import Helpers, helpers
-from helios.views.engine import Views, load
+from helios.view import Helpers, helpers
+from helios.view.engine import Views, load
 
 
 def test_renders_simple():
