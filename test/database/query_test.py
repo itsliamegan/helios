@@ -142,6 +142,133 @@ def test_binds_sql_looking_filter_values_as_data():
 			connection.close()
 
 
+def test_where_in_matches_membership():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			alpha = store.find_by(Item, name="Alpha")[0]
+			gamma = store.find_by(Item, name="Gamma")[0]
+			assert_eq(
+				set(names(store.query(Item).where_in(id=[alpha.id, gamma.id]).all())),
+				{"Alpha", "Gamma"},
+			)
+		finally:
+			connection.close()
+
+
+def test_where_in_combines_with_where_and_where_in_using_and():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			assert_eq(
+				names(store.query(Item).where(group="one").where_in(rank=[1, 3]).all()),
+				["Beta"],
+			)
+			assert_eq(
+				names(
+					store.query(Item).where_in(rank=[1, 2]).where_in(rank=[2, 3]).all()
+				),
+				["Alpha"],
+			)
+		finally:
+			connection.close()
+
+
+def test_where_in_works_with_order_by_limit_and_first():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			ordered = store.query(Item).where_in(rank=[1, 2, 3]).order_by("rank").all()
+			assert_eq(names(ordered), ["Beta", "Alpha", "Gamma"])
+			assert_eq(
+				names(
+					store.query(Item)
+					.where_in(rank=[1, 2, 3])
+					.order_by("rank")
+					.limit(2)
+					.all()
+				),
+				["Beta", "Alpha"],
+			)
+			assert_eq(
+				store.query(Item)
+				.where_in(rank=[1, 2, 3])
+				.order_by("rank")
+				.first()
+				.name,
+				"Beta",
+			)
+		finally:
+			connection.close()
+
+
+def test_where_in_empty_iterable_matches_nothing():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			assert_eq(store.query(Item).where_in(rank=[]).all(), [])
+		finally:
+			connection.close()
+
+
+def test_where_in_none_among_candidates_includes_null_row():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			assert_eq(
+				set(names(store.query(Item).where_in(group=["one", None]).all())),
+				{"Alpha", "Beta", "Gamma"},
+			)
+			assert_eq(
+				names(store.query(Item).where_in(group=[None]).all()),
+				["Gamma"],
+			)
+		finally:
+			connection.close()
+
+
+def test_where_in_consumes_generator_once_and_stays_reusable():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			query = store.query(Item).where_in(rank=(rank for rank in (1, 2)))
+			assert_eq(set(names(query.all())), {"Alpha", "Beta"})
+			assert_eq(set(names(query.all())), {"Alpha", "Beta"})
+		finally:
+			connection.close()
+
+
+def test_where_in_rejects_invalid_construction_before_execution():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			with assert_raises(ModelError):
+				store.query(Item).where_in(missing=["value"])
+			with assert_raises(ModelError):
+				store.query(Item).where_in(rank=[True])
+			with assert_raises(ModelError):
+				store.query(Item).where_in(rank=[None])
+			with assert_raises(TypeError):
+				store.query(Item).where_in(name="Alpha")
+		finally:
+			connection.close()
+
+
+def test_where_in_binds_sql_looking_candidate_values_as_data():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			value = "Alpha' OR 1 = 1 --"
+			store.create(Item, name=value, group="two", rank=4)
+
+			assert_eq(
+				names(store.query(Item).where_in(name=[value]).all()),
+				[value],
+			)
+		finally:
+			connection.close()
+
+
 def test_raw_select_preserves_order_and_identity():
 	with TemporaryDirectory() as directory:
 		connection, store = open_store(Path(directory, "app.sqlite"))

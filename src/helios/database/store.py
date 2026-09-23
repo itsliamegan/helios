@@ -7,7 +7,7 @@ from helios.http.error import NotFoundError as BaseNotFoundError
 
 from . import types
 from .model import Attribute, Model, ModelError, Status
-from .query import Filter, Query
+from .query import Filter, Membership, Predicate, Query
 from .sqlite import Connection, DatabaseError, quote_identifier
 
 
@@ -130,20 +130,28 @@ class Store:
 	def execute_query[T: Model](
 		self,
 		model_type: type[T],
-		filters: tuple[Filter, ...],
+		predicates: tuple[Predicate, ...],
 		ordering: tuple[str, str] | None,
 		count: int | None,
 	) -> list[T]:
 		columns = ", ".join(quote_identifier(name) for name in model_type.attrs)
-		predicates: list[str] = []
+		clauses: list[str] = []
 		parameters: list[Any] = []
-		for filter in filters:
-			if filter.value is None:
-				predicates.append(f"{quote_identifier(filter.name)} IS NULL")
-			else:
-				predicates.append(f"{quote_identifier(filter.name)} = ?")
-				parameters.append(filter.value)
-		where = f" WHERE {" AND ".join(predicates)}" if predicates else ""
+		for predicate in predicates:
+			match predicate:
+				case Filter(name=name, value=None):
+					clauses.append(f"{quote_identifier(name)} IS NULL")
+				case Filter(name=name, value=value):
+					clauses.append(f"{quote_identifier(name)} = ?")
+					parameters.append(value)
+				case Membership(name=name, values=values, includes_null=includes_null):
+					placeholders = ", ".join("?" for _ in values)
+					clause = f"{quote_identifier(name)} IN ({placeholders})"
+					if includes_null:
+						clause = f"({clause} OR {quote_identifier(name)} IS NULL)"
+					clauses.append(clause)
+					parameters.extend(values)
+		where = f" WHERE {" AND ".join(clauses)}" if clauses else ""
 		order = ""
 		if ordering is not None:
 			name, direction = ordering
