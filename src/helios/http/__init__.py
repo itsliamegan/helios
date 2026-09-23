@@ -1,4 +1,7 @@
 from .body import Body as Body
+from .body import Buffered as Buffered
+from .body import Stream as Stream
+from .body import body as body
 from .cookie import Cookie as Cookie
 from .cookie import Cookies as Cookies
 from .cookie import SameSite as SameSite
@@ -15,6 +18,7 @@ from .url import URL as URL
 __all__ = [
 	"URL",
 	"Body",
+	"Buffered",
 	"Cookie",
 	"Cookies",
 	"File",
@@ -26,4 +30,6 @@ __all__ = [
 	"Response",
 	"SameSite",
 	"Status",
+	"Stream",
+	"body",
 ]

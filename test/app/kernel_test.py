@@ -4,7 +4,7 @@ from luna.test.assertion import assert_eq
 
 from helios.app import Container, Kernel
 from helios.http import (
-	Body,
+	Buffered,
 	Cookies,
 	Headers,
 	Input,
@@ -39,7 +39,7 @@ def test_records_handled_errors_for_outer_middleware():
 
 def test_content_length_uses_encoded_body_size():
 	def index(request, context):
-		return Response(Status.OK, Headers(), Cookies(), Body(b"\x00\xff"))
+		return Response(Status.OK, Headers(), Cookies(), Buffered(b"\x00\xff"))
 
 	kernel = Kernel(
 		Container(),

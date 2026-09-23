@@ -2,7 +2,7 @@ from collections.abc import Callable
 import sys
 import traceback
 
-from helios.http import Method, Request, Response, Status
+from helios.http import Method, Request, Response, Status, Stream
 from helios.http.error import HTTPError
 from helios.routing import Router
 
@@ -63,9 +63,12 @@ class Kernel:
 		next: Next,
 	) -> Response:
 		response = next(request, context)
-		if "Content-Length" not in response.headers:
-			response.headers["Content-Length"] = str(len(response.body.to_bytes()))
-		return response
+		if isinstance(response.body, Stream):
+			return response
+		else:
+			if "Content-Length" not in response.headers:
+				response.headers["Content-Length"] = str(len(response.body.to_bytes()))
+			return response
 
 	@staticmethod
 	def adapt_artificial_method(

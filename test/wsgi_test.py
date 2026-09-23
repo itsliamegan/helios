@@ -6,7 +6,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.test import EnvironBuilder
 
 import helios.app
-from helios.http import Body, Cookies, Headers, Method, Response, Status, URL
+from helios.http import Buffered, Cookies, Headers, Method, Response, Status, URL
 from helios.routing import Pattern, Route, Router
 from helios.wsgi import Application
 from helios.wsgi.adapt import RequestAdapter, ResponseAdapter
@@ -124,7 +124,7 @@ def test_adapts_res():
 		Status.OK,
 		Headers({"Content-Type": "text/html"}),
 		Cookies({"session_id": "51d0d53a-11dd-47a5-b438-5eb1b84e1432"}),
-		Body("<h1>Index</h1>"),
+		Buffered("<h1>Index</h1>"),
 	)
 
 	def start_res(status, pairs):

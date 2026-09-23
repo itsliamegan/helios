@@ -1,9 +1,12 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
+
+type Body = Buffered | Stream
 
 
 @dataclass
-class Body:
-	content: str | bytes | None = ""
+class Buffered:
+	content: str | bytes = ""
 
 	def to_bytes(self) -> bytes:
 		if isinstance(self.content, bytes):
@@ -12,3 +15,12 @@ class Body:
 
 	def __str__(self) -> str:
 		return str(self.content)
+
+
+@dataclass
+class Stream:
+	chunks: Iterable[bytes]
+
+
+def body(content: str | bytes = "") -> Buffered:
+	return Buffered(content)

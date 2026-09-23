@@ -3,7 +3,7 @@ from typing import cast
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
 from helios.http import (
-	Body,
+	Buffered,
 	Cookie,
 	Cookies,
 	File,
@@ -46,8 +46,8 @@ def test_preserves_absolute_url_port():
 
 
 def test_encodes_text_and_binary_bodies():
-	assert_eq(Body("Hello, world!").to_bytes(), b"Hello, world!")
-	assert_eq(Body(b"\x00\xff").to_bytes(), b"\x00\xff")
+	assert_eq(Buffered("Hello, world!").to_bytes(), b"Hello, world!")
+	assert_eq(Buffered(b"\x00\xff").to_bytes(), b"\x00\xff")
 
 
 def test_creates_file_response():

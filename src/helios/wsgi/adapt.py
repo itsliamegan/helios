@@ -8,7 +8,17 @@ from werkzeug.formparser import FormDataParser
 from werkzeug.http import parse_options_header
 from werkzeug.wsgi import get_current_url
 
-from helios.http import File, Files, Headers, Input, Method, Request, Response, URL
+from helios.http import (
+	File,
+	Files,
+	Headers,
+	Input,
+	Method,
+	Request,
+	Response,
+	Stream,
+	URL,
+)
 
 
 class ResponseAdapter:
@@ -20,7 +30,10 @@ class ResponseAdapter:
 		headers = list(self.response.headers)
 		headers += list(self.response.cookies.to_headers())
 		self.start_response(str(self.response.status), headers)
-		return [self.response.body.to_bytes()]
+		if isinstance(self.response.body, Stream):
+			return self.response.body.chunks
+		else:
+			return [self.response.body.to_bytes()]
 
 
 class RequestAdapter:
