@@ -3,10 +3,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from markupsafe import Markup, escape
-
-from helios.http import URL
-
 
 @dataclass(init=False)
 class Helpers:
@@ -23,7 +19,7 @@ class Helpers:
 
 	@classmethod
 	def defaults(cls) -> Helpers:
-		return cls(filters={"date": date, "url": url, "elapsed": elapsed})
+		return cls(filters={"date": date, "elapsed": elapsed})
 
 	def update(self, other: Helpers):
 		self.filters.update(other.filters)
@@ -32,15 +28,6 @@ class Helpers:
 
 def date(date: datetime) -> str:
 	return date.strftime("%b %-d, %Y")
-
-
-def url(url: URL) -> str:
-	# escape returns a Markup object which will always escape further
-	# transformations. Convert it to a str to add unescaped line break
-	# suggestions, then mark it as escaped.
-	escaped = str(escape(url))
-	broken = escaped.replace("/", "/<wbr>")
-	return Markup(broken)
 
 
 def elapsed(then: datetime, now: datetime | None = None) -> str:

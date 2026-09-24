@@ -1,4 +1,5 @@
 from helios.app import Application, Container, Context, Provider
+from helios.routing import URLs
 
 from .config import Config
 from .engine import Engine
@@ -21,7 +22,11 @@ class Provider(Provider):
 		application.container.get(Engine)
 
 	def engine(self, container: Container) -> Engine:
-		return Engine(Driver(self.dir), self.helpers, self.reload)
+		helpers = Helpers()
+		if container.bound(URLs):
+			helpers.globals["urls"] = container.get(URLs)
+		helpers.update(self.helpers or Helpers())
+		return Engine(Driver(self.dir), helpers, self.reload)
 
 	def views(self, context: Context) -> Views:
 		return Views(context.get(Engine), context)

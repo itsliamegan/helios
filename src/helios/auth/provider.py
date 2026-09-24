@@ -20,7 +20,7 @@ class Provider(Provider):
 			application.container.get(Engine).composer(self.compose)
 
 	def compose(self, view: View, context: Context):
-		view.assign("current_user", context.get(Authenticator).user)
+		view.assign("auth", context.get(Authenticator))
 
 	def authenticator(self, context: Context) -> Authenticator:
 		session = context.get(Session)

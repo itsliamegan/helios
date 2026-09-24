@@ -126,11 +126,11 @@ def test_removes_malformed_user_id():
 	assert_that("_user_id" not in session)
 
 
-def render_current_user(store: Store, session: Session) -> str:
+def render_signed_in_user(store: Store, session: Session) -> str:
 	with TemporaryDirectory() as directory:
 		views_dir = Path(directory)
 		views_dir.joinpath("index.html").write_text(
-			"{% if current_user %}{{ current_user.name }}{% else %}Guest{% endif %}"
+			"{% if auth.is_signed_in() %}{{ auth.user.name }}{% else %}Guest{% endif %}"
 		)
 
 		def index(request, context):
@@ -152,7 +152,7 @@ def render_current_user(store: Store, session: Session) -> str:
 	return str(response.body)
 
 
-def test_shares_current_user_with_views():
+def test_shares_signed_in_authenticator_with_views():
 	with TemporaryDirectory() as directory:
 		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
@@ -160,18 +160,18 @@ def test_shares_current_user_with_views():
 			session = Session(uuid4())
 			session["_user_id"] = str(user.id)
 
-			html = render_current_user(store, session)
+			html = render_signed_in_user(store, session)
 		finally:
 			connection.close()
 
 	assert_eq(html, "Alice")
 
 
-def test_shares_missing_current_user_with_views():
+def test_shares_signed_out_authenticator_with_views():
 	with TemporaryDirectory() as directory:
 		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
-			html = render_current_user(store, Session(uuid4()))
+			html = render_signed_in_user(store, Session(uuid4()))
 		finally:
 			connection.close()
 

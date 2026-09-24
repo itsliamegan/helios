@@ -7,8 +7,10 @@ from jinja2 import TemplateNotFound, TemplateSyntaxError, UndefinedError
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
 
-from helios.app import Container, Context
+from helios.app import Application, Config, Container, Context
 from helios.http import Method, Request, Status, URL
+from helios.routing import Pattern, Route, Router
+import helios.view
 from helios.view import Engine, Helpers, Views, file, helpers, memory
 
 
@@ -341,6 +343,39 @@ def test_engine_renders_without_composers():
 		engine.render("index")
 
 
+def test_provider_shares_urls_with_templates():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("index.html").write_text(
+			'<a href="{{ urls.route("boards.show", {"id": 7}) }}">Board</a>'
+		)
+
+		def index(request, context):
+			return context.get(Views).render("index")
+
+		app = Application(
+			Config(URL("https://example.com")),
+			Router(
+				[
+					Route(Method.GET, Pattern("/"), index),
+					Route(
+						Method.GET,
+						Pattern("/boards/{id}"),
+						index,
+						name="boards.show",
+					),
+				]
+			),
+			[helios.view.Provider(helios.view.Config(views_dir))],
+		)
+		try:
+			response = app.handle(Request(Method.GET, URL("/")))
+		finally:
+			app.close()
+
+	assert_eq(str(response.body), '<a href="/boards/7">Board</a>')
+
+
 def test_formats_elapsed_seconds():
 	then = datetime(year=2025, month=9, day=1, hour=12, minute=0, second=0, tzinfo=UTC)
 	now = datetime(year=2025, month=9, day=1, hour=12, minute=0, second=25, tzinfo=UTC)
@@ -380,12 +415,6 @@ def test_formats_date():
 	date = datetime(year=2026, month=4, day=7, tzinfo=UTC)
 
 	assert_eq(helpers.date(date), "Apr 7, 2026")
-
-
-def test_formats_url_with_breaks():
-	url = URL("/posts/1354")
-
-	assert_eq(str(helpers.url(url)), "/<wbr>posts/<wbr>1354")
 
 
 def context() -> Context:

@@ -142,7 +142,7 @@ def test_runs_provider_then_standalone_middleware_in_order():
 def test_provides_framework_bindings():
 	def index(request, context):
 		urls = context.get(URLs)
-		return Response.text(str(urls.route("home")))
+		return Response.text(str(urls.route("home", absolute=True)))
 
 	router = Router([Route(Method.GET, Pattern("/"), index, name="home")])
 	app = Application(Config(URL("https://example.com:8443")), router, [])

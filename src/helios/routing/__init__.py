@@ -224,8 +224,7 @@ class URLs:
 		name: str,
 		params: dict[str, Any] | None = None,
 		query: Query | None = None,
-		*,
-		absolute: bool = True,
+		absolute: bool = False,
 	) -> URL:
 		path = self.router.path(name, params)
 		if not absolute:

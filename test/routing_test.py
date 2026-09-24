@@ -484,7 +484,7 @@ def test_rejects_duplicate_route_names():
 		)
 
 
-def test_generates_absolute_route_with_query_by_default():
+def test_generates_absolute_route_with_query_explicitly():
 	router = Router(
 		[
 			Route(
@@ -497,7 +497,7 @@ def test_generates_absolute_route_with_query_by_default():
 	)
 	urls = URLs(router, URL("https://cork.example:8443"))
 
-	url = urls.route("redemptions.new", query={"token": "secret value"})
+	url = urls.route("redemptions.new", query={"token": "secret value"}, absolute=True)
 
 	assert_eq(
 		str(url),
@@ -505,7 +505,7 @@ def test_generates_absolute_route_with_query_by_default():
 	)
 
 
-def test_generates_relative_route_explicitly():
+def test_generates_relative_route_by_default():
 	router = Router(
 		[
 			Route(
@@ -518,7 +518,7 @@ def test_generates_relative_route_explicitly():
 	)
 	urls = URLs(router, URL("https://cork.example"))
 
-	url = urls.route("boards.index", absolute=False)
+	url = urls.route("boards.index")
 
 	assert_eq(str(url), "/boards/")
 
