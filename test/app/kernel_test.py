@@ -7,6 +7,7 @@ from helios.http import (
 	Buffered,
 	Cookies,
 	Headers,
+	Input,
 	Method,
 	Request,
 	Response,
@@ -101,3 +102,36 @@ def test_returned_error_response_has_no_context_error():
 	kernel.handle(request())
 
 	assert_eq(seen, [None])
+
+
+def test_overrides_method_from_input():
+	def destroy(request, context):
+		return Response.text(f"{"_method" in request.input}")
+
+	kernel = Kernel(
+		Container(),
+		Router([Route(Method.DELETE, Pattern("/"), destroy)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(Method.POST, URL("/"), input=Input({"_method": "DELETE"}))
+	)
+
+	assert_eq(response.status, Status.OK)
+	assert_eq(str(response.body), "False")
+
+
+def test_ignores_unknown_method_override():
+	def create(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route(Method.POST, Pattern("/"), create)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(Method.POST, URL("/"), input=Input({"_method": "delete"}))
+	)
+
+	assert_eq(response.status, Status.OK)
