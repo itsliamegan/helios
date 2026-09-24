@@ -38,9 +38,9 @@ class Query[T: Model]:
 	ordering: tuple[str, Direction] | None = None
 	count: int | None = None
 
-	def where(self, **attrs: Any) -> Query[T]:
+	def where(self, **attributes: Any) -> Query[T]:
 		predicates = list(self.predicates)
-		for name, value in attrs.items():
+		for name, value in attributes.items():
 			attribute = self.model_type.attribute(name)
 			predicates.append(Filter(name, attribute.encode(value, self.model_type)))
 		return Query(
@@ -51,9 +51,9 @@ class Query[T: Model]:
 			self.count,
 		)
 
-	def where_in(self, **attrs: Iterable[Any]) -> Query[T]:
+	def where_in(self, **attributes: Iterable[Any]) -> Query[T]:
 		predicates = list(self.predicates)
-		for name, candidates in attrs.items():
+		for name, candidates in attributes.items():
 			if isinstance(candidates, (str, bytes)) or not isinstance(
 				candidates, Iterable
 			):

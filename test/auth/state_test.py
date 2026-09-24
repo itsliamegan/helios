@@ -3,14 +3,14 @@ from uuid import uuid4
 from luna.test.assertion import assert_eq, assert_that
 
 from helios.auth.state import Authenticator
-from helios.database import Model, attr
+from helios.database import Model
 from helios.session.store import Session, Store
 
 
 class User(Model):
 	table = "users"
 
-	name = attr(str)
+	name: str
 
 
 def test_signs_in():

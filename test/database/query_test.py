@@ -4,16 +4,16 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.database import Config, DatabaseError, Model, ModelError, Store, attr
+from helios.database import Config, DatabaseError, Model, ModelError, Store
 from helios.database.sqlite import connect
 
 
 class Item(Model):
 	table = "items"
 
-	name = attr(str)
-	group = attr(str, nullable=True)
-	rank = attr(int)
+	name: str
+	group: str | None = None
+	rank: int
 
 
 SCHEMA = """

@@ -8,7 +8,7 @@ from luna.test.assertion import assert_eq, assert_that
 import helios.app
 import helios.auth
 import helios.database
-from helios.database import Model, Store, attr
+from helios.database import Model, Store
 from helios.http import Headers, Method, Request, Response, Status, URL
 from helios.routing import Pattern, Route, Router
 import helios.session
@@ -18,7 +18,7 @@ from helios.session.file import Driver
 class User(Model):
 	table = "users"
 
-	name = attr(str)
+	name: str
 
 
 def request(session_id: str | None = None) -> Request:

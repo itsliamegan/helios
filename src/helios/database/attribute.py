@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Literal, TYPE_CHECKING, cast, overload
+from types import NoneType
+from typing import Any, TYPE_CHECKING, Union, cast, get_args, get_origin
 from uuid import UUID
 
 from helios.http import URL
@@ -11,50 +12,36 @@ from .error import ModelError
 if TYPE_CHECKING:
 	from .model import Model
 
-MISSING: Any = object()
+MISSING: object = object()
 
 
 @dataclass
-class Attribute[StoredT, ValueT = StoredT]:
+class Attribute:
 	name: str | None
-	owner: type[Model] | None
-	type: types.Type[StoredT]
-	default: ValueT | None
+	type: types.Type[object]
+	default: object
 	required: bool
 	nullable: bool
 	init: bool
 
 	def __init__(
 		self,
-		typ: types.Type[StoredT],
-		*,
-		default: ValueT,
+		type: types.Type[object],
+		default: object,
 		nullable: bool,
 		init: bool,
 	):
-		self.name: str | None = None
-		self.owner: type[Model] | None = None
-		self.type = typ
+		self.name = None
+		self.type = type
 		self.default = None if default is MISSING else default
 		self.required = default is MISSING
 		self.nullable = nullable
 		self.init = init
 
-	def __set_name__(self, owner: type[Model], name: str):
-		self.owner = owner
+	def __set_name__(self, _owner: type, name: str):
 		self.name = name
 
-	@overload
-	def __get__(
-		self, instance: None, owner: type[Model]
-	) -> Attribute[StoredT, ValueT]: ...
-
-	@overload
-	def __get__(self, instance: Model, owner: type[Model]) -> ValueT: ...
-
-	def __get__(
-		self, instance: Model | None, owner: type[Model]
-	) -> Attribute[StoredT, ValueT] | ValueT:
+	def __get__(self, instance: Model | None, owner: type) -> object:
 		if instance is None:
 			return self
 		if self.name is None:
@@ -84,12 +71,12 @@ class Attribute[StoredT, ValueT = StoredT]:
 			return None
 		return types.encode(self.type, value)
 
-	def decode(self, raw: types.Scalar | None, model_type: type) -> StoredT | None:
+	def decode(self, raw: types.Scalar | None, model_type: type) -> object:
 		value = None if raw is None else self.type.decode(raw)
 		self.check(value, model_type)
 		return value
 
-	def __set__(self, instance: Model, value: ValueT):
+	def __set__(self, instance: Model, value: object):
 		if self.name is None:
 			raise AttributeError("attribute has not been assigned to a model")
 		self.check(value, type(instance))
@@ -97,39 +84,60 @@ class Attribute[StoredT, ValueT = StoredT]:
 		instance._changes.mark(self.name)
 
 
-@overload
-def attr[T](
-	typ: type[T] | types.Type[T],
-	*,
-	default: T = MISSING,
-	nullable: Literal[False] = False,
+@dataclass(init=False)
+class Declaration:
+	default: object
+	init: bool
+	type: types.Type[object] | None
+
+	def __init__(
+		self,
+		default: object,
+		init: bool,
+		type: types.Type[object] | None,
+	):
+		self.default = default
+		self.init = init
+		self.type = type
+
+
+def attribute(
+	default: object = MISSING,
 	init: bool = True,
-) -> Attribute[T]: ...
+	type: types.Type[object] | None = None,
+) -> Any:
+	return Declaration(default, init, type)
 
 
-@overload
-def attr[T](
-	typ: type[T] | types.Type[T],
-	*,
-	default: T | None = MISSING,
-	nullable: Literal[True],
-	init: bool = True,
-) -> Attribute[T, T | None]: ...
-
-
-def attr(
-	typ: type[Any] | types.Type[Any],
-	*,
-	default: Any = MISSING,
-	nullable: bool = False,
-	init: bool = True,
-) -> Attribute[Any, Any]:
+def declare(annotation: Any, value: object) -> Attribute:
+	if isinstance(value, Declaration):
+		declaration = value
+	else:
+		declaration = Declaration(value, True, None)
+	value_type, nullable = split_nullable(annotation)
+	if declaration.type is None:
+		codec = resolve_type(value_type)
+	else:
+		codec = declaration.type
 	return Attribute(
-		resolve_type(typ),
-		default=default,
-		nullable=nullable,
-		init=init,
+		codec,
+		declaration.default,
+		nullable,
+		declaration.init,
 	)
+
+
+def split_nullable(annotation: Any) -> tuple[Any, bool]:
+	if get_origin(annotation) is not Union:
+		return annotation, False
+
+	members = get_args(annotation)
+	if len(members) != 2:
+		raise TypeError(f"unsupported attribute type: {annotation!r}")
+	value_index = 1 if members[0] is NoneType else 0
+	if members[1 - value_index] is not NoneType:
+		raise TypeError(f"unsupported attribute type: {annotation!r}")
+	return members[value_index], True
 
 
 def resolve_type[T](typ: type[T] | types.Type[T]) -> types.Type[T]:

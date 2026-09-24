@@ -9,7 +9,7 @@ from helios.app import Application, Config, Container, Provider
 import helios.auth
 from helios.auth import Authenticator
 from helios.database import Config as DatabaseConfig
-from helios.database import Model, Store, attr
+from helios.database import Model, Store
 from helios.database.sqlite import connect
 from helios.http import Method, Request, Response, URL
 from helios.routing import Pattern, Route, Router
@@ -21,7 +21,7 @@ from helios.view import Views
 class User(Model):
 	table = "users"
 
-	name = attr(str)
+	name: str
 
 
 class Values(Provider):

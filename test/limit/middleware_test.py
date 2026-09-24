@@ -6,7 +6,7 @@ from luna.test.assertion import assert_eq
 from helios.app import Application, Container, Provider
 from helios.app import Config as AppConfig
 from helios.auth.state import Authenticator
-from helios.database import Model, attr
+from helios.database import Model
 from helios.http import Headers, Method, Request, Response, Status, URL
 import helios.limit
 from helios.limit.config import Config
@@ -17,7 +17,7 @@ from helios.session.store import Session
 class User(Model):
 	table = "users"
 
-	name = attr(str)
+	name: str
 
 
 class Authentication(Provider):
