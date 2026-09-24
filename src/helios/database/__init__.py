@@ -1,4 +1,4 @@
-from .attribute import attr
+from .attribute import attribute
 from .config import Config
 from .error import DatabaseBusy, DatabaseError, ModelError, NotFoundError
 from .model import Model
@@ -19,5 +19,5 @@ __all__ = [
 	"Scalar",
 	"Store",
 	"Type",
-	"attr",
+	"attribute",
 ]

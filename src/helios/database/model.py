@@ -4,7 +4,7 @@ from enum import Enum, auto
 from typing import Any, ClassVar, cast
 from uuid import UUID, uuid4
 
-from .attribute import Attribute, attr
+from .attribute import Attribute, attribute
 from .error import ModelError
 
 
@@ -34,7 +34,7 @@ class Changes:
 
 
 class ModelMeta(type):
-	attrs: dict[str, Attribute[Any, Any]]
+	attributes: dict[str, Attribute[Any, Any]]
 
 	def __new__(
 		metaclass,
@@ -42,41 +42,45 @@ class ModelMeta(type):
 		bases: tuple[type, ...],
 		namespace: dict[str, Any],
 	):
-		if bases and "attrs" in namespace:
+		if bases and "attributes" in namespace:
 			raise ModelError(
-				f"{name}.attrs is model metadata; declare named attributes instead"
+				f"{name}.attributes is model metadata; declare named attributes instead"
 			)
 
 		model_bases = [base for base in bases if isinstance(base, ModelMeta)]
 		if len(model_bases) > 1:
 			raise ModelError(f"{name} cannot inherit from multiple model classes")
 
-		attrs = dict(model_bases[0].attrs) if model_bases else {}
-		for attr_name, value in namespace.items():
-			if attr_name in attrs:
-				if not attrs[attr_name].init:
-					raise ModelError(f"'{name}.{attr_name}' is a reserved attr")
+		attributes = dict(model_bases[0].attributes) if model_bases else {}
+		for attribute_name, value in namespace.items():
+			if attribute_name in attributes:
+				if not attributes[attribute_name].init:
+					raise ModelError(
+						f"'{name}.{attribute_name}' is a reserved attribute"
+					)
 				if not isinstance(value, Attribute):
 					raise ModelError(
-						f"'{name}.{attr_name}' replaces an inherited attr with a non-Attribute"
+						f"'{name}.{attribute_name}' replaces an inherited attribute with a non-Attribute"
 					)
 			if isinstance(value, Attribute):
-				attrs[attr_name] = value
+				attributes[attribute_name] = value
 
 		model_type = super().__new__(metaclass, name, bases, namespace)
-		model_type.attrs = attrs
+		model_type.attributes = attributes
 		return model_type
 
 
 class Model(metaclass=ModelMeta):
 	table: ClassVar[str] = ""
-	attrs: ClassVar[dict[str, Attribute[Any, Any]]]
+	attributes: ClassVar[dict[str, Attribute[Any, Any]]]
 
-	id = attr(UUID, init=False)
-	created_at = cast(Attribute[datetime, datetime | None], attr(datetime, init=False))
+	id = attribute(UUID, init=False)
+	created_at = cast(
+		Attribute[datetime, datetime | None], attribute(datetime, init=False)
+	)
 
-	def __init__(self, **attrs: Any):
-		self.values = type(self).initialize(attrs)
+	def __init__(self, **attributes: Any):
+		self.values = type(self).initialize(attributes)
 		self.values["id"] = uuid4()
 		self.values["created_at"] = None
 		self._changes = Changes()
@@ -93,29 +97,29 @@ class Model(metaclass=ModelMeta):
 	@classmethod
 	def attribute(cls, name: str) -> Attribute[Any, Any]:
 		try:
-			return cls.attrs[name]
+			return cls.attributes[name]
 		except KeyError:
 			raise ModelError(f"{cls.__name__} has no attribute {name!r}") from None
 
 	@classmethod
-	def initialize(cls, raw_attrs: dict[str, Any]) -> dict[str, Any]:
-		for name in raw_attrs:
-			attribute = cls.attrs.get(name)
+	def initialize(cls, raw_attributes: dict[str, Any]) -> dict[str, Any]:
+		for name in raw_attributes:
+			attribute = cls.attributes.get(name)
 			if attribute is None or not attribute.init:
-				raise ModelError(f"extra attr '{name}'")
+				raise ModelError(f"extra attribute '{name}'")
 
 		values = {}
-		for name, attribute in cls.attrs.items():
+		for name, attribute in cls.attributes.items():
 			if not attribute.init:
 				continue
-			if name in raw_attrs:
-				value = raw_attrs[name]
+			if name in raw_attributes:
+				value = raw_attributes[name]
 			elif not attribute.required:
 				value = attribute.default
 			elif attribute.nullable:
 				value = None
 			else:
-				raise ModelError(f"missing attr '{name}'")
+				raise ModelError(f"missing attribute '{name}'")
 			attribute.check(value, cls)
 			values[name] = value
 		return values

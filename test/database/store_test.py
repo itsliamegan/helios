@@ -15,7 +15,7 @@ from helios.database import (
 	ModelError,
 	NotFoundError,
 	Store,
-	attr,
+	attribute,
 )
 from helios.database.sqlite import connect
 
@@ -43,14 +43,14 @@ class TokenCodec:
 class Record(Model):
 	table = "records"
 
-	name = attr(str)
-	count = attr(int)
-	active = attr(bool)
-	owner_id = attr(UUID)
-	link = attr(http.URL)
-	published_at = attr(datetime)
-	note = attr(str, nullable=True)
-	token = attr(TokenCodec())
+	name = attribute(str)
+	count = attribute(int)
+	active = attribute(bool)
+	owner_id = attribute(UUID)
+	link = attribute(http.URL)
+	published_at = attribute(datetime)
+	note = attribute(str, nullable=True)
+	token = attribute(TokenCodec())
 
 
 SCHEMA = """
@@ -350,7 +350,7 @@ def test_malformed_stored_scalar_is_database_error():
 def test_quotes_declared_table_and_column_identifiers():
 	class OddRecord(Model):
 		table = 'odd"records'
-		select = attr(str)
+		select = attribute(str)
 
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")

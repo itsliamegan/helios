@@ -2,15 +2,15 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.database import Model, ModelError, attr
+from helios.database import Model, ModelError, attribute
 
 
 def test_constructs_model_with_table_defaults_and_nulls():
 	class Post(Model):
 		table = "posts"
-		title = attr(str)
-		published = attr(bool, default=False)
-		summary = attr(str, nullable=True)
+		title = attribute(str)
+		published = attribute(bool, default=False)
+		summary = attribute(str, nullable=True)
 
 	post = Post(title="Intro")
 
@@ -24,15 +24,15 @@ def test_constructs_model_with_table_defaults_and_nulls():
 
 def test_preserves_explicit_null_instead_of_default():
 	class Post(Model):
-		title = attr(str, default="Untitled", nullable=True)
+		title = attribute(str, default="Untitled", nullable=True)
 
 	assert_that(Post(title=None).title is None)
 
 
 def test_assigns_canonical_values_and_nulls():
 	class Post(Model):
-		title = attr(str)
-		summary = attr(str, nullable=True)
+		title = attribute(str)
+		summary = attribute(str, nullable=True)
 
 	post = Post(title="Intro")
 	post.title = "Revised"
@@ -45,7 +45,7 @@ def test_assigns_canonical_values_and_nulls():
 
 def test_failed_assignment_preserves_value():
 	class Post(Model):
-		points = attr(int)
+		points = attribute(int)
 
 	post = Post(points=3)
 	with assert_raises(ModelError):
@@ -56,7 +56,7 @@ def test_failed_assignment_preserves_value():
 
 def test_rejects_missing_extra_non_init_and_null_attributes():
 	class Post(Model):
-		title = attr(str)
+		title = attribute(str)
 
 	with assert_raises(ModelError):
 		Post()
@@ -70,12 +70,12 @@ def test_rejects_missing_extra_non_init_and_null_attributes():
 
 def test_inherits_and_overrides_attributes():
 	class Content(Model):
-		title = attr(str)
-		score = attr(str)
+		title = attribute(str)
+		score = attribute(str)
 
 	class Post(Content):
 		table = "posts"
-		score = attr(int)
+		score = attribute(int)
 
 	post = Post(title="Intro", score=3)
 
@@ -87,10 +87,10 @@ def test_rejects_reserved_and_invalid_inherited_overrides():
 	with assert_raises(ModelError):
 
 		class Reserved(Model):
-			id = attr(UUID)
+			id = attribute(UUID)
 
 	class Content(Model):
-		title = attr(str)
+		title = attribute(str)
 
 	with assert_raises(ModelError):
 

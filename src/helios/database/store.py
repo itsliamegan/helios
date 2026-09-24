@@ -41,9 +41,9 @@ class Store:
 		)
 		self.identity: dict[tuple[type[Model], UUID], Model] = {}
 
-	def create[T: Model](self, model_type: type[T], **attrs: Any) -> T:
+	def create[T: Model](self, model_type: type[T], **attributes: Any) -> T:
 		self.registry.get(model_type)
-		model = model_type(**attrs)
+		model = model_type(**attributes)
 		self.save(model)
 		return model
 
@@ -59,11 +59,12 @@ class Store:
 		values = dict(model.values)
 		values["created_at"] = created_at
 		changes = model._changes.snapshot()
-		names = tuple(model_type.attrs)
+		names = tuple(model_type.attributes)
 		columns = ", ".join(quote_identifier(name) for name in names)
 		placeholders = ", ".join("?" for _ in names)
 		parameters = [
-			model_type.attrs[name].encode(values[name], model_type) for name in names
+			model_type.attributes[name].encode(values[name], model_type)
+			for name in names
 		]
 		sql = (
 			f"INSERT INTO {quote_identifier(model_type.table)} ({columns}) "
@@ -78,15 +79,15 @@ class Store:
 
 	def update[T: Model](self, model_type: type[T], model: T):
 		changes = model._changes.snapshot()
-		names = tuple(name for name in model_type.attrs if name in changes)
+		names = tuple(name for name in model_type.attributes if name in changes)
 		if not names:
 			return
 		assignments = ", ".join(f"{quote_identifier(name)} = ?" for name in names)
 		parameters = [
-			model_type.attrs[name].encode(model.values[name], model_type)
+			model_type.attributes[name].encode(model.values[name], model_type)
 			for name in names
 		]
-		parameters.append(model_type.attrs["id"].encode(model.id, model_type))
+		parameters.append(model_type.attributes["id"].encode(model.id, model_type))
 		sql = (
 			f"UPDATE {quote_identifier(model_type.table)} SET {assignments} "
 			f"WHERE {quote_identifier("id")} = ?"
@@ -96,7 +97,7 @@ class Store:
 
 	def delete(self, model: Model):
 		model_type = self.registry.get(type(model))
-		identifier = model_type.attrs["id"].encode(model.id, model_type)
+		identifier = model_type.attributes["id"].encode(model.id, model_type)
 		sql = (
 			f"DELETE FROM {quote_identifier(model_type.table)} "
 			f"WHERE {quote_identifier("id")} = ?"
@@ -116,8 +117,8 @@ class Store:
 	def find_all[T: Model](self, model_type: type[T]) -> list[T]:
 		return self.query(model_type).all()
 
-	def find_by[T: Model](self, model_type: type[T], **attrs: Any) -> list[T]:
-		return self.query(model_type).where(**attrs).all()
+	def find_by[T: Model](self, model_type: type[T], **attributes: Any) -> list[T]:
+		return self.query(model_type).where(**attributes).all()
 
 	def query[T: Model](self, model_type: type[T]) -> Query[T]:
 		self.registry.get(model_type)
@@ -125,7 +126,7 @@ class Store:
 
 	def execute[T: Model](self, query: Query[T]) -> list[T]:
 		model_type = query.model_type
-		columns = ", ".join(quote_identifier(name) for name in model_type.attrs)
+		columns = ", ".join(quote_identifier(name) for name in model_type.attributes)
 		clauses: list[str] = []
 		parameters: list[Any] = []
 		for predicate in query.predicates:
@@ -186,7 +187,7 @@ class Store:
 		column_names: tuple[str, ...],
 		row: tuple[types.Scalar | None, ...],
 	) -> T:
-		expected = tuple(model_type.attrs)
+		expected = tuple(model_type.attributes)
 		if (
 			len(column_names) != len(expected)
 			or len(set(column_names)) != len(column_names)
@@ -198,7 +199,7 @@ class Store:
 		values: dict[str, Any] = {}
 		try:
 			for name, raw_value in zip(column_names, row, strict=True):
-				values[name] = model_type.attrs[name].decode(raw_value, model_type)
+				values[name] = model_type.attributes[name].decode(raw_value, model_type)
 		except (TypeError, ValueError, ModelError) as error:
 			raise DatabaseError(
 				"database row contains an invalid model value"

@@ -98,7 +98,7 @@ class Attribute[StoredT, ValueT = StoredT]:
 
 
 @overload
-def attr[T](
+def attribute[T](
 	typ: type[T] | types.Type[T],
 	*,
 	default: T = MISSING,
@@ -108,7 +108,7 @@ def attr[T](
 
 
 @overload
-def attr[T](
+def attribute[T](
 	typ: type[T] | types.Type[T],
 	*,
 	default: T | None = MISSING,
@@ -117,7 +117,7 @@ def attr[T](
 ) -> Attribute[T, T | None]: ...
 
 
-def attr(
+def attribute(
 	typ: type[Any] | types.Type[Any],
 	*,
 	default: Any = MISSING,
