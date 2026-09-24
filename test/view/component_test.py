@@ -351,37 +351,44 @@ def test_rejects_components_with_missing_templates():
 
 
 def test_rejects_accepts_without_attributes_field():
-	class Button(Component):
-		template = "button"
-		accepts = {"type"}
-
-	driver = memory.Driver({"button": ""})
-
 	with assert_raises(ValueError):
-		Engine(driver, components=[Button])
+
+		class Button(Component):
+			template = "button"
+			accepts = {"type"}
 
 
 def test_rejects_accepts_that_name_a_field():
-	class Button(Component):
-		template = "button"
-		accepts = {"form-action"}
-
-		form_action: str
-		attributes: Attributes = Attributes()
-
-	driver = memory.Driver({"button": ""})
-
 	with assert_raises(ValueError):
-		Engine(driver, components=[Button])
+
+		class Button(Component):
+			template = "button"
+			accepts = {"form-action"}
+
+			form_action: str
+			attributes: Attributes = Attributes()
 
 
 def test_rejects_fields_named_component():
-	class Wrapper(Component):
-		template = "wrapper"
-
-		component: str
-
-	driver = memory.Driver({"wrapper": ""})
-
 	with assert_raises(ValueError):
-		Engine(driver, components=[Wrapper])
+
+		class Wrapper(Component):
+			template = "wrapper"
+
+			component: str
+
+
+def test_rejects_fields_named_like_component_members():
+	with assert_raises(ValueError):
+
+		class Wrapper(Component):
+			template: str = "wrapper"  # ty: ignore[invalid-attribute-override]
+
+
+def test_rejects_mutable_defaults():
+	with assert_raises(ValueError):
+
+		class Row(Component):
+			template = "row"
+
+			names: list[str] = []

@@ -27,6 +27,7 @@ class Component:
 			if not is_class_variable(annotation):
 				fields[name] = vars(cls).get(name, MISSING)
 		cls.fields = fields
+		check_component(cls)
 
 	@classmethod
 	def accepts_attribute(cls, name: str) -> bool:
@@ -99,3 +100,28 @@ class Component:
 
 def is_class_variable(annotation: Any) -> bool:
 	return annotation is ClassVar or get_origin(annotation) is ClassVar
+
+
+def check_component(component: type[Component]):
+	name = component.__name__
+	for field_name, default in component.fields.items():
+		if field_name == "component":
+			raise ValueError(f'Component {name} has a field named "component"')
+		if field_name in vars(Component) or field_name in get_annotations(Component):
+			raise ValueError(
+				f'Component {name} has a field named "{field_name}", '
+				"which Component uses"
+			)
+		if default is not MISSING and default.__hash__ is None:
+			raise ValueError(
+				f'Component {name} has a mutable default for "{field_name}"'
+			)
+		if html_name(field_name) in component.accepts:
+			raise ValueError(
+				f'Component {name} accepts "{html_name(field_name)}", '
+				"which is also a field"
+			)
+	if component.accepts and "attributes" not in component.fields:
+		raise ValueError(
+			f"Component {name} declares accepts but has no attributes field"
+		)

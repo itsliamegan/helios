@@ -5,7 +5,6 @@ from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
 
 from helios.app import Context
 
-from .attributes import html_name
 from .component import Component, rendering
 from .extension import RenderExtension
 from .helpers import Helpers
@@ -108,7 +107,6 @@ def check_registration(
 	templates: list[str],
 ):
 	name = component.__name__
-	field_names = list(component.fields)
 	if name in registered:
 		raise ValueError(f"Two components are named {name}")
 	if name in helpers.globals:
@@ -118,18 +116,6 @@ def check_registration(
 			f'Component {name} uses the template "{component.template}", '
 			"which does not exist"
 		)
-	if component.accepts and "attributes" not in field_names:
-		raise ValueError(
-			f"Component {name} declares accepts but has no attributes field"
-		)
-	for field_name in field_names:
-		if html_name(field_name) in component.accepts:
-			raise ValueError(
-				f'Component {name} accepts "{html_name(field_name)}", '
-				"which is also a field"
-			)
-	if "component" in field_names:
-		raise ValueError(f'Component {name} has a field named "component"')
 
 
 type Composer = Callable[[View, Context], None]
