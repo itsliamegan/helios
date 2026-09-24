@@ -49,12 +49,9 @@ def test_provider_registers_components():
 		views_dir = Path(dir)
 		views_dir.joinpath("boards").mkdir()
 		views_dir.joinpath("boards", "chip.py").write_text(
-			"from dataclasses import dataclass\n"
-			"\n"
 			"from helios.view import Component\n"
 			"\n"
 			"\n"
-			"@dataclass(kw_only=True)\n"
 			"class BoardChip(Component):\n"
 			'\ttemplate = "boards.chip"\n'
 			"\n"

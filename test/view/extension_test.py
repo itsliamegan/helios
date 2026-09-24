@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from jinja2 import TemplateSyntaxError
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
@@ -7,7 +5,6 @@ from markupsafe import Markup
 from helios.view import Component, Engine, memory
 
 
-@dataclass(kw_only=True)
 class Card(Component):
 	template = "card"
 
@@ -15,7 +12,6 @@ class Card(Component):
 	content: Markup = Markup("<p>Empty</p>")
 
 
-@dataclass(kw_only=True)
 class Panel(Component):
 	template = "panel"
 

@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from jinja2 import UndefinedError
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
@@ -7,14 +5,12 @@ from markupsafe import Markup
 from helios.view import Attributes, Component, Engine, Helpers, memory
 
 
-@dataclass(kw_only=True)
 class Chip(Component):
 	template = "chip"
 
 	name: str
 
 
-@dataclass(kw_only=True)
 class Link(Component):
 	template = "link"
 	accepts = {"target", "rel"}
@@ -25,7 +21,6 @@ class Link(Component):
 	attributes: Attributes = Attributes()
 
 
-@dataclass(kw_only=True)
 class Board(Component):
 	template = "board"
 
@@ -38,7 +33,6 @@ class Board(Component):
 		return self.owner == self.user
 
 
-@dataclass(kw_only=True)
 class Row(Component):
 	template = "row"
 
@@ -52,7 +46,7 @@ link_template = (
 )
 
 
-def test_keeps_dataclass_repr():
+def test_represents_fields():
 	chip = Chip(name="Travel")
 
 	text = repr(chip)
@@ -79,9 +73,21 @@ def test_rejects_positional_arguments_from_python():
 		Chip("Travel")  # ty: ignore[missing-argument, too-many-positional-arguments]
 
 
-def test_rejects_loose_attributes_from_python():
-	with assert_raises(TypeError):
-		Link(url="/", class_="pin-link")  # ty: ignore[unknown-argument]
+def test_collects_loose_keywords_into_attributes():
+	link = Link(url="/", class_="pin-link", data_turbo_frame="modal")  # ty: ignore[unknown-argument]
+
+	assert_eq(link.attributes.names(), {"class", "data-turbo-frame"})
+
+
+def test_inherits_fields():
+	class Badge(Chip):
+		template = "badge"
+
+		count: int = 0
+
+	badge = Badge(name="Travel")
+
+	assert_eq(repr(badge), "Badge(name='Travel', count=0)")
 
 
 def test_accepts_global_and_declared_attributes_from_python():
@@ -321,7 +327,6 @@ def test_rejects_attributes_bag_with_loose_attributes():
 
 
 def test_rejects_components_with_the_same_name():
-	@dataclass(kw_only=True)
 	class Chip(Component):
 		template = "chip"
 
@@ -346,7 +351,6 @@ def test_rejects_components_with_missing_templates():
 
 
 def test_rejects_accepts_without_attributes_field():
-	@dataclass(kw_only=True)
 	class Button(Component):
 		template = "button"
 		accepts = {"type"}
@@ -358,7 +362,6 @@ def test_rejects_accepts_without_attributes_field():
 
 
 def test_rejects_accepts_that_name_a_field():
-	@dataclass(kw_only=True)
 	class Button(Component):
 		template = "button"
 		accepts = {"form-action"}
@@ -373,7 +376,6 @@ def test_rejects_accepts_that_name_a_field():
 
 
 def test_rejects_fields_named_component():
-	@dataclass(kw_only=True)
 	class Wrapper(Component):
 		template = "wrapper"
 

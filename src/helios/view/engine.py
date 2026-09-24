@@ -6,7 +6,7 @@ from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
 from helios.app import Context
 
 from .attributes import html_name
-from .component import Component, Constructor, rendering
+from .component import Component, rendering
 from .extension import RenderExtension
 from .helpers import Helpers
 from .source import Driver
@@ -42,11 +42,11 @@ class Engine:
 		for name in templates:
 			self.jinja.get_template(name)
 
-		constructors: dict[str, Any] = {}
+		registered: dict[str, Any] = {}
 		for component in components or []:
-			check_registration(component, constructors, self.helpers, templates)
-			constructors[component.__name__] = Constructor(component)
-		self.jinja.globals.update(constructors)
+			check_registration(component, registered, self.helpers, templates)
+			registered[component.__name__] = component
+		self.jinja.globals.update(registered)
 
 	def composer(self, composer: Composer):
 		self.composers.append(composer)
@@ -108,7 +108,7 @@ def check_registration(
 	templates: list[str],
 ):
 	name = component.__name__
-	field_names = component.field_names()
+	field_names = list(component.fields)
 	if name in registered:
 		raise ValueError(f"Two components are named {name}")
 	if name in helpers.globals:
