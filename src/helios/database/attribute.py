@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from types import NoneType
-from typing import Any, TYPE_CHECKING, Union, cast, get_args, get_origin, overload
+from typing import Any, TYPE_CHECKING, Union, cast, get_args, get_origin
 from uuid import UUID
 
 from helios.http import URL
@@ -16,46 +16,32 @@ MISSING: Any = object()
 
 
 @dataclass
-class Attribute[StoredT, ValueT = StoredT]:
+class Attribute:
 	name: str | None
-	owner: type | None
-	type: types.Type[StoredT]
-	default: ValueT | None
+	type: types.Type[Any]
+	default: Any
 	required: bool
 	nullable: bool
 	init: bool
 
 	def __init__(
 		self,
-		typ: types.Type[StoredT],
-		*,
-		default: ValueT,
+		type: types.Type[Any],
+		default: Any,
 		nullable: bool,
 		init: bool,
 	):
-		self.name: str | None = None
-		self.owner: type | None = None
-		self.type = typ
+		self.name = None
+		self.type = type
 		self.default = None if default is MISSING else default
 		self.required = default is MISSING
 		self.nullable = nullable
 		self.init = init
 
 	def __set_name__(self, owner: type, name: str):
-		self.owner = owner
 		self.name = name
 
-	@overload
-	def __get__(
-		self, instance: None, owner: type[Model]
-	) -> Attribute[StoredT, ValueT]: ...
-
-	@overload
-	def __get__(self, instance: Model, owner: type[Model]) -> ValueT: ...
-
-	def __get__(
-		self, instance: Model | None, owner: type[Model]
-	) -> Attribute[StoredT, ValueT] | ValueT:
+	def __get__(self, instance: Model | None, owner: type) -> Any:
 		if instance is None:
 			return self
 		if self.name is None:
@@ -85,12 +71,12 @@ class Attribute[StoredT, ValueT = StoredT]:
 			return None
 		return types.encode(self.type, value)
 
-	def decode(self, raw: types.Scalar | None, model_type: type) -> StoredT | None:
+	def decode(self, raw: types.Scalar | None, model_type: type) -> Any:
 		value = None if raw is None else self.type.decode(raw)
 		self.check(value, model_type)
 		return value
 
-	def __set__(self, instance: Model, value: ValueT):
+	def __set__(self, instance: Model, value: Any):
 		if self.name is None:
 			raise AttributeError("attribute has not been assigned to a model")
 		self.check(value, type(instance))
@@ -123,17 +109,21 @@ def attribute(
 	return Declaration(default, init, type)
 
 
-def declare(annotation: Any, value: Any) -> Attribute[Any, Any]:
+def declare(annotation: Any, value: Any) -> Attribute:
 	if isinstance(value, Declaration):
 		declaration = value
 	else:
 		declaration = Declaration(value, True, None)
 	value_type, nullable = split_nullable(annotation)
+	if declaration.type is None:
+		codec = resolve_type(value_type)
+	else:
+		codec = declaration.type
 	return Attribute(
-		declaration.type or resolve_type(value_type),
-		default=declaration.default,
-		nullable=nullable,
-		init=declaration.init,
+		codec,
+		declaration.default,
+		nullable,
+		declaration.init,
 	)
 
 

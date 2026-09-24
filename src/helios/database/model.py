@@ -35,7 +35,7 @@ class Changes:
 
 
 class ModelMeta(type):
-	attributes: dict[str, Attribute[Any, Any]]
+	attributes: dict[str, Attribute]
 
 	def __new__(
 		metaclass,
@@ -74,7 +74,7 @@ class ModelMeta(type):
 		return model_type
 
 
-def declare_attributes(model_type: type) -> dict[str, Attribute[Any, Any]]:
+def declare_attributes(model_type: type) -> dict[str, Attribute]:
 	try:
 		annotations = get_annotations(model_type, eval_str=True)
 	except NameError as error:
@@ -100,7 +100,7 @@ def declare_attributes(model_type: type) -> dict[str, Attribute[Any, Any]]:
 )
 class Model(metaclass=ModelMeta):
 	table: ClassVar[str] = ""
-	attributes: ClassVar[dict[str, Attribute[Any, Any]]]
+	attributes: ClassVar[dict[str, Attribute]]
 
 	id: UUID = attribute(init=False)
 	created_at: datetime | None = attribute(init=False)
@@ -121,7 +121,7 @@ class Model(metaclass=ModelMeta):
 		return model
 
 	@classmethod
-	def attribute(cls, name: str) -> Attribute[Any, Any]:
+	def attribute(cls, name: str) -> Attribute:
 		try:
 			return cls.attributes[name]
 		except KeyError:
