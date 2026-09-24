@@ -1,19 +1,29 @@
+from dataclasses import dataclass
 from typing import Any
 
 from markupsafe import Markup
 
+GLOBAL_ATTRIBUTES = {"class", "id", "hidden"}
 
+
+@dataclass(init=False, eq=False)
 class Attributes:
+	values: dict[str, Any]
+
 	def __init__(self, **values: Any):
-		self.values = normalize(
+		self.values = split_class_names(
 			{html_name(name): value for name, value in values.items()}
 		)
 
 	@classmethod
 	def from_html_names(cls, values: dict[str, Any]) -> Attributes:
 		attributes = cls()
-		attributes.values = normalize(values)
+		attributes.values = split_class_names(values)
 		return attributes
+
+	@classmethod
+	def is_global(cls, name: str) -> bool:
+		return name in GLOBAL_ATTRIBUTES or name.startswith("data-")
 
 	def names(self) -> set[str]:
 		return set(self.values)
@@ -46,15 +56,18 @@ def html_name(name: str) -> str:
 	return name.removesuffix("_").replace("_", "-")
 
 
-def normalize(values: dict[str, Any]) -> dict[str, Any]:
-	normalized = dict(values)
-	if "class" in normalized:
-		normalized["class"] = classes(normalized["class"])
-	return normalized
+def split_class_names(values: dict[str, Any]) -> dict[str, Any]:
+	split = dict(values)
+	if "class" in split:
+		split["class"] = class_names(split["class"])
+	return split
 
 
-def classes(value: str | list[Any] | None) -> list[str]:
+def class_names(value: str | list[Any] | None) -> list[str]:
 	if isinstance(value, str):
 		value = [value]
-	names = [name for entry in value or [] if entry for name in str(entry).split()]
+	names = []
+	for entry in value or []:
+		if entry:
+			names.extend(str(entry).split())
 	return list(dict.fromkeys(names))

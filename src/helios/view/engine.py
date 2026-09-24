@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from dataclasses import fields
 from typing import Any, TYPE_CHECKING, overload
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
@@ -45,7 +44,7 @@ class Engine:
 
 		constructors: dict[str, Any] = {}
 		for component in components or []:
-			check(component, constructors, self.helpers, templates)
+			check_registration(component, constructors, self.helpers, templates)
 			constructors[component.__name__] = Constructor(component)
 		self.jinja.globals.update(constructors)
 
@@ -71,8 +70,11 @@ class Engine:
 		try:
 			if isinstance(renderable, Component):
 				return str(renderable)
-			template = self.jinja.get_template(renderable)
-			return template.render(**(assigns or {}))
+			else:
+				if assigns is None:
+					assigns = {}
+				template = self.jinja.get_template(renderable)
+				return template.render(**assigns)
 		finally:
 			rendering.reset(token)
 
@@ -100,14 +102,14 @@ class Loader(BaseLoader):
 		return self.driver.names()
 
 
-def check(
+def check_registration(
 	component: type[Component],
 	registered: dict[str, Any],
 	helpers: Helpers,
 	templates: list[str],
 ):
 	name = component.__name__
-	field_names = [field.name for field in fields(component)]
+	field_names = component.field_names()
 	if name in registered:
 		raise ValueError(f"Two components are named {name}")
 	if name in helpers.globals:

@@ -6,18 +6,18 @@ from jinja2.parser import Parser
 
 
 class RenderExtension(Extension):
-	tags = {"render"}  # noqa: RUF012
-	serial = count()
+	tags = {"render"}
+	counter = count()
 
 	def parse(self, parser: Parser) -> nodes.Node:
 		lineno = next(parser.stream).lineno
 		call = parser.parse_expression()
 		if not isinstance(call, nodes.Call):
-			parser.fail("render expects a component call, such as Card()", lineno)
+			parser.fail("render expects a component call", lineno)
 		body = parser.parse_statements(("name:endrender",), drop_needle=True)
 		statements: list[nodes.Node] = []
 		if not blank(body):
-			variable = f"render_content_{next(self.serial)}"
+			variable = f"render_content_{next(self.counter)}"
 			statements.append(
 				nodes.AssignBlock(
 					nodes.Name(variable, "store"),

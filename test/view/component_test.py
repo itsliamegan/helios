@@ -17,7 +17,7 @@ class Chip(Component):
 @dataclass
 class Link(Component):
 	template = "link"
-	accepts = {"target", "rel"}  # noqa: RUF012
+	accepts = {"target", "rel"}
 
 	url: str
 	new_tab: bool = False
@@ -66,10 +66,7 @@ def test_rejects_rendering_outside_a_view():
 	with assert_raises(RuntimeError) as raised:
 		str(chip)
 
-	assert_eq(
-		str(raised.exception),
-		"Chip was rendered outside a view; use engine.render(component)",
-	)
+	assert_eq(str(raised.exception), "Chip was rendered outside a view")
 
 
 def test_rejects_missing_arguments_from_python():
@@ -333,7 +330,7 @@ def test_rejects_accepts_without_attributes_field():
 	@dataclass
 	class Button(Component):
 		template = "button"
-		accepts = {"type"}  # noqa: RUF012
+		accepts = {"type"}
 
 	driver = memory.Driver({"button": ""})
 
@@ -345,7 +342,7 @@ def test_rejects_accepts_that_name_a_field():
 	@dataclass
 	class Button(Component):
 		template = "button"
-		accepts = {"form-action"}  # noqa: RUF012
+		accepts = {"form-action"}
 
 		form_action: str
 		attributes: Attributes = Attributes()

@@ -11,8 +11,6 @@ if TYPE_CHECKING:
 
 rendering: ContextVar[Engine] = ContextVar("rendering")
 
-global_attributes = {"class", "id", "hidden"}
-
 
 class Component:
 	__dataclass_fields__: ClassVar[dict[str, Field[Any]]]
@@ -20,12 +18,21 @@ class Component:
 	template: ClassVar[str]
 	accepts: ClassVar[set[str]] = set()
 
+	@classmethod
+	def field_names(cls) -> list[str]:
+		return [field.name for field in fields(cls)]
+
+	@classmethod
+	def accepts_attribute(cls, name: str) -> bool:
+		return Attributes.is_global(name) or name in cls.accepts
+
 	def __post_init__(self):
-		if "attributes" not in field_names(type(self)):
+		if "attributes" not in self.field_names():
 			return
+
 		attributes: Attributes = vars(self)["attributes"]
 		for name in sorted(attributes.names()):
-			if not allowed(type(self), name):
+			if not self.accepts_attribute(name):
 				raise TypeError(
 					f'{type(self).__name__} does not accept the attribute "{name}"'
 				)
@@ -33,14 +40,12 @@ class Component:
 	def __html__(self) -> Markup:
 		engine = rendering.get(None)
 		if engine is None:
-			raise RuntimeError(
-				f"{type(self).__name__} was rendered outside a view; "
-				"use engine.render(component)"
-			)
-		template = engine.jinja.get_template(self.template)
-		values = {name: getattr(self, name) for name in field_names(type(self))}
+			raise RuntimeError(f"{type(self).__name__} was rendered outside a view")
+		values = {}
+		for name in self.field_names():
+			values[name] = getattr(self, name)
 		values["component"] = self
-		return Markup(template.render(values))
+		return Markup(engine.render(self.template, values))
 
 	def __str__(self) -> str:
 		return str(self.__html__())
@@ -49,35 +54,26 @@ class Component:
 class Constructor:
 	def __init__(self, component: type[Component]):
 		self.component = component
-		self.fields = field_names(component)
+		self.fields = component.field_names()
 
 	def __call__(self, *arguments: Any, **keywords: Any) -> Component:
 		if "attributes" not in self.fields:
 			return self.component(*arguments, **keywords)
-		inputs = {}
-		loose = {}
+
+		field_keywords = {}
+		attribute_keywords = {}
 		for name, value in keywords.items():
 			if name in self.fields:
-				inputs[name] = value
+				field_keywords[name] = value
 			else:
-				loose[html_name(name)] = value
-		if loose and "attributes" in inputs:
+				attribute_keywords[html_name(name)] = value
+		if attribute_keywords and "attributes" in field_keywords:
 			raise TypeError(
 				f"{self.component.__name__} takes either attributes= "
 				"or attribute keywords, not both"
 			)
-		if loose:
-			inputs["attributes"] = Attributes.from_html_names(loose)
-		return self.component(*arguments, **inputs)
-
-
-def allowed(component: type[Component], name: str) -> bool:
-	return (
-		name in global_attributes
-		or name.startswith("data-")
-		or name in component.accepts
-	)
-
-
-def field_names(component: type[Component]) -> list[str]:
-	return [field.name for field in fields(component)]
+		if attribute_keywords:
+			field_keywords["attributes"] = Attributes.from_html_names(
+				attribute_keywords
+			)
+		return self.component(*arguments, **field_keywords)
