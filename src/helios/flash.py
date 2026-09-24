@@ -10,24 +10,15 @@ from helios.view import Engine, View
 
 class Flashes:
 	def __init__(self, flashes: dict[str, Any] | None = None):
-		if flashes is None:
-			flashes = {}
-		self.flashes = {}
-		for name in flashes:
-			self.flashes[name] = Flash(name, flashes[name])
+		self.flashes = {name: Flash(name, val) for name, val in (flashes or {}).items()}
 
 	def dirty(self) -> dict[str, Any]:
-		dirty = {}
-		for name in self.flashes:
-			if self.flashes[name].is_dirty:
-				dirty[name] = self.flashes[name].val
-		return dirty
+		return {
+			name: flash.val for name, flash in self.flashes.items() if flash.is_dirty
+		}
 
 	def is_dirty(self) -> bool:
-		for name in self.flashes:
-			if self.flashes[name].is_dirty:
-				return True
-		return False
+		return any(flash.is_dirty for flash in self.flashes.values())
 
 	def __getitem__(self, name: str) -> Any:
 		return self.flashes[name].val
@@ -46,7 +37,7 @@ class Flashes:
 		return name in self.flashes
 
 	def __repr__(self) -> str:
-		return f"Flash({self.flashes!r})"
+		return f"Flashes({self.flashes!r})"
 
 
 class Flash:

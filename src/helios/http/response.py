@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .body import Body, Buffered, Stream
 from .cookie import Cookies
@@ -10,45 +10,37 @@ from .url import URL
 
 @dataclass
 class Response:
-	status: Status
-	headers: Headers
-	cookies: Cookies
-	body: Body
+	status: Status = Status.OK
+	headers: Headers = field(default_factory=Headers)
+	cookies: Cookies = field(default_factory=Cookies)
+	body: Body = field(default_factory=Buffered)
 
 	@classmethod
 	def empty(cls, status: Status = Status.NO_CONTENT) -> Response:
-		return cls(status, Headers(), Cookies(), Buffered())
+		return cls(status)
 
 	@classmethod
 	def text(cls, text: str, status: Status = Status.OK) -> Response:
-		return cls(
-			status, Headers({"Content-Type": "text/plain"}), Cookies(), Buffered(text)
-		)
+		return cls(status, Headers({"Content-Type": "text/plain"}), body=Buffered(text))
 
 	@classmethod
 	def html(cls, html: str, status: Status = Status.OK) -> Response:
-		return cls(
-			status, Headers({"Content-Type": "text/html"}), Cookies(), Buffered(html)
-		)
+		return cls(status, Headers({"Content-Type": "text/html"}), body=Buffered(html))
 
 	@classmethod
 	def file(cls, content: bytes, filename: str, content_type: str) -> Response:
-		return cls(
-			Status.OK,
-			Headers(
-				{
-					"Content-Type": content_type,
-					"Content-Disposition": f'attachment; filename="{filename}"',
-					"Content-Length": str(len(content)),
-				}
-			),
-			Cookies(),
-			Buffered(content),
+		headers = Headers(
+			{
+				"Content-Type": content_type,
+				"Content-Disposition": f'attachment; filename="{filename}"',
+				"Content-Length": str(len(content)),
+			}
 		)
+		return cls(Status.OK, headers, body=Buffered(content))
 
 	@classmethod
 	def redirect(cls, url: URL) -> Response:
-		return cls(Status.FOUND, Headers({"Location": str(url)}), Cookies(), Buffered())
+		return cls(Status.FOUND, Headers({"Location": str(url)}))
 
 	@classmethod
 	def stream(
@@ -57,6 +49,4 @@ class Response:
 		status: Status = Status.OK,
 		content_type: str = "text/event-stream",
 	) -> Response:
-		return cls(
-			status, Headers({"Content-Type": content_type}), Cookies(), Stream(chunks)
-		)
+		return cls(status, Headers({"Content-Type": content_type}), body=Stream(chunks))

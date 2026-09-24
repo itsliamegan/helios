@@ -24,26 +24,22 @@ class Provider(Provider):
 
 	def authenticator(self, context: Context) -> Authenticator:
 		session = context.get(Session)
-		store = context.get(Store)
-
-		if SESSION_KEY in session:
-			raw_id = session[SESSION_KEY]
-			if isinstance(raw_id, str):
-				try:
-					id = UUID(raw_id)
-				except ValueError:
-					id = None
-			else:
-				id = None
-			if id is not None:
-				try:
-					user = store.find_one(self.user_type, id)
-				except NotFoundError:
-					user = None
-			else:
-				user = None
-			if user is None:
-				del session[SESSION_KEY]
-		else:
-			user = None
+		user = self.user(session, context.get(Store))
+		if user is None and SESSION_KEY in session:
+			del session[SESSION_KEY]
 		return Authenticator(session, user)
+
+	def user(self, session: Session, store: Store) -> Model | None:
+		if SESSION_KEY not in session:
+			return None
+		raw_id = session[SESSION_KEY]
+		if not isinstance(raw_id, str):
+			return None
+		try:
+			id = UUID(raw_id)
+		except ValueError:
+			return None
+		try:
+			return store.find_one(self.user_type, id)
+		except NotFoundError:
+			return None
