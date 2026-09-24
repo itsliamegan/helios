@@ -1,6 +1,6 @@
+from annotationlib import Format, get_annotations
 from contextvars import ContextVar
-from dataclasses import Field, fields
-from typing import Any, ClassVar, TYPE_CHECKING
+from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform, get_origin
 
 from markupsafe import Markup
 
@@ -11,38 +11,82 @@ if TYPE_CHECKING:
 
 rendering: ContextVar[Engine] = ContextVar("rendering")
 
+MISSING: Any = object()
 
+
+@dataclass_transform(kw_only_default=True, eq_default=False)
 class Component:
-	__dataclass_fields__: ClassVar[dict[str, Field[Any]]]
-
 	template: ClassVar[str]
 	accepts: ClassVar[set[str]] = set()
+	props: ClassVar[dict[str, Any]] = {}
 
-	@classmethod
-	def field_names(cls) -> list[str]:
-		return [field.name for field in fields(cls)]
+	def __init_subclass__(cls, **keywords: Any):
+		super().__init_subclass__(**keywords)
+		props = {}
+		for name, annotation in get_annotations(cls, format=Format.FORWARDREF).items():
+			is_class_variable = (
+				annotation is ClassVar or get_origin(annotation) is ClassVar
+			)
+			if not is_class_variable:
+				props[name] = vars(cls).get(name, MISSING)
+		cls.props = cls.props | props
+		check_declaration(cls)
 
 	@classmethod
 	def accepts_attribute(cls, name: str) -> bool:
 		return Attributes.is_global(name) or name in cls.accepts
 
-	def __post_init__(self):
-		if "attributes" not in self.field_names():
-			return
+	def __init__(self, **keywords: Any):
+		component = type(self)
+		props = {}
+		attributes = {}
+		for name, value in keywords.items():
+			if name in component.props:
+				props[name] = value
+			else:
+				attributes[name] = value
 
-		attributes: Attributes = vars(self)["attributes"]
-		for name in sorted(attributes.names()):
-			if not self.accepts_attribute(name):
+		if attributes:
+			if "attributes" not in component.props:
 				raise TypeError(
-					f'{type(self).__name__} does not accept the attribute "{name}"'
+					f"{component.__name__} got unexpected keywords: "
+					f"{", ".join(attributes)}"
 				)
+			if "attributes" in props:
+				raise TypeError(
+					f"{component.__name__} takes either attributes= "
+					"or attribute keywords, not both"
+				)
+			props["attributes"] = Attributes.from_html_names(
+				{html_name(name): value for name, value in attributes.items()}
+			)
+
+		missing = [
+			name
+			for name, default in component.props.items()
+			if name not in props and default is MISSING
+		]
+		if missing:
+			raise TypeError(
+				f"{component.__name__} is missing props: {", ".join(missing)}"
+			)
+
+		for name, default in component.props.items():
+			setattr(self, name, props.get(name, default))
+
+		if "attributes" in component.props:
+			for name in sorted(vars(self)["attributes"].names()):
+				if not component.accepts_attribute(name):
+					raise TypeError(
+						f'{component.__name__} does not accept the attribute "{name}"'
+					)
 
 	def __html__(self) -> Markup:
 		engine = rendering.get(None)
 		if engine is None:
 			raise RuntimeError(f"{type(self).__name__} was rendered outside a view")
 		values = {}
-		for name in self.field_names():
+		for name in type(self).props:
 			values[name] = getattr(self, name)
 		values["component"] = self
 		return Markup(engine.render(self.template, values))
@@ -50,30 +94,32 @@ class Component:
 	def __str__(self) -> str:
 		return str(self.__html__())
 
+	def __repr__(self) -> str:
+		values = ", ".join(
+			f"{name}={getattr(self, name)!r}" for name in type(self).props
+		)
+		return f"{type(self).__name__}({values})"
 
-class Constructor:
-	def __init__(self, component: type[Component]):
-		self.component = component
-		self.fields = component.field_names()
 
-	def __call__(self, *arguments: Any, **keywords: Any) -> Component:
-		if "attributes" not in self.fields:
-			return self.component(*arguments, **keywords)
-
-		field_keywords = {}
-		attribute_keywords = {}
-		for name, value in keywords.items():
-			if name in self.fields:
-				field_keywords[name] = value
-			else:
-				attribute_keywords[html_name(name)] = value
-		if attribute_keywords and "attributes" in field_keywords:
-			raise TypeError(
-				f"{self.component.__name__} takes either attributes= "
-				"or attribute keywords, not both"
+def check_declaration(component: type[Component]):
+	name = component.__name__
+	for prop_name, default in component.props.items():
+		if prop_name == "component":
+			raise ValueError(f'Component {name} has a prop named "component"')
+		if prop_name in vars(Component) or prop_name in get_annotations(Component):
+			raise ValueError(
+				f'Component {name} has a prop named "{prop_name}", which Component uses'
 			)
-		if attribute_keywords:
-			field_keywords["attributes"] = Attributes.from_html_names(
-				attribute_keywords
+		if default is not MISSING and default.__hash__ is None:
+			raise ValueError(
+				f'Component {name} has a mutable default for "{prop_name}"'
 			)
-		return self.component(*arguments, **field_keywords)
+		if html_name(prop_name) in component.accepts:
+			raise ValueError(
+				f'Component {name} accepts "{html_name(prop_name)}", '
+				"which is also a prop"
+			)
+	if component.accepts and "attributes" not in component.props:
+		raise ValueError(
+			f"Component {name} declares accepts but has no attributes prop"
+		)

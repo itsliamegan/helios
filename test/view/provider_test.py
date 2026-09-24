@@ -49,12 +49,9 @@ def test_provider_registers_components():
 		views_dir = Path(dir)
 		views_dir.joinpath("boards").mkdir()
 		views_dir.joinpath("boards", "chip.py").write_text(
-			"from dataclasses import dataclass\n"
-			"\n"
 			"from helios.view import Component\n"
 			"\n"
 			"\n"
-			"@dataclass\n"
 			"class BoardChip(Component):\n"
 			'\ttemplate = "boards.chip"\n'
 			"\n"
@@ -64,7 +61,7 @@ def test_provider_registers_components():
 			'<span class="chip">{{ name }}</span>'
 		)
 		views_dir.joinpath("index.html").write_text(
-			"{% for name in names %}{{ BoardChip(name) }}{% endfor %}"
+			"{% for name in names %}{{ BoardChip(name=name) }}{% endfor %}"
 		)
 		spec = importlib.util.spec_from_file_location(
 			"chip",
