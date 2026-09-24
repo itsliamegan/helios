@@ -24,7 +24,7 @@ class Component:
 		super().__init_subclass__(**keywords)
 		props = dict(cls.props)
 		for name, annotation in get_annotations(cls, format=Format.FORWARDREF).items():
-			if not is_class_variable(annotation):
+			if annotation is not ClassVar and get_origin(annotation) is not ClassVar:
 				props[name] = vars(cls).get(name, MISSING)
 		cls.props = props
 		check_component(cls)
@@ -97,10 +97,6 @@ class Component:
 			f"{name}={getattr(self, name)!r}" for name in type(self).props
 		)
 		return f"{type(self).__name__}({values})"
-
-
-def is_class_variable(annotation: Any) -> bool:
-	return annotation is ClassVar or get_origin(annotation) is ClassVar
 
 
 def check_component(component: type[Component]):
