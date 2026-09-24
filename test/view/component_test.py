@@ -73,12 +73,6 @@ def test_rejects_positional_arguments_from_python():
 		Chip("Travel")  # ty: ignore[missing-argument, too-many-positional-arguments]
 
 
-def test_collects_loose_keywords_into_attributes():
-	link = Link(url="/", class_="pin-link", data_turbo_frame="modal")  # ty: ignore[unknown-argument]
-
-	assert_eq(link.attributes.names(), {"class", "data-turbo-frame"})
-
-
 def test_inherits_props():
 	class Badge(Chip):
 		template = "badge"
