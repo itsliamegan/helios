@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from jinja2 import TemplateNotFound, TemplateSyntaxError
+from jinja2 import TemplateNotFound, TemplateSyntaxError, UndefinedError
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
 
@@ -240,6 +240,35 @@ def test_escapes_assigns_in_loaded_templates():
 		views = Views(file.Driver(views_dir))
 
 		assert_eq(views.render("boards.index", {"title": "<b>"}), "&lt;b&gt;")
+
+
+def test_rejects_undefined_variables():
+	views = Views(memory.Driver({"index": "<h1>{{ titel }}</h1>"}))
+
+	with assert_raises(UndefinedError):
+		views.render("index", {"title": "Index"})
+
+
+def test_rejects_undefined_attributes():
+	views = Views(memory.Driver({"index": "<h1>{{ board.titel }}</h1>"}))
+
+	with assert_raises(UndefinedError):
+		views.render("index", {"board": {"title": "Index"}})
+
+
+def test_rejects_undefined_variables_in_conditions():
+	views = Views(memory.Driver({"index": "{% if error %}{{ error }}{% endif %}"}))
+
+	with assert_raises(UndefinedError):
+		views.render("index")
+
+
+def test_renders_none_variables_in_conditions():
+	views = Views(memory.Driver({"index": "{% if error %}{{ error }}{% endif %}"}))
+
+	html = views.render("index", {"error": None})
+
+	assert_eq(html, "")
 
 
 def test_formats_elapsed_seconds():

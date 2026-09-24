@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from jinja2 import BaseLoader, Environment, TemplateNotFound
+from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
 
 from .helpers import Helpers
 from .source import Driver
@@ -17,6 +17,7 @@ class Views:
 		self.jinja = Environment(
 			loader=Loader(driver),
 			autoescape=True,
+			undefined=StrictUndefined,
 			auto_reload=reload,
 			cache_size=-1,
 		)
