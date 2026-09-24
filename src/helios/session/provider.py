@@ -34,7 +34,7 @@ class Provider(ApplicationProvider):
 		store = context.get(Store)
 		if "session_id" in request.cookies:
 			try:
-				id = UUID(request.cookies["session_id"].val)
+				id = UUID(request.cookies["session_id"].value)
 			except ValueError:
 				id = None
 			if id is not None and id in store:

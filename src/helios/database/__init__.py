@@ -1,7 +1,7 @@
+from .attribute import attr as attr
 from .config import Config as Config
+from .error import ModelError as ModelError
 from .model import Model as Model
-from .model import ModelError as ModelError
-from .model import attr as attr
 from .provider import Provider as Provider
 from .query import Query as Query
 from .sqlite import DatabaseBusy as DatabaseBusy

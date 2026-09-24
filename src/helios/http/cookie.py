@@ -12,7 +12,7 @@ type SameSite = Literal["Lax", "Strict", "None"]
 @dataclass
 class Cookie:
 	name: str
-	val: str
+	value: str
 	path: str = "/"
 	expires: datetime | None = None
 	http_only: bool = False
@@ -27,7 +27,7 @@ class Cookie:
 	def __str__(self) -> str:
 		return dump_cookie(
 			self.name,
-			self.val,
+			self.value,
 			path=self.path,
 			expires=self.expires,
 			secure=self.secure,
@@ -53,8 +53,8 @@ class Cookies:
 		cookies = cls()
 		if "Cookie" not in headers:
 			return cookies
-		for name, val in parse_cookie(str(headers["Cookie"])).items():
-			cookies[name] = val
+		for name, value in parse_cookie(str(headers["Cookie"])).items():
+			cookies[name] = value
 		return cookies
 
 	def to_headers(self) -> Headers:
@@ -68,13 +68,13 @@ class Cookies:
 	def __getitem__(self, name: str) -> Cookie:
 		return self.cookies[name]
 
-	def __setitem__(self, name: str, val: str | Cookie):
-		if isinstance(val, Cookie):
-			self.cookies[name] = val
+	def __setitem__(self, name: str, value: str | Cookie):
+		if isinstance(value, Cookie):
+			self.cookies[name] = value
 		elif name in self.cookies:
-			self.cookies[name].val = val
+			self.cookies[name].value = value
 		else:
-			self.cookies[name] = Cookie(name, val)
+			self.cookies[name] = Cookie(name, value)
 
 	def __contains__(self, name: str) -> bool:
 		return name in self.cookies

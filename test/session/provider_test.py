@@ -12,7 +12,8 @@ import time_machine
 from helios.app import Application
 from helios.app import Config as AppConfig
 from helios.http import Headers, Method, Request, Response, Status, URL
-from helios.routing import NotFoundError, Pattern, Route, Router
+from helios.http.error import NotFoundError
+from helios.routing import Pattern, Route, Router
 import helios.session
 from helios.session.file import Driver
 from helios.session.store import Session
@@ -114,7 +115,7 @@ def test_stores_data_and_sets_cookie_policy():
 		stored = read_sessions(path)
 		cookie = response.cookies["session_id"]
 		assert_eq(stored[str(session.id)]["items"], {"message": "Hello"})
-		assert_eq(cookie.val, str(session.id))
+		assert_eq(cookie.value, str(session.id))
 		assert_that(cookie.http_only)
 		assert_that(cookie.secure)
 		assert_eq(cookie.same_site, "Lax")
@@ -137,7 +138,7 @@ def test_reuses_touches_and_rotates_known_session():
 		assert_that(str(old_id) not in stored)
 		assert_eq(stored[str(session.id)]["items"], {"message": "Hello"})
 		assert_eq(stored[str(session.id)]["last_active_at"], now.isoformat())
-		assert_eq(response.cookies["session_id"].val, str(session.id))
+		assert_eq(response.cookies["session_id"].value, str(session.id))
 
 
 def test_replaces_malformed_and_unknown_cookies():
@@ -186,7 +187,7 @@ def test_clear_and_invalidate_remove_persisted_session():
 			path, request(str(first_id)), lambda session: session.clear()
 		)
 		assert_eq(read_sessions(path), {})
-		assert_eq(response.cookies["session_id"].val, "")
+		assert_eq(response.cookies["session_id"].value, "")
 		assert_eq(
 			response.cookies["session_id"].expires, datetime(1970, 1, 1, tzinfo=UTC)
 		)
@@ -197,7 +198,7 @@ def test_clear_and_invalidate_remove_persisted_session():
 			path, request(str(second_id)), lambda session: session.invalidate()
 		)
 		assert_eq(read_sessions(path), {})
-		assert_eq(response.cookies["session_id"].val, "")
+		assert_eq(response.cookies["session_id"].value, "")
 
 
 def test_unexpected_exception_does_not_save_and_releases_lock():

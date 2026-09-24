@@ -283,7 +283,7 @@ def test_client_retains_response_cookies():
 		return res
 
 	def recall(req, ctx):
-		return Response.text(req.cookies["token"].val)
+		return Response.text(req.cookies["token"].value)
 
 	client = make_client(
 		[

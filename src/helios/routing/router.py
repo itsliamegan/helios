@@ -2,16 +2,12 @@ from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 from helios.http import Method, Request, Response, URL
-from helios.http.error import NotFoundError as BaseNotFoundError
+from helios.http.error import NotFoundError
 
 from .route import Group, Route
 
 if TYPE_CHECKING:
 	from helios.app import Context
-
-
-class NotFoundError(BaseNotFoundError):
-	pass
 
 
 class RouteNotFoundError(LookupError):

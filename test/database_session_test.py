@@ -85,7 +85,7 @@ def test_session_and_database_resources_persist_and_recover_together():
 			response = app.handle(request())
 		finally:
 			app.close()
-		session_id = response.cookies["session_id"].val
+		session_id = response.cookies["session_id"].value
 		assert_eq(user_names(database_path), ["Alice"])
 		assert_that(json.loads(session_path.read_text())[session_id]["items"])
 
