@@ -20,6 +20,23 @@ def test_reports_missing_and_scoped_dependencies():
 	assert "request context" in str(raised.exception)
 
 
+def test_reports_bound_dependencies():
+	container = Container()
+	container.instance(int, 1)
+	container.singleton(str, lambda container: "value")
+	container.scoped(float, lambda context: 1.0)
+
+	assert_eq(
+		[
+			container.bound(int),
+			container.bound(str),
+			container.bound(float),
+			container.bound(bytes),
+		],
+		[True, True, True, False],
+	)
+
+
 def test_rejects_none_and_retries_failed_singleton_factories():
 	container = Container()
 

@@ -14,6 +14,8 @@ from helios.database.sqlite import connect
 from helios.http import Method, Request, Response, URL
 from helios.routing import Pattern, Route, Router
 from helios.session.store import Session
+import helios.view
+from helios.view import Views
 
 
 class User(Model):
@@ -122,3 +124,55 @@ def test_removes_malformed_user_id():
 
 	assert_that(provided.user is None)
 	assert_that("_user_id" not in session)
+
+
+def render_current_user(store: Store, session: Session) -> str:
+	with TemporaryDirectory() as directory:
+		views_dir = Path(directory)
+		views_dir.joinpath("index.html").write_text(
+			"{% if current_user %}{{ current_user.name }}{% else %}Guest{% endif %}"
+		)
+
+		def index(request, context):
+			return context.get(Views).render("index")
+
+		app = Application(
+			Config(),
+			Router([Route(Method.GET, Pattern("/"), index)]),
+			[
+				Values(store, session),
+				helios.auth.Provider(User),
+				helios.view.Provider(helios.view.Config(views_dir)),
+			],
+		)
+		try:
+			response = app.handle(Request(Method.GET, URL("/")))
+		finally:
+			app.close()
+	return str(response.body)
+
+
+def test_shares_current_user_with_views():
+	with TemporaryDirectory() as directory:
+		connection, store = create_store(Path(directory, "app.sqlite"))
+		try:
+			user = store.create(User, name="Alice")
+			session = Session(uuid4())
+			session["_user_id"] = str(user.id)
+
+			html = render_current_user(store, session)
+		finally:
+			connection.close()
+
+	assert_eq(html, "Alice")
+
+
+def test_shares_missing_current_user_with_views():
+	with TemporaryDirectory() as directory:
+		connection, store = create_store(Path(directory, "app.sqlite"))
+		try:
+			html = render_current_user(store, Session(uuid4()))
+		finally:
+			connection.close()
+
+	assert_eq(html, "Guest")

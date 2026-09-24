@@ -24,4 +24,4 @@ class Provider(Provider):
 		return Engine(Driver(self.dir), self.helpers, self.reload)
 
 	def views(self, context: Context) -> Views:
-		return Views(context.get(Engine))
+		return Views(context.get(Engine), context)

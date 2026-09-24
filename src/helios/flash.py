@@ -5,6 +5,7 @@ from typing import Any
 from helios.app import Application, Container, Context, Next, Provider
 from helios.http import Request, Response
 from helios.session.store import Session
+from helios.view import Engine, View
 
 
 class Flashes:
@@ -31,6 +32,12 @@ class Flashes:
 	def __getitem__(self, name: str) -> Any:
 		return self.flashes[name].val
 
+	def get(self, name: str, default: Any = None) -> Any:
+		if name in self.flashes:
+			return self.flashes[name].val
+		else:
+			return default
+
 	def __setitem__(self, name: str, val: Any):
 		self.flashes[name] = Flash(name, val)
 		self.flashes[name].is_dirty = True
@@ -55,6 +62,8 @@ class Provider(Provider):
 
 	def boot(self, application: Application):
 		application.use(self.middleware)
+		if application.container.bound(Engine):
+			application.container.get(Engine).composer(self.compose)
 
 	def flashes(self, context: Context) -> Flashes:
 		session = context.get(Session)
@@ -63,6 +72,9 @@ class Provider(Provider):
 			del session["_flash"]
 			return flashes
 		return Flashes()
+
+	def compose(self, view: View, context: Context):
+		view.assign("flash", context.get(Flashes))
 
 	def middleware(self, request: Request, context: Context, next: Next) -> Response:
 		response = next(request, context)

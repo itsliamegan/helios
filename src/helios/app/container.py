@@ -53,6 +53,9 @@ class Container:
 		self.bindings[key] = binding
 		self.singletons.pop(key, None)
 
+	def bound(self, key: type[Any]) -> bool:
+		return key in self.bindings
+
 	def get[T](self, key: type[T]) -> T:
 		return self.resolve(key)
 

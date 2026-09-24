@@ -1,8 +1,9 @@
 from uuid import UUID
 
-from helios.app import Container, Context, Provider
+from helios.app import Application, Container, Context, Provider
 from helios.database import Model, NotFoundError, Store
 from helios.session.store import Session
+from helios.view import Engine, View
 
 from .state import Authenticator, SESSION_KEY
 
@@ -13,6 +14,13 @@ class Provider(Provider):
 
 	def register(self, container: Container):
 		container.scoped(Authenticator, self.authenticator)
+
+	def boot(self, application: Application):
+		if application.container.bound(Engine):
+			application.container.get(Engine).composer(self.compose)
+
+	def compose(self, view: View, context: Context):
+		view.assign("current_user", context.get(Authenticator).user)
 
 	def authenticator(self, context: Context) -> Authenticator:
 		session = context.get(Session)

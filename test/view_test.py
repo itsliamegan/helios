@@ -7,7 +7,8 @@ from jinja2 import TemplateNotFound, TemplateSyntaxError, UndefinedError
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
 
-from helios.http import Status, URL
+from helios.app import Container, Context
+from helios.http import Method, Request, Status, URL
 from helios.view import Engine, Helpers, Views, file, helpers, memory
 
 
@@ -272,7 +273,7 @@ def test_renders_none_variables_in_conditions():
 
 
 def test_views_render_html_responses():
-	views = Views(Engine(memory.Driver({"index": "<h1>{{ title }}</h1>"})))
+	views = Views(Engine(memory.Driver({"index": "<h1>{{ title }}</h1>"})), context())
 
 	response = views.render("index", {"title": "Index"})
 
@@ -282,12 +283,62 @@ def test_views_render_html_responses():
 
 
 def test_views_render_responses_with_status():
-	views = Views(Engine(memory.Driver({"missing": "<h1>Not found</h1>"})))
+	views = Views(Engine(memory.Driver({"missing": "<h1>Not found</h1>"})), context())
 
 	response = views.render("missing", status=Status.NOT_FOUND)
 
 	assert_eq(response.status, Status.NOT_FOUND)
 	assert_eq(str(response.body), "<h1>Not found</h1>")
+
+
+def test_views_render_composer_assigns():
+	engine = Engine(memory.Driver({"index": "<h1>{{ title }}</h1>"}))
+	engine.composer(lambda view, context: view.assign("title", "Composed"))
+	views = Views(engine, context())
+
+	response = views.render("index")
+
+	assert_eq(str(response.body), "<h1>Composed</h1>")
+
+
+def test_views_pass_context_and_view_to_composers():
+	engine = Engine(memory.Driver({"index": "{{ name }} {{ path }}"}))
+	engine.composer(lambda view, context: view.assign("name", view.name))
+	engine.composer(lambda view, context: view.assign("path", str(context.request.url)))
+	views = Views(engine, context())
+
+	response = views.render("index")
+
+	assert_eq(str(response.body), "index /")
+
+
+def test_views_run_composers_in_registration_order():
+	engine = Engine(memory.Driver({"index": "{{ title }}"}))
+	engine.composer(lambda view, context: view.assign("title", "First"))
+	engine.composer(lambda view, context: view.assign("title", "Second"))
+	views = Views(engine, context())
+
+	response = views.render("index")
+
+	assert_eq(str(response.body), "Second")
+
+
+def test_views_prefer_assigns_over_composers():
+	engine = Engine(memory.Driver({"index": "{{ title }}"}))
+	engine.composer(lambda view, context: view.assign("title", "Composed"))
+	views = Views(engine, context())
+
+	response = views.render("index", {"title": "Assigned"})
+
+	assert_eq(str(response.body), "Assigned")
+
+
+def test_engine_renders_without_composers():
+	engine = Engine(memory.Driver({"index": "{{ title }}"}))
+	engine.composer(lambda view, context: view.assign("title", "Composed"))
+
+	with assert_raises(UndefinedError):
+		engine.render("index")
 
 
 def test_formats_elapsed_seconds():
@@ -335,3 +386,7 @@ def test_formats_url_with_breaks():
 	url = URL("/posts/1354")
 
 	assert_eq(str(helpers.url(url)), "/<wbr>posts/<wbr>1354")
+
+
+def context() -> Context:
+	return Context(Container(), Request(Method.GET, URL("/")))
