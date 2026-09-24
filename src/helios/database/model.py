@@ -105,6 +105,17 @@ class Attribute[StoredT, ValueT = StoredT]:
 		except (TypeError, ValueError) as error:
 			raise ModelError(f"{model_type.__name__}.{self.name}: {error}") from error
 
+	def encode(self, value: object, model_type: type) -> types.Scalar | None:
+		self.check(value, model_type)
+		if value is None:
+			return None
+		return types.encode(self.type, value)
+
+	def decode(self, raw: types.Scalar | None, model_type: type) -> StoredT | None:
+		value = None if raw is None else self.type.decode(raw)
+		self.check(value, model_type)
+		return value
+
 	def __set__(self, instance: Model, value: ValueT):
 		if self.name is None:
 			raise AttributeError("attribute has not been assigned to a model")
@@ -222,6 +233,13 @@ class Model(metaclass=ModelMeta):
 		model._changes = Changes()
 		model._status = Status.PERSISTED
 		return model
+
+	@classmethod
+	def attribute(cls, name: str) -> Attribute[Any, Any]:
+		try:
+			return cls.attrs[name]
+		except KeyError:
+			raise ModelError(f"{cls.__name__} has no attribute {name!r}") from None
 
 	@classmethod
 	def initialize(cls, raw_attrs: dict[str, Any]) -> dict[str, Any]:
