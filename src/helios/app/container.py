@@ -57,9 +57,6 @@ class Container:
 		return key in self.bindings
 
 	def get[T](self, key: type[T]) -> T:
-		return self.resolve(key)
-
-	def resolve[T](self, key: type[T]) -> T:
 		binding = self.bindings.get(key)
 		if binding is None:
 			raise DependencyError(f"nothing provides {key.__qualname__}")
