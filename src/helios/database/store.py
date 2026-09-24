@@ -6,8 +6,8 @@ from uuid import UUID
 from helios.http.error import NotFoundError as BaseNotFoundError
 
 from . import types
-from .model import Attribute, Model, ModelError, Status
-from .query import Filter, Membership, Predicate, Query
+from .model import Model, ModelError, Status
+from .query import Filter, Membership, Query
 from .sqlite import Connection, DatabaseError, quote_identifier
 
 
@@ -70,7 +70,9 @@ class Store:
 		names = tuple(model_type.attrs)
 		columns = ", ".join(quote_identifier(name) for name in names)
 		placeholders = ", ".join("?" for _ in names)
-		parameters = [self.encode(model_type, name, values[name]) for name in names]
+		parameters = [
+			model_type.attrs[name].encode(values[name], model_type) for name in names
+		]
 		sql = (
 			f"INSERT INTO {quote_identifier(model_type.table)} ({columns}) "
 			f"VALUES ({placeholders})"
@@ -87,10 +89,12 @@ class Store:
 		names = tuple(name for name in model_type.attrs if name in changes)
 		if not names:
 			return
-		values = {name: model.values[name] for name in names}
 		assignments = ", ".join(f"{quote_identifier(name)} = ?" for name in names)
-		parameters = [self.encode(model_type, name, values[name]) for name in names]
-		parameters.append(types.encode(model_type.attrs["id"].type, model.id))
+		parameters = [
+			model_type.attrs[name].encode(model.values[name], model_type)
+			for name in names
+		]
+		parameters.append(model_type.attrs["id"].encode(model.id, model_type))
 		sql = (
 			f"UPDATE {quote_identifier(model_type.table)} SET {assignments} "
 			f"WHERE {quote_identifier("id")} = ?"
@@ -100,7 +104,7 @@ class Store:
 
 	def delete(self, model: Model):
 		model_type = self.registry.get(type(model))
-		identifier = types.encode(model_type.attrs["id"].type, model.id)
+		identifier = model_type.attrs["id"].encode(model.id, model_type)
 		sql = (
 			f"DELETE FROM {quote_identifier(model_type.table)} "
 			f"WHERE {quote_identifier("id")} = ?"
@@ -127,17 +131,12 @@ class Store:
 		self.registry.get(model_type)
 		return Query(self, model_type)
 
-	def execute_query[T: Model](
-		self,
-		model_type: type[T],
-		predicates: tuple[Predicate, ...],
-		ordering: tuple[str, str] | None,
-		count: int | None,
-	) -> list[T]:
+	def execute_query[T: Model](self, query: Query[T]) -> list[T]:
+		model_type = query.model_type
 		columns = ", ".join(quote_identifier(name) for name in model_type.attrs)
 		clauses: list[str] = []
 		parameters: list[Any] = []
-		for predicate in predicates:
+		for predicate in query.predicates:
 			match predicate:
 				case Filter(name=name, value=None):
 					clauses.append(f"{quote_identifier(name)} IS NULL")
@@ -153,13 +152,13 @@ class Store:
 					parameters.extend(values)
 		where = f" WHERE {" AND ".join(clauses)}" if clauses else ""
 		order = ""
-		if ordering is not None:
-			name, direction = ordering
+		if query.ordering is not None:
+			name, direction = query.ordering
 			order = f" ORDER BY {quote_identifier(name)} {direction.upper()}"
 		limit = ""
-		if count is not None:
+		if query.count is not None:
 			limit = " LIMIT ?"
-			parameters.append(count)
+			parameters.append(query.count)
 		sql = (
 			f"SELECT {columns} FROM {quote_identifier(model_type.table)}"
 			f"{where}{order}{limit}"
@@ -207,13 +206,7 @@ class Store:
 		values: dict[str, Any] = {}
 		try:
 			for name, raw_value in zip(column_names, row, strict=True):
-				attribute = model_type.attrs[name]
-				if raw_value is None:
-					value = None
-				else:
-					value = attribute.type.decode(raw_value)
-				attribute.check(value, model_type)
-				values[name] = value
+				values[name] = model_type.attrs[name].decode(raw_value, model_type)
 		except (TypeError, ValueError, ModelError) as error:
 			raise DatabaseError(
 				"database row contains an invalid model value"
@@ -226,21 +219,3 @@ class Store:
 		model = cast(T, model_type.hydrate(values))
 		self.identity[(model_type, identifier)] = model
 		return model
-
-	def attribute[T: Model](
-		self, model_type: type[T], name: str
-	) -> Attribute[Any, Any]:
-		try:
-			return model_type.attrs[name]
-		except KeyError:
-			raise ModelError(
-				f"{model_type.__name__} has no attribute {name!r}"
-			) from None
-
-	def encode[T: Model](self, model_type: type[T], name: str, value: Any):
-		attribute = model_type.attrs[name]
-		if value is None:
-			attribute.check(value, model_type)
-			return None
-		attribute.check(value, model_type)
-		return types.encode(attribute.type, value)
