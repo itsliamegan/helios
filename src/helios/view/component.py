@@ -24,10 +24,10 @@ class Component:
 		super().__init_subclass__(**keywords)
 		props = {}
 		for name, annotation in get_annotations(cls, format=Format.FORWARDREF).items():
-			class_variable = (
+			is_class_variable = (
 				annotation is ClassVar or get_origin(annotation) is ClassVar
 			)
-			if not class_variable:
+			if not is_class_variable:
 				props[name] = vars(cls).get(name, MISSING)
 		cls.props = cls.props | props
 		check_declaration(cls)
