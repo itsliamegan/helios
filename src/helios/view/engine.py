@@ -8,6 +8,7 @@ from helios.app import Context
 
 from .attributes import html_name
 from .component import Component, Constructor, rendering
+from .extension import RenderExtension
 from .helpers import Helpers
 from .source import Driver
 
@@ -25,6 +26,7 @@ class Engine:
 	):
 		self.jinja = Environment(
 			loader=Loader(driver),
+			extensions=[RenderExtension],
 			autoescape=True,
 			undefined=StrictUndefined,
 			auto_reload=reload,
