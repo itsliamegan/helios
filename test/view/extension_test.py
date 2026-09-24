@@ -4,8 +4,7 @@ from jinja2 import TemplateSyntaxError
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
 
-from helios.view import Engine, memory
-from helios.view.component import Component
+from helios.view import Component, Engine, memory
 
 
 @dataclass

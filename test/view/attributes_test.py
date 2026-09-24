@@ -1,7 +1,7 @@
 from luna.test.assertion import assert_eq
 from markupsafe import Markup
 
-from helios.view.attributes import Attributes
+from helios.view import Attributes
 
 
 def test_converts_python_names_to_html_names():

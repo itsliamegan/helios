@@ -1,6 +1,7 @@
 from helios.app import Application, Container, Context, Provider
 from helios.routing import URLs
 
+from .component import Component
 from .config import Config
 from .engine import Engine
 from .file import Driver
@@ -9,10 +10,16 @@ from .views import Views
 
 
 class Provider(Provider):
-	def __init__(self, config: Config, helpers: Helpers | None = None):
+	def __init__(
+		self,
+		config: Config,
+		helpers: Helpers | None = None,
+		components: list[type[Component]] | None = None,
+	):
 		self.dir = config.dir
 		self.reload = config.reload
 		self.helpers = helpers
+		self.components = components
 
 	def register(self, container: Container):
 		container.singleton(Engine, self.engine)
@@ -26,7 +33,7 @@ class Provider(Provider):
 		if container.bound(URLs):
 			helpers.globals["urls"] = container.get(URLs)
 		helpers.update(self.helpers or Helpers())
-		return Engine(Driver(self.dir), helpers, self.reload)
+		return Engine(Driver(self.dir), helpers, self.reload, self.components)
 
 	def views(self, context: Context) -> Views:
 		return Views(context.get(Engine), context)
