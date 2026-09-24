@@ -9,6 +9,8 @@ from .config import Config
 from .file import Driver
 from .store import Session, Store
 
+EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
 
 class Provider(ApplicationProvider):
 	def __init__(self, config: Config, driver: Driver):
@@ -51,26 +53,20 @@ class Provider(ApplicationProvider):
 		store = context.get(Store)
 
 		if session.invalidated:
-			self.expire_cookie(response)
+			response.cookies["session_id"] = self.cookie("", EPOCH)
 		elif session.items:
 			if session.store is None:
 				session.touch()
 				store.put(session)
-			self.set_cookie(response, session)
+			expires = datetime.now(UTC) + self.config.maximum_age
+			response.cookies["session_id"] = self.cookie(str(session.id), expires)
 		elif session.store is not None:
 			store.remove(session.id)
-			self.expire_cookie(response)
+			response.cookies["session_id"] = self.cookie("", EPOCH)
 
 		if store.is_dirty():
 			self.driver.save(store)
 		return response
-
-	def set_cookie(self, response: Response, session: Session):
-		expires = datetime.now(UTC) + self.config.maximum_age
-		response.cookies.add(self.cookie(str(session.id), expires))
-
-	def expire_cookie(self, response: Response):
-		response.cookies.add(self.cookie("", datetime(1970, 1, 1, tzinfo=UTC)))
 
 	def cookie(self, value: str, expires: datetime) -> Cookie:
 		return Cookie(

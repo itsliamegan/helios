@@ -38,7 +38,7 @@ class Router:
 	def path(self, name: str, params: dict[str, Any] | None = None) -> str:
 		if name not in self.named:
 			raise RouteNotFoundError(f"route not found: {name}")
-		return self.named[name].pattern.generate(params)
+		return self.named[name].pattern.path(params)
 
 	def match(self, method: Method, url: URL) -> Match | None:
 		for route in self.routes:

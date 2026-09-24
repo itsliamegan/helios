@@ -11,6 +11,7 @@ from .file import Files as Files
 from .header import Headers as Headers
 from .input import Input as Input
 from .method import Method as Method
+from .method import UnsupportedMethodError as UnsupportedMethodError
 from .request import Request as Request
 from .response import Response as Response
 from .status import Status as Status
@@ -32,6 +33,7 @@ __all__ = [
 	"SameSite",
 	"Status",
 	"Stream",
+	"UnsupportedMethodError",
 	"body",
 	"error",
 ]

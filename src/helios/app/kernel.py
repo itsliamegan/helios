@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from contextlib import suppress
 import sys
 import traceback
 
@@ -80,8 +79,7 @@ class Kernel:
 		if "_method" in request.input:
 			raw_method = request.input["_method"]
 			del request.input["_method"]
-			with suppress(ValueError):
-				request.method = Method(raw_method)
+			request.method = Method.parse(raw_method)
 		return next(request, context)
 
 	@staticmethod

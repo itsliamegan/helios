@@ -131,7 +131,7 @@ class Store:
 		self.registry.get(model_type)
 		return Query(self, model_type)
 
-	def execute_query[T: Model](self, query: Query[T]) -> list[T]:
+	def execute[T: Model](self, query: Query[T]) -> list[T]:
 		model_type = query.model_type
 		columns = ", ".join(quote_identifier(name) for name in model_type.attrs)
 		clauses: list[str] = []

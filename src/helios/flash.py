@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from helios.app import Application, Container, Context, Next, Provider
@@ -8,17 +9,28 @@ from helios.session.store import Session
 from helios.view import Engine, View
 
 
+@dataclass(init=False)
 class Flashes:
+	flashes: dict[str, Flash]
+
 	def __init__(self, flashes: dict[str, Any] | None = None):
-		self.flashes = {name: Flash(name, val) for name, val in (flashes or {}).items()}
+		flashes = flashes or {}
+		self.flashes = {}
+		for name in flashes:
+			self.flashes[name] = Flash(name, flashes[name])
 
 	def dirty(self) -> dict[str, Any]:
-		return {
-			name: flash.val for name, flash in self.flashes.items() if flash.is_dirty
-		}
+		dirty = {}
+		for name in self.flashes:
+			if self.flashes[name].is_dirty:
+				dirty[name] = self.flashes[name].val
+		return dirty
 
 	def is_dirty(self) -> bool:
-		return any(flash.is_dirty for flash in self.flashes.values())
+		for name in self.flashes:
+			if self.flashes[name].is_dirty:
+				return True
+		return False
 
 	def __getitem__(self, name: str) -> Any:
 		return self.flashes[name].val
@@ -30,21 +42,17 @@ class Flashes:
 			return default
 
 	def __setitem__(self, name: str, val: Any):
-		self.flashes[name] = Flash(name, val)
-		self.flashes[name].is_dirty = True
+		self.flashes[name] = Flash(name, val, is_dirty=True)
 
 	def __contains__(self, name: str) -> bool:
 		return name in self.flashes
 
-	def __repr__(self) -> str:
-		return f"Flashes({self.flashes!r})"
 
-
+@dataclass
 class Flash:
-	def __init__(self, name: str, val: Any):
-		self.name = name
-		self.val = val
-		self.is_dirty = False
+	name: str
+	val: Any
+	is_dirty: bool = False
 
 
 class Provider(Provider):

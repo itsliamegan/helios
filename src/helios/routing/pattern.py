@@ -40,7 +40,7 @@ class Pattern:
 			return None
 		return self.convert(match.groupdict())
 
-	def generate(self, params: dict[str, Any] | None = None) -> str:
+	def path(self, params: dict[str, Any] | None = None) -> str:
 		params = params or {}
 		expected = set(self.converters)
 		supplied = set(params)
