@@ -18,15 +18,15 @@ MISSING: Any = object()
 class Component:
 	template: ClassVar[str]
 	accepts: ClassVar[set[str]] = set()
-	fields: ClassVar[dict[str, Any]] = {}
+	props: ClassVar[dict[str, Any]] = {}
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
-		fields = dict(cls.fields)
+		props = dict(cls.props)
 		for name, annotation in get_annotations(cls, format=Format.FORWARDREF).items():
 			if not is_class_variable(annotation):
-				fields[name] = vars(cls).get(name, MISSING)
-		cls.fields = fields
+				props[name] = vars(cls).get(name, MISSING)
+		cls.props = props
 		check_component(cls)
 
 	@classmethod
@@ -38,13 +38,13 @@ class Component:
 		values = {}
 		loose = {}
 		for name, value in keywords.items():
-			if name in component.fields:
+			if name in component.props:
 				values[name] = value
 			else:
 				loose[name] = value
 
 		if loose:
-			if "attributes" not in component.fields:
+			if "attributes" not in component.props:
 				raise TypeError(
 					f"{component.__name__} got unexpected keywords: {", ".join(loose)}"
 				)
@@ -59,18 +59,18 @@ class Component:
 
 		missing = [
 			name
-			for name, default in component.fields.items()
+			for name, default in component.props.items()
 			if name not in values and default is MISSING
 		]
 		if missing:
 			raise TypeError(
-				f"{component.__name__} is missing fields: {", ".join(missing)}"
+				f"{component.__name__} is missing props: {", ".join(missing)}"
 			)
 
-		for name, default in component.fields.items():
+		for name, default in component.props.items():
 			setattr(self, name, values.get(name, default))
 
-		if "attributes" in component.fields:
+		if "attributes" in component.props:
 			attributes: Attributes = vars(self)["attributes"]
 			for name in sorted(attributes.names()):
 				if not component.accepts_attribute(name):
@@ -83,7 +83,7 @@ class Component:
 		if engine is None:
 			raise RuntimeError(f"{type(self).__name__} was rendered outside a view")
 		values = {}
-		for name in type(self).fields:
+		for name in type(self).props:
 			values[name] = getattr(self, name)
 		values["component"] = self
 		return Markup(engine.render(self.template, values))
@@ -93,7 +93,7 @@ class Component:
 
 	def __repr__(self) -> str:
 		values = ", ".join(
-			f"{name}={getattr(self, name)!r}" for name in type(self).fields
+			f"{name}={getattr(self, name)!r}" for name in type(self).props
 		)
 		return f"{type(self).__name__}({values})"
 
@@ -104,24 +104,23 @@ def is_class_variable(annotation: Any) -> bool:
 
 def check_component(component: type[Component]):
 	name = component.__name__
-	for field_name, default in component.fields.items():
-		if field_name == "component":
-			raise ValueError(f'Component {name} has a field named "component"')
-		if field_name in vars(Component) or field_name in get_annotations(Component):
+	for prop_name, default in component.props.items():
+		if prop_name == "component":
+			raise ValueError(f'Component {name} has a prop named "component"')
+		if prop_name in vars(Component) or prop_name in get_annotations(Component):
 			raise ValueError(
-				f'Component {name} has a field named "{field_name}", '
-				"which Component uses"
+				f'Component {name} has a prop named "{prop_name}", which Component uses'
 			)
 		if default is not MISSING and default.__hash__ is None:
 			raise ValueError(
-				f'Component {name} has a mutable default for "{field_name}"'
+				f'Component {name} has a mutable default for "{prop_name}"'
 			)
-		if html_name(field_name) in component.accepts:
+		if html_name(prop_name) in component.accepts:
 			raise ValueError(
-				f'Component {name} accepts "{html_name(field_name)}", '
-				"which is also a field"
+				f'Component {name} accepts "{html_name(prop_name)}", '
+				"which is also a prop"
 			)
-	if component.accepts and "attributes" not in component.fields:
+	if component.accepts and "attributes" not in component.props:
 		raise ValueError(
-			f"Component {name} declares accepts but has no attributes field"
+			f"Component {name} declares accepts but has no attributes prop"
 		)

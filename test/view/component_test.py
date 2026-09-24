@@ -46,7 +46,7 @@ link_template = (
 )
 
 
-def test_represents_fields():
+def test_represents_props():
 	chip = Chip(name="Travel")
 
 	text = repr(chip)
@@ -79,7 +79,7 @@ def test_collects_loose_keywords_into_attributes():
 	assert_eq(link.attributes.names(), {"class", "data-turbo-frame"})
 
 
-def test_inherits_fields():
+def test_inherits_props():
 	class Badge(Chip):
 		template = "badge"
 
@@ -112,7 +112,7 @@ def test_rejects_unknown_attributes_from_python():
 	assert_eq(str(raised.exception), 'Link does not accept the attribute "tabindex"')
 
 
-def test_renders_fields():
+def test_renders_props():
 	engine = Engine(
 		memory.Driver(
 			{
@@ -246,7 +246,7 @@ def test_rejects_positional_arguments_from_templates():
 		engine.render("index")
 
 
-def test_rejects_unknown_keywords_without_attributes_field():
+def test_rejects_unknown_keywords_without_attributes_prop():
 	engine = Engine(
 		memory.Driver(
 			{"index": '{{ Chip(name="a", class="b") }}', "chip": "{{ name }}"}
@@ -350,7 +350,7 @@ def test_rejects_components_with_missing_templates():
 		Engine(driver, components=[Chip])
 
 
-def test_rejects_accepts_without_attributes_field():
+def test_rejects_accepts_without_attributes_prop():
 	with assert_raises(ValueError):
 
 		class Button(Component):
@@ -358,7 +358,7 @@ def test_rejects_accepts_without_attributes_field():
 			accepts = {"type"}
 
 
-def test_rejects_accepts_that_name_a_field():
+def test_rejects_accepts_that_name_a_prop():
 	with assert_raises(ValueError):
 
 		class Button(Component):
@@ -369,7 +369,7 @@ def test_rejects_accepts_that_name_a_field():
 			attributes: Attributes = Attributes()
 
 
-def test_rejects_fields_named_component():
+def test_rejects_props_named_component():
 	with assert_raises(ValueError):
 
 		class Wrapper(Component):
@@ -378,7 +378,7 @@ def test_rejects_fields_named_component():
 			component: str
 
 
-def test_rejects_fields_named_like_component_members():
+def test_rejects_props_named_like_component_members():
 	with assert_raises(ValueError):
 
 		class Wrapper(Component):
