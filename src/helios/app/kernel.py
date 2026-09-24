@@ -1,8 +1,9 @@
 from collections.abc import Callable
+from contextlib import suppress
 import sys
 import traceback
 
-from helios.http import Method, Request, Response, Status, Stream
+from helios.http import Buffered, Method, Request, Response, Status
 from helios.http.error import HTTPError
 from helios.routing import Router
 
@@ -63,12 +64,12 @@ class Kernel:
 		next: Next,
 	) -> Response:
 		response = next(request, context)
-		if isinstance(response.body, Stream):
-			return response
-		else:
-			if "Content-Length" not in response.headers:
-				response.headers["Content-Length"] = str(len(response.body.to_bytes()))
-			return response
+		if (
+			isinstance(response.body, Buffered)
+			and "Content-Length" not in response.headers
+		):
+			response.headers["Content-Length"] = str(len(response.body.to_bytes()))
+		return response
 
 	@staticmethod
 	def adapt_artificial_method(
@@ -79,16 +80,8 @@ class Kernel:
 		if "_method" in request.input:
 			raw_method = request.input["_method"]
 			del request.input["_method"]
-			if raw_method == "GET":
-				request.method = Method.GET
-			elif raw_method == "POST":
-				request.method = Method.POST
-			elif raw_method == "PUT":
-				request.method = Method.PUT
-			elif raw_method == "PATCH":
-				request.method = Method.PATCH
-			elif raw_method == "DELETE":
-				request.method = Method.DELETE
+			with suppress(ValueError):
+				request.method = Method(raw_method)
 		return next(request, context)
 
 	@staticmethod

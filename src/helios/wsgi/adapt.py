@@ -51,19 +51,7 @@ class RequestAdapter:
 		)
 
 	def method(self) -> Method:
-		raw = self.environment["REQUEST_METHOD"]
-		if raw == "GET":
-			return Method.GET
-		elif raw == "POST":
-			return Method.POST
-		elif raw == "PUT":
-			return Method.PUT
-		elif raw == "PATCH":
-			return Method.PATCH
-		elif raw == "DELETE":
-			return Method.DELETE
-		else:
-			raise RuntimeError(f"Unsupported HTTP method '{raw}'")
+		return Method(self.environment["REQUEST_METHOD"])
 
 	def url(self) -> URL:
 		raw = get_current_url(self.environment)
