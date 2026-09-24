@@ -25,6 +25,13 @@ ignore = [
 	"BLE001",
 ]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+	"helios.view.Attributes",
+	"helios.view.attributes.Attributes",
+	"markupsafe.Markup",
+]
+
 [tool.ruff.lint.isort]
 case-sensitive = true
 known-first-party = ["helios"]
