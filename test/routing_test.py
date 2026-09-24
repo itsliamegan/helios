@@ -5,6 +5,7 @@ from luna.test.assertion import assert_eq, assert_raises, assert_that
 from helios.http import Method, Request, Response, Status, URL
 from helios.routing import (
 	Group,
+	Match,
 	Pattern,
 	Route,
 	RouteNotFoundError,
@@ -28,9 +29,9 @@ def test_routes_to_root():
 	route = Route(Method.GET, Pattern("/"), handler)
 	router = Router([route])
 
-	match = router.match(Request(Method.GET, URL("/")))
+	match = router.match(Method.GET, URL("/"))
 
-	assert_eq(match, (route, {}))
+	assert_eq(match, Match(route, {}))
 
 
 def test_routes_by_path():
@@ -38,11 +39,11 @@ def test_routes_by_path():
 	comments = Route(Method.GET, Pattern("/comments/"), object())
 	router = Router([articles, comments])
 
-	articles_match = router.match(Request(Method.GET, URL("/articles/")))
-	comments_match = router.match(Request(Method.GET, URL("/comments/")))
+	articles_match = router.match(Method.GET, URL("/articles/"))
+	comments_match = router.match(Method.GET, URL("/comments/"))
 
-	assert_eq(articles_match, (articles, {}))
-	assert_eq(comments_match, (comments, {}))
+	assert_eq(articles_match, Match(articles, {}))
+	assert_eq(comments_match, Match(comments, {}))
 
 
 def test_routes_by_method():
@@ -50,29 +51,29 @@ def test_routes_by_method():
 	store = Route(Method.POST, Pattern("/articles/"), object())
 	router = Router([index, store])
 
-	index_match = router.match(Request(Method.GET, URL("/articles/")))
-	store_match = router.match(Request(Method.POST, URL("/articles/")))
+	index_match = router.match(Method.GET, URL("/articles/"))
+	store_match = router.match(Method.POST, URL("/articles/"))
 
-	assert_eq(index_match, (index, {}))
-	assert_eq(store_match, (store, {}))
+	assert_eq(index_match, Match(index, {}))
+	assert_eq(store_match, Match(store, {}))
 
 
 def test_routes_with_params():
 	route = Route(Method.GET, Pattern("/articles/{slug}"), object())
 	router = Router([route])
 
-	match = router.match(Request(Method.GET, URL("/articles/intro")))
+	match = router.match(Method.GET, URL("/articles/intro"))
 
-	assert_eq(match, (route, {"slug": "intro"}))
+	assert_eq(match, Match(route, {"slug": "intro"}))
 
 
 def test_routes_with_explicit_str_converter():
 	route = Route(Method.GET, Pattern("/articles/{slug:str}"), object())
 	router = Router([route])
 
-	match = router.match(Request(Method.GET, URL("/articles/intro")))
+	match = router.match(Method.GET, URL("/articles/intro"))
 
-	assert_eq(match, (route, {"slug": "intro"}))
+	assert_eq(match, Match(route, {"slug": "intro"}))
 
 
 def test_routes_with_uuid_converter():
@@ -80,9 +81,9 @@ def test_routes_with_uuid_converter():
 	route = Route(Method.GET, Pattern("/articles/{id:uuid}"), object())
 	router = Router([route])
 
-	match = router.match(Request(Method.GET, URL(f"/articles/{id}")))
+	match = router.match(Method.GET, URL(f"/articles/{id}"))
 
-	assert_eq(match, (route, {"id": id}))
+	assert_eq(match, Match(route, {"id": id}))
 
 
 def test_passes_converted_params_to_handler_by_name():
@@ -113,18 +114,18 @@ def test_routes_instead_of_param():
 	show = Route(Method.GET, Pattern("/articles/{slug}"), object())
 	router = Router([new, show])
 
-	match = router.match(Request(Method.GET, URL("/articles/new")))
+	match = router.match(Method.GET, URL("/articles/new"))
 
-	assert_eq(match, (new, {}))
+	assert_eq(match, Match(new, {}))
 
 
 def test_routes_with_param_to_subroute():
 	route = Route(Method.POST, Pattern("/articles/{slug}/read"), object())
 	router = Router([route])
 
-	match = router.match(Request(Method.POST, URL("/articles/intro/read")))
+	match = router.match(Method.POST, URL("/articles/intro/read"))
 
-	assert_eq(match, (route, {"slug": "intro"}))
+	assert_eq(match, Match(route, {"slug": "intro"}))
 
 
 def test_runs_route_guards_in_order_before_handler():
@@ -192,7 +193,7 @@ def test_doesnt_run_guards_for_unmatched_routes():
 		calls.append("guard")
 
 	router = Router([Route(Method.GET, Pattern("/articles"), object(), guards=[guard])])
-	match = router.match(Request(Method.GET, URL("/missing")))
+	match = router.match(Method.GET, URL("/missing"))
 
 	assert_that(match is None)
 	assert_eq(calls, [])
@@ -388,8 +389,8 @@ def test_group_flattening_preserves_declaration_and_matching_order():
 	)
 
 	assert_eq([route.handler for route in router.routes], [first, second, third])
-	match = router.match(Request(Method.GET, URL("/new")))
-	assert_that(match[0].handler is first)
+	match = router.match(Method.GET, URL("/new"))
+	assert_that(match is not None and match.route.handler is first)
 
 
 def test_generates_named_grouped_route():
@@ -521,6 +522,76 @@ def test_generates_relative_route_by_default():
 	url = urls.route("boards.index")
 
 	assert_eq(str(url), "/boards/")
+
+
+def matchable_urls():
+	show = Route(
+		Method.GET,
+		Pattern("/boards/{id:uuid}"),
+		lambda req, ctx, id: Response.empty(),
+		name="boards.show",
+	)
+	update = Route(
+		Method.POST,
+		Pattern("/boards/{id:uuid}/title"),
+		lambda req, ctx, id: Response.empty(),
+		name="boards.update",
+	)
+	return URLs(Router([show, update]), URL("https://cork.example"))
+
+
+def test_matches_url_string_to_named_route():
+	urls = matchable_urls()
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+
+	match = urls.match(f"/boards/{id}?sort=recent")
+
+	assert_that(match is not None)
+	assert_eq(match.route.name, "boards.show")
+	assert_eq(match.params, {"id": id})
+
+
+def test_matches_url_object_to_named_route():
+	urls = matchable_urls()
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+
+	match = urls.match(URL(f"/boards/{id}"))
+
+	assert_that(match is not None)
+	assert_eq(match.route.name, "boards.show")
+	assert_eq(match.params, {"id": id})
+
+
+def test_matches_only_the_path_of_absolute_urls():
+	urls = matchable_urls()
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+
+	match = urls.match(f"https://elsewhere.example/boards/{id}")
+
+	assert_that(match is not None)
+	assert_eq(match.route.name, "boards.show")
+	assert_eq(match.params, {"id": id})
+
+
+def test_matches_only_get_routes():
+	urls = matchable_urls()
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+
+	match = urls.match(f"/boards/{id}/title")
+
+	assert_that(match is None)
+
+
+def test_doesnt_match_missing_or_unknown_urls():
+	urls = matchable_urls()
+
+	missing = urls.match(None)
+	unknown = urls.match("/boards/not-a-uuid")
+	unparseable = urls.match("http://[invalid/boards/")
+
+	assert_that(missing is None)
+	assert_that(unknown is None)
+	assert_that(unparseable is None)
 
 
 def test_reusing_group_configuration_doesnt_mutate_sources():

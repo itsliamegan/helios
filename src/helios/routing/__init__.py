@@ -1,7 +1,8 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 import re
 from typing import Any, Concatenate, TYPE_CHECKING
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from helios.http import Method, Request, Response, URL
 from helios.http.error import NotFoundError as BaseNotFoundError
@@ -110,10 +111,10 @@ class Route:
 		self.guards = guards or []
 		self.name = name
 
-	def match(self, req: Request) -> dict[str, Any] | None:
-		if req.method is not self.method:
+	def match(self, method: Method, url: URL) -> dict[str, Any] | None:
+		if method is not self.method:
 			return None
-		params = self.pattern.match(req.url)
+		params = self.pattern.match(url)
 		if params is not None:
 			return params
 		return None
@@ -177,6 +178,12 @@ class Group:
 		return f"{prefix.rstrip("/")}/{pattern.lstrip("/")}"
 
 
+@dataclass
+class Match:
+	route: Route
+	params: dict[str, Any]
+
+
 class Router:
 	def __init__(self, routes: list[Route | Group]):
 		self.routes = Group.flatten(routes)
@@ -193,23 +200,22 @@ class Router:
 			raise RouteNotFoundError(f"route not found: {name}")
 		return self.named[name].pattern.generate(params)
 
-	def match(self, req: Request) -> tuple[Route, dict[str, Any]] | None:
+	def match(self, method: Method, url: URL) -> Match | None:
 		for route in self.routes:
-			params = route.match(req)
+			params = route.match(method, url)
 			if params is not None:
-				return route, params
+				return Match(route, params)
 		return None
 
 	def __call__(self, req: Request, ctx: Context) -> Response:
-		match = self.match(req)
-		if not match:
+		match = self.match(req.method, req.url)
+		if match is None:
 			raise NotFoundError()
-		route, params = match
-		for guard in route.guards:
-			res = guard(req, ctx, **params)
+		for guard in match.route.guards:
+			res = guard(req, ctx, **match.params)
 			if res is not None:
 				return res
-		return route.handler(req, ctx, **params)
+		return match.route.handler(req, ctx, **match.params)
 
 
 class URLs:
@@ -236,3 +242,15 @@ class URLs:
 			host=self.base_url.host,
 			port=self.base_url.port,
 		)
+
+	def match(self, url: URL | str | None) -> Match | None:
+		if url is None:
+			return None
+		elif isinstance(url, URL):
+			path = url.path
+		else:
+			try:
+				path = urlsplit(url).path
+			except ValueError:
+				return None
+		return self.router.match(Method.GET, URL(path))
