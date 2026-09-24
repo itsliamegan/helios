@@ -3,15 +3,8 @@ import sqlite3
 from typing import Any, Self
 
 from .config import Config
+from .error import DatabaseBusy, DatabaseError
 from .types import Scalar
-
-
-class DatabaseError(RuntimeError):
-	pass
-
-
-class DatabaseBusy(DatabaseError):
-	pass
 
 
 def quote_identifier(identifier: str) -> str:

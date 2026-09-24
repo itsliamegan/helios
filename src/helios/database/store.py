@@ -3,20 +3,11 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from helios.http.error import NotFoundError as BaseNotFoundError
-
 from . import types
-from .error import ModelError
+from .error import DatabaseError, ModelError, NotFoundError
 from .model import Model, Status
 from .query import Filter, Membership, Query
-from .sqlite import Connection, DatabaseError, quote_identifier
-
-
-class NotFoundError(BaseNotFoundError):
-	def __init__(self, model_type: type[Model], id: UUID):
-		self.model_type = model_type
-		self.id = id
-		super().__init__(f"{model_type.__name__} {id} not found")
+from .sqlite import Connection, quote_identifier
 
 
 class Registry:
