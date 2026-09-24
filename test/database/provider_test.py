@@ -8,7 +8,8 @@ import helios.app
 from helios.app import Application
 from helios.database import Config, Model, Provider, Store, attr
 from helios.http import Method, Request, Response, Status, URL
-from helios.routing import NotFoundError, Pattern, Route, Router
+from helios.http.error import NotFoundError
+from helios.routing import Pattern, Route, Router
 
 
 class Post(Model):

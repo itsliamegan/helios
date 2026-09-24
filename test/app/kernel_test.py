@@ -15,7 +15,8 @@ from helios.http import (
 	URL,
 	UnsupportedMethodError,
 )
-from helios.routing import NotFoundError, Pattern, Route, Router
+from helios.http.error import NotFoundError
+from helios.routing import Pattern, Route, Router
 
 
 def request() -> Request:

@@ -189,9 +189,9 @@ def test_adapts_cookies_from_headers():
 
 	cookies = Cookies.from_headers(headers)
 
-	assert_eq(cookies["session_id"].val, "51d0d53a-11dd-47a5-b438-5eb1b84e1432")
-	assert_eq(cookies["csrf_token"].val, "fd3e6aff6360af4d6ba905d4299cff81")
-	assert_eq(cookies["message"].val, "hello world")
+	assert_eq(cookies["session_id"].value, "51d0d53a-11dd-47a5-b438-5eb1b84e1432")
+	assert_eq(cookies["csrf_token"].value, "fd3e6aff6360af4d6ba905d4299cff81")
+	assert_eq(cookies["message"].value, "hello world")
 
 
 def test_adapts_cookies_to_headers():
@@ -210,7 +210,7 @@ def test_adapts_cookies_to_headers():
 	)
 
 
-def test_assigns_configured_cookie():
+def test_assigns_cookie_object():
 	cookies = Cookies()
 	cookie = Cookie("session_id", "abc", http_only=True)
 

@@ -6,7 +6,8 @@ from uuid import UUID
 from helios.http.error import NotFoundError as BaseNotFoundError
 
 from . import types
-from .model import Model, ModelError, Status
+from .error import ModelError
+from .model import Model, Status
 from .query import Filter, Membership, Query
 from .sqlite import Connection, DatabaseError, quote_identifier
 

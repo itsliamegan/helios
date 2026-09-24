@@ -23,7 +23,7 @@ class Flashes:
 		dirty = {}
 		for name in self.flashes:
 			if self.flashes[name].is_dirty:
-				dirty[name] = self.flashes[name].val
+				dirty[name] = self.flashes[name].value
 		return dirty
 
 	def is_dirty(self) -> bool:
@@ -33,16 +33,16 @@ class Flashes:
 		return False
 
 	def __getitem__(self, name: str) -> Any:
-		return self.flashes[name].val
+		return self.flashes[name].value
 
 	def get(self, name: str, default: Any = None) -> Any:
 		if name in self.flashes:
-			return self.flashes[name].val
+			return self.flashes[name].value
 		else:
 			return default
 
-	def __setitem__(self, name: str, val: Any):
-		self.flashes[name] = Flash(name, val, is_dirty=True)
+	def __setitem__(self, name: str, value: Any):
+		self.flashes[name] = Flash(name, value, is_dirty=True)
 
 	def __contains__(self, name: str) -> bool:
 		return name in self.flashes
@@ -51,7 +51,7 @@ class Flashes:
 @dataclass
 class Flash:
 	name: str
-	val: Any
+	value: Any
 	is_dirty: bool = False
 
 
