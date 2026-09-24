@@ -35,32 +35,33 @@ class Component:
 
 	def __init__(self, **keywords: Any):
 		component = type(self)
-		values = {}
-		loose = {}
+		passed_props = {}
+		passed_attributes = {}
 		for name, value in keywords.items():
 			if name in component.props:
-				values[name] = value
+				passed_props[name] = value
 			else:
-				loose[name] = value
+				passed_attributes[name] = value
 
-		if loose:
+		if passed_attributes:
 			if "attributes" not in component.props:
 				raise TypeError(
-					f"{component.__name__} got unexpected keywords: {", ".join(loose)}"
+					f"{component.__name__} got unexpected keywords: "
+					f"{", ".join(passed_attributes)}"
 				)
-			if "attributes" in values:
+			if "attributes" in passed_props:
 				raise TypeError(
 					f"{component.__name__} takes either attributes= "
 					"or attribute keywords, not both"
 				)
-			values["attributes"] = Attributes.from_html_names(
-				{html_name(name): value for name, value in loose.items()}
+			passed_props["attributes"] = Attributes.from_html_names(
+				{html_name(name): value for name, value in passed_attributes.items()}
 			)
 
 		missing = [
 			name
 			for name, default in component.props.items()
-			if name not in values and default is MISSING
+			if name not in passed_props and default is MISSING
 		]
 		if missing:
 			raise TypeError(
@@ -68,7 +69,7 @@ class Component:
 			)
 
 		for name, default in component.props.items():
-			setattr(self, name, values.get(name, default))
+			setattr(self, name, passed_props.get(name, default))
 
 		if "attributes" in component.props:
 			attributes: Attributes = vars(self)["attributes"]
