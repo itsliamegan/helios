@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from helios.app import Application, Container, Context, Next
 from helios.app import Provider as ApplicationProvider
-from helios.http import Request, Response
+from helios.http import Cookie, Request, Response
 
 from .config import Config
 from .file import Driver
@@ -66,17 +66,18 @@ class Provider(ApplicationProvider):
 		return response
 
 	def set_cookie(self, response: Response, session: Session):
-		response.cookies["session_id"] = str(session.id)
-		response.cookies["session_id"].expires = (
-			datetime.now(UTC) + self.config.maximum_age
-		)
-		response.cookies["session_id"].http_only = True
-		response.cookies["session_id"].secure = self.config.secure
-		response.cookies["session_id"].same_site = "Lax"
+		expires = datetime.now(UTC) + self.config.maximum_age
+		response.cookies.add(self.cookie(str(session.id), expires))
 
 	def expire_cookie(self, response: Response):
-		response.cookies["session_id"] = ""
-		response.cookies["session_id"].expires = datetime(1970, 1, 1, tzinfo=UTC)
-		response.cookies["session_id"].http_only = True
-		response.cookies["session_id"].secure = self.config.secure
-		response.cookies["session_id"].same_site = "Lax"
+		response.cookies.add(self.cookie("", datetime(1970, 1, 1, tzinfo=UTC)))
+
+	def cookie(self, value: str, expires: datetime) -> Cookie:
+		return Cookie(
+			"session_id",
+			value,
+			expires=expires,
+			http_only=True,
+			secure=self.config.secure,
+			same_site="Lax",
+		)

@@ -65,6 +65,9 @@ class Cookies:
 				headers["Set-Cookie"] += str(self.cookies[name])
 		return headers
 
+	def add(self, cookie: Cookie):
+		self.cookies[cookie.name] = cookie
+
 	def __getitem__(self, name: str) -> Cookie:
 		return self.cookies[name]
 

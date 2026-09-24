@@ -210,6 +210,15 @@ def test_adapts_cookies_to_headers():
 	)
 
 
+def test_adds_configured_cookie_by_name():
+	cookies = Cookies()
+	cookie = Cookie("session_id", "abc", http_only=True)
+
+	cookies.add(cookie)
+
+	assert_that(cookies["session_id"] is cookie)
+
+
 def test_stores_uploaded_files():
 	avatar = File(b"image bytes", "avatar.png", "image/png")
 	attachments = [
