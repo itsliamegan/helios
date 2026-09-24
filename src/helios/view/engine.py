@@ -71,8 +71,7 @@ class Engine:
 			if isinstance(renderable, Component):
 				return str(renderable)
 			else:
-				if assigns is None:
-					assigns = {}
+				assigns = assigns or {}
 				template = self.jinja.get_template(renderable)
 				return template.render(**assigns)
 		finally:

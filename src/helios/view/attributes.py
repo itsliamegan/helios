@@ -64,10 +64,12 @@ def split_class_names(values: dict[str, Any]) -> dict[str, Any]:
 
 
 def class_names(value: str | list[Any] | None) -> list[str]:
+	if not value:
+		value = []
 	if isinstance(value, str):
 		value = [value]
 	names = []
-	for entry in value or []:
+	for entry in value:
 		if entry:
 			names.extend(str(entry).split())
 	return list(dict.fromkeys(names))

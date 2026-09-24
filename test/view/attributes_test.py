@@ -54,6 +54,14 @@ def test_drops_falsy_classes_from_lists():
 	assert_eq(html, 'class="link link--active"')
 
 
+def test_omits_falsy_classes():
+	attributes = Attributes(class_=False, id="menu")
+
+	html = str(attributes)
+
+	assert_eq(html, 'id="menu"')
+
+
 def test_omits_empty_class_lists():
 	attributes = Attributes(class_=[False], id="menu")
 
