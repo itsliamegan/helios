@@ -12,22 +12,22 @@ from .error import ModelError
 if TYPE_CHECKING:
 	from .model import Model
 
-MISSING: Any = object()
+MISSING: object = object()
 
 
 @dataclass
 class Attribute:
 	name: str | None
-	type: types.Type[Any]
-	default: Any
+	type: types.Type[object]
+	default: object
 	required: bool
 	nullable: bool
 	init: bool
 
 	def __init__(
 		self,
-		type: types.Type[Any],
-		default: Any,
+		type: types.Type[object],
+		default: object,
 		nullable: bool,
 		init: bool,
 	):
@@ -41,7 +41,7 @@ class Attribute:
 	def __set_name__(self, _owner: type, name: str):
 		self.name = name
 
-	def __get__(self, instance: Model | None, owner: type) -> Any:
+	def __get__(self, instance: Model | None, owner: type) -> object:
 		if instance is None:
 			return self
 		if self.name is None:
@@ -71,12 +71,12 @@ class Attribute:
 			return None
 		return types.encode(self.type, value)
 
-	def decode(self, raw: types.Scalar | None, model_type: type) -> Any:
+	def decode(self, raw: types.Scalar | None, model_type: type) -> object:
 		value = None if raw is None else self.type.decode(raw)
 		self.check(value, model_type)
 		return value
 
-	def __set__(self, instance: Model, value: Any):
+	def __set__(self, instance: Model, value: object):
 		if self.name is None:
 			raise AttributeError("attribute has not been assigned to a model")
 		self.check(value, type(instance))
@@ -86,15 +86,15 @@ class Attribute:
 
 @dataclass(init=False)
 class Declaration:
-	default: Any
+	default: object
 	init: bool
-	type: types.Type[Any] | None
+	type: types.Type[object] | None
 
 	def __init__(
 		self,
-		default: Any,
+		default: object,
 		init: bool,
-		type: types.Type[Any] | None,
+		type: types.Type[object] | None,
 	):
 		self.default = default
 		self.init = init
@@ -102,14 +102,14 @@ class Declaration:
 
 
 def attribute(
-	default: Any = MISSING,
+	default: object = MISSING,
 	init: bool = True,
-	type: types.Type[Any] | None = None,
+	type: types.Type[object] | None = None,
 ) -> Any:
 	return Declaration(default, init, type)
 
 
-def declare(annotation: Any, value: Any) -> Attribute:
+def declare(annotation: Any, value: object) -> Attribute:
 	if isinstance(value, Declaration):
 		declaration = value
 	else:
