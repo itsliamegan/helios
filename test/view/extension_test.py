@@ -7,7 +7,7 @@ from markupsafe import Markup
 from helios.view import Component, Engine, memory
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Card(Component):
 	template = "card"
 
@@ -15,7 +15,7 @@ class Card(Component):
 	content: Markup = Markup("<p>Empty</p>")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Panel(Component):
 	template = "panel"
 
@@ -26,7 +26,7 @@ def test_fills_content_with_the_body():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{% render Card("Pins") %}<b>{{ name }}</b>{% endrender %}',
+				"index": '{% render Card(title="Pins") %}<b>{{ name }}</b>{% endrender %}',
 				"card": "<h2>{{ title }}</h2>{{ content }}",
 			}
 		),
@@ -44,7 +44,7 @@ def test_renders_the_body_in_the_caller_scope():
 			{
 				"index": (
 					"{% for pin in pins %}"
-					"{% render Card(pin) %}{{ pin }} of {{ board }}{% endrender %}"
+					"{% render Card(title=pin) %}{{ pin }} of {{ board }}{% endrender %}"
 					"{% endfor %}"
 				),
 				"card": "[{{ content }}]",
@@ -62,7 +62,7 @@ def test_uses_the_default_for_a_blank_body():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{% render Card("Pins") %}\n\t \n{% endrender %}',
+				"index": '{% render Card(title="Pins") %}\n\t \n{% endrender %}',
 				"card": "{{ content }}",
 			}
 		),
@@ -95,7 +95,7 @@ def test_nests_render_inside_render():
 			{
 				"index": (
 					"{% render Panel() %}"
-					'{% render Card("Inner") %}<i>body</i>{% endrender %}'
+					'{% render Card(title="Inner") %}<i>body</i>{% endrender %}'
 					"{% endrender %}"
 				),
 				"panel": "<section>{{ content }}</section>",
@@ -118,7 +118,7 @@ def test_rejects_expressions_that_are_not_calls():
 
 
 def test_rejects_a_missing_endrender():
-	driver = memory.Driver({"index": '{% render Card("a") %}body'})
+	driver = memory.Driver({"index": '{% render Card(title="a") %}body'})
 
 	with assert_raises(TemplateSyntaxError):
 		Engine(driver)

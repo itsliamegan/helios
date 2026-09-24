@@ -7,14 +7,14 @@ from markupsafe import Markup
 from helios.view import Attributes, Component, Engine, Helpers, memory
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Chip(Component):
 	template = "chip"
 
 	name: str
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Link(Component):
 	template = "link"
 	accepts = {"target", "rel"}
@@ -25,7 +25,7 @@ class Link(Component):
 	attributes: Attributes = Attributes()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Board(Component):
 	template = "board"
 
@@ -38,7 +38,7 @@ class Board(Component):
 		return self.owner == self.user
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Row(Component):
 	template = "row"
 
@@ -53,7 +53,7 @@ link_template = (
 
 
 def test_keeps_dataclass_repr():
-	chip = Chip("Travel")
+	chip = Chip(name="Travel")
 
 	text = repr(chip)
 
@@ -61,7 +61,7 @@ def test_keeps_dataclass_repr():
 
 
 def test_rejects_rendering_outside_a_view():
-	chip = Chip("Travel")
+	chip = Chip(name="Travel")
 
 	with assert_raises(RuntimeError) as raised:
 		str(chip)
@@ -74,9 +74,14 @@ def test_rejects_missing_arguments_from_python():
 		Chip()  # ty: ignore[missing-argument]
 
 
+def test_rejects_positional_arguments_from_python():
+	with assert_raises(TypeError):
+		Chip("Travel")  # ty: ignore[missing-argument, too-many-positional-arguments]
+
+
 def test_rejects_loose_attributes_from_python():
 	with assert_raises(TypeError):
-		Link("/", class_="pin-link")  # ty: ignore[unknown-argument]
+		Link(url="/", class_="pin-link")  # ty: ignore[unknown-argument]
 
 
 def test_accepts_global_and_declared_attributes_from_python():
@@ -89,14 +94,14 @@ def test_accepts_global_and_declared_attributes_from_python():
 		rel="nofollow",
 	)
 
-	link = Link("/", attributes=attributes)
+	link = Link(url="/", attributes=attributes)
 
 	assert link.attributes is attributes
 
 
 def test_rejects_unknown_attributes_from_python():
 	with assert_raises(TypeError) as raised:
-		Link("/", attributes=Attributes(tabindex=0))
+		Link(url="/", attributes=Attributes(tabindex=0))
 
 	assert_eq(str(raised.exception), 'Link does not accept the attribute "tabindex"')
 
@@ -105,7 +110,7 @@ def test_renders_fields():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": "{{ Chip(name) }}",
+				"index": "{{ Chip(name=name) }}",
 				"chip": "<span>{{ name }}</span>",
 			}
 		),
@@ -121,7 +126,7 @@ def test_renders_globals_and_filters():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{{ Chip("travel") }}',
+				"index": '{{ Chip(name="travel") }}',
 				"chip": "{{ name | shout }} on {{ site }}",
 			}
 		),
@@ -141,7 +146,7 @@ def test_hides_caller_assigns():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": "{{ Chip(name) }}",
+				"index": "{{ Chip(name=name) }}",
 				"chip": "{{ title }}",
 			}
 		),
@@ -156,7 +161,7 @@ def test_renders_component_properties():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{{ Board("Travel", "ada", "ada") }}',
+				"index": '{{ Board(name="Travel", owner="ada", user="ada") }}',
 				"board": "{{ name }}{% if component.owned %} (yours){% endif %}",
 			}
 		),
@@ -172,8 +177,8 @@ def test_renders_nested_components():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{{ Row(["a", "b"]) }}',
-				"row": "<ul>{% for name in names %}<li>{{ Chip(name) }}</li>{% endfor %}</ul>",
+				"index": '{{ Row(names=["a", "b"]) }}',
+				"row": "<ul>{% for name in names %}<li>{{ Chip(name=name) }}</li>{% endfor %}</ul>",
 				"chip": "{{ name }}",
 			}
 		),
@@ -189,7 +194,7 @@ def test_renders_components_as_strings_inside_a_render():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{{ describe(Chip("<b>")) }}',
+				"index": '{{ describe(Chip(name="<b>")) }}',
 				"chip": "<span>{{ name }}</span>",
 			}
 		),
@@ -206,7 +211,7 @@ def test_engine_renders_components():
 	engine = Engine(
 		memory.Driver({"chip": "<span>{{ name }}</span>"}), components=[Chip]
 	)
-	chip = Chip("Travel")
+	chip = Chip(name="Travel")
 
 	html = engine.render(chip)
 
@@ -225,9 +230,21 @@ def test_rejects_missing_arguments_from_templates():
 		engine.render("index")
 
 
+def test_rejects_positional_arguments_from_templates():
+	engine = Engine(
+		memory.Driver({"index": '{{ Chip("Travel") }}', "chip": "{{ name }}"}),
+		components=[Chip],
+	)
+
+	with assert_raises(TypeError):
+		engine.render("index")
+
+
 def test_rejects_unknown_keywords_without_attributes_field():
 	engine = Engine(
-		memory.Driver({"index": '{{ Chip("a", class="b") }}', "chip": "{{ name }}"}),
+		memory.Driver(
+			{"index": '{{ Chip(name="a", class="b") }}', "chip": "{{ name }}"}
+		),
 		components=[Chip],
 	)
 
@@ -240,7 +257,7 @@ def test_passes_attributes_through_from_templates():
 		memory.Driver(
 			{
 				"index": (
-					'{{ Link("/pins/1", new_tab=True, class="pin-link", '
+					'{{ Link(url="/pins/1", new_tab=True, class="pin-link", '
 					'data_turbo_frame="modal", rel="nofollow") }}'
 				),
 				"link": link_template,
@@ -262,7 +279,7 @@ def test_passes_attributes_bag_from_templates():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{{ Link("/", attributes=bag) }}',
+				"index": '{{ Link(url="/", attributes=bag) }}',
 				"link": link_template,
 			}
 		),
@@ -276,7 +293,9 @@ def test_passes_attributes_bag_from_templates():
 
 def test_rejects_unknown_attributes_from_templates():
 	engine = Engine(
-		memory.Driver({"index": '{{ Link("/", tabindex=0) }}', "link": link_template}),
+		memory.Driver(
+			{"index": '{{ Link(url="/", tabindex=0) }}', "link": link_template}
+		),
 		components=[Link],
 	)
 
@@ -290,7 +309,7 @@ def test_rejects_attributes_bag_with_loose_attributes():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{{ Link("/", attributes=bag, id="home") }}',
+				"index": '{{ Link(url="/", attributes=bag, id="home") }}',
 				"link": link_template,
 			}
 		),
@@ -302,7 +321,7 @@ def test_rejects_attributes_bag_with_loose_attributes():
 
 
 def test_rejects_components_with_the_same_name():
-	@dataclass
+	@dataclass(kw_only=True)
 	class Chip(Component):
 		template = "chip"
 
@@ -327,7 +346,7 @@ def test_rejects_components_with_missing_templates():
 
 
 def test_rejects_accepts_without_attributes_field():
-	@dataclass
+	@dataclass(kw_only=True)
 	class Button(Component):
 		template = "button"
 		accepts = {"type"}
@@ -339,7 +358,7 @@ def test_rejects_accepts_without_attributes_field():
 
 
 def test_rejects_accepts_that_name_a_field():
-	@dataclass
+	@dataclass(kw_only=True)
 	class Button(Component):
 		template = "button"
 		accepts = {"form-action"}
@@ -354,7 +373,7 @@ def test_rejects_accepts_that_name_a_field():
 
 
 def test_rejects_fields_named_component():
-	@dataclass
+	@dataclass(kw_only=True)
 	class Wrapper(Component):
 		template = "wrapper"
 

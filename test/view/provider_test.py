@@ -54,7 +54,7 @@ def test_provider_registers_components():
 			"from helios.view import Component\n"
 			"\n"
 			"\n"
-			"@dataclass\n"
+			"@dataclass(kw_only=True)\n"
 			"class BoardChip(Component):\n"
 			'\ttemplate = "boards.chip"\n'
 			"\n"
@@ -64,7 +64,7 @@ def test_provider_registers_components():
 			'<span class="chip">{{ name }}</span>'
 		)
 		views_dir.joinpath("index.html").write_text(
-			"{% for name in names %}{{ BoardChip(name) }}{% endfor %}"
+			"{% for name in names %}{{ BoardChip(name=name) }}{% endfor %}"
 		)
 		spec = importlib.util.spec_from_file_location(
 			"chip",
