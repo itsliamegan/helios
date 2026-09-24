@@ -133,6 +133,11 @@ def test_rejects_attributes_without_supported_annotations():
 
 	with assert_raises(ModelError):
 
+		class Alternative(Model):
+			value: str | int
+
+	with assert_raises(ModelError):
+
 		class Unresolved(Model):
 			author: Author  # noqa: F821
 

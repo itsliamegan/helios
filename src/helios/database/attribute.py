@@ -38,7 +38,7 @@ class Attribute:
 		self.nullable = nullable
 		self.init = init
 
-	def __set_name__(self, owner: type, name: str):
+	def __set_name__(self, _owner: type, name: str):
 		self.name = name
 
 	def __get__(self, instance: Model | None, owner: type) -> Any:
@@ -130,11 +130,14 @@ def declare(annotation: Any, value: Any) -> Attribute:
 def split_nullable(annotation: Any) -> tuple[Any, bool]:
 	if get_origin(annotation) is not Union:
 		return annotation, False
+
 	members = get_args(annotation)
-	value_types = [member for member in members if member is not NoneType]
-	if len(members) != 2 or len(value_types) != 1:
+	if len(members) != 2:
 		raise TypeError(f"unsupported attribute type: {annotation!r}")
-	return value_types[0], True
+	value_index = 1 if members[0] is NoneType else 0
+	if members[1 - value_index] is not NoneType:
+		raise TypeError(f"unsupported attribute type: {annotation!r}")
+	return members[value_index], True
 
 
 def resolve_type[T](typ: type[T] | types.Type[T]) -> types.Type[T]:

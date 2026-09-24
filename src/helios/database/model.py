@@ -86,6 +86,7 @@ def declare_attributes(model_type: type) -> dict[str, Attribute]:
 	for name, annotation in annotations.items():
 		if annotation is ClassVar or get_origin(annotation) is ClassVar:
 			continue
+
 		try:
 			declared[name] = declare(annotation, vars(model_type).get(name, MISSING))
 		except TypeError as error:
