@@ -1,5 +1,5 @@
-from .config import Config as Config
-from .provider import Provider as Provider
-from .store import Session as Session
+from .config import Config
+from .provider import Provider
+from .store import Session
 
 __all__ = ["Config", "Provider", "Session"]

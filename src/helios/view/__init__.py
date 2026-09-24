@@ -1,12 +1,10 @@
-from .attributes import Attributes as Attributes
-from .component import Component as Component
-from .config import Config as Config
-from .engine import Composer as Composer
-from .engine import Engine as Engine
-from .helpers import Helpers as Helpers
-from .provider import Provider as Provider
-from .views import View as View
-from .views import Views as Views
+from .attributes import Attributes
+from .component import Component
+from .config import Config
+from .engine import Composer, Engine
+from .helpers import Helpers
+from .provider import Provider
+from .views import View, Views
 
 __all__ = [
 	"Attributes",
