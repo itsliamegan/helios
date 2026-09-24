@@ -3,7 +3,7 @@ from urllib.parse import parse_qs as parse_query
 from urllib.parse import urlparse as parse_url
 from wsgiref.types import StartResponse, WSGIEnvironment
 
-from werkzeug.datastructures import EnvironHeaders, FileStorage
+from werkzeug.datastructures import EnvironHeaders
 from werkzeug.formparser import FormDataParser
 from werkzeug.http import parse_options_header
 from werkzeug.wsgi import get_current_url
@@ -51,13 +51,18 @@ class RequestAdapter:
 		)
 
 	def method(self) -> Method:
-		return Method(self.environment["REQUEST_METHOD"])
+		return Method.parse(self.environment["REQUEST_METHOD"])
 
 	def url(self) -> URL:
 		raw = get_current_url(self.environment)
 		parsed = parse_url(raw)
-		query = parse_query(parsed.query, keep_blank_values=True)
-		return URL(parsed.path, {name: unwrap(vals) for name, vals in query.items()})
+		query = {}
+		for name, vals in parse_query(parsed.query, keep_blank_values=True).items():
+			if isinstance(vals, list) and len(vals) == 1:
+				query[name] = vals[0]
+			else:
+				query[name] = vals
+		return URL(parsed.path, query)
 
 	def headers(self) -> Headers:
 		return Headers(dict(EnvironHeaders(self.environment)))
@@ -78,23 +83,20 @@ class RequestAdapter:
 			max_form_parts=1_000,
 		)
 		_, form, uploads = parser.parse_from_environ(self.environment)
-		input = Input({name: unwrap(values) for name, values in form.lists()})
-		files = Files(
-			{
-				name: unwrap([adapt_file(storage) for storage in storages])
-				for name, storages in uploads.lists()
-			}
-		)
-		return input, files
+		input_items: dict[str, str | list[str]] = {}
+		for name, values in form.lists():
+			input_items[name] = values[0] if len(values) == 1 else values
 
+		file_items: dict[str, File | list[File]] = {}
+		for name, storages in uploads.lists():
+			files = [
+				File(
+					storage.read(),
+					storage.filename or "",
+					storage.content_type or "application/octet-stream",
+				)
+				for storage in storages
+			]
+			file_items[name] = files[0] if len(files) == 1 else files
 
-def adapt_file(storage: FileStorage) -> File:
-	return File(
-		storage.read(),
-		storage.filename or "",
-		storage.content_type or "application/octet-stream",
-	)
-
-
-def unwrap[T](values: list[T]) -> T | list[T]:
-	return values[0] if len(values) == 1 else values
+		return Input(input_items), Files(file_items)

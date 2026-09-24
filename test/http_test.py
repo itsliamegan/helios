@@ -210,11 +210,11 @@ def test_adapts_cookies_to_headers():
 	)
 
 
-def test_adds_configured_cookie_by_name():
+def test_assigns_configured_cookie():
 	cookies = Cookies()
 	cookie = Cookie("session_id", "abc", http_only=True)
 
-	cookies.add(cookie)
+	cookies["session_id"] = cookie
 
 	assert_that(cookies["session_id"] is cookie)
 

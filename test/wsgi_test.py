@@ -6,7 +6,16 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.test import EnvironBuilder
 
 import helios.app
-from helios.http import Buffered, Cookies, Headers, Method, Response, Status, URL
+from helios.http import (
+	Buffered,
+	Cookies,
+	Headers,
+	Method,
+	Response,
+	Status,
+	URL,
+	UnsupportedMethodError,
+)
 from helios.routing import Pattern, Route, Router
 from helios.wsgi import Application
 from helios.wsgi.adapt import RequestAdapter, ResponseAdapter
@@ -19,6 +28,13 @@ def test_adapts_method():
 	req = RequestAdapter(env).adapt()
 
 	assert_that(req.method is Method.GET)
+
+
+def test_rejects_unsupported_method():
+	env = EnvironBuilder(method="OPTIONS").get_environ()
+
+	with assert_raises(UnsupportedMethodError):
+		RequestAdapter(env).adapt()
 
 
 def test_adapts_url():

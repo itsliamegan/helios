@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Any, Literal, TYPE_CHECKING
 
 from . import types
@@ -43,7 +43,13 @@ class Query[T: Model]:
 		for name, value in attrs.items():
 			attribute = self.model_type.attribute(name)
 			predicates.append(Filter(name, attribute.encode(value, self.model_type)))
-		return replace(self, predicates=tuple(predicates))
+		return Query(
+			self.store,
+			self.model_type,
+			tuple(predicates),
+			self.ordering,
+			self.count,
+		)
 
 	def where_in(self, **attrs: Iterable[Any]) -> Query[T]:
 		predicates = list(self.predicates)
@@ -63,21 +69,39 @@ class Query[T: Model]:
 				dict.fromkeys(value for value in encoded if value is not None)
 			)
 			predicates.append(Membership(name, values, None in encoded))
-		return replace(self, predicates=tuple(predicates))
+		return Query(
+			self.store,
+			self.model_type,
+			tuple(predicates),
+			self.ordering,
+			self.count,
+		)
 
 	def order_by(self, name: str, direction: Direction = "asc") -> Query[T]:
 		self.model_type.attribute(name)
 		if direction not in ("asc", "desc"):
 			raise ValueError("direction must be 'asc' or 'desc'")
-		return replace(self, ordering=(name, direction))
+		return Query(
+			self.store,
+			self.model_type,
+			self.predicates,
+			(name, direction),
+			self.count,
+		)
 
 	def limit(self, count: int) -> Query[T]:
 		if not isinstance(count, int) or isinstance(count, bool) or count < 0:
 			raise ValueError("limit must be a non-negative integer")
-		return replace(self, count=count)
+		return Query(
+			self.store,
+			self.model_type,
+			self.predicates,
+			self.ordering,
+			count,
+		)
 
 	def all(self) -> list[T]:
-		return self.store.execute_query(self)
+		return self.store.execute(self)
 
 	def first(self) -> T | None:
 		found = self.limit(0 if self.count == 0 else 1).all()

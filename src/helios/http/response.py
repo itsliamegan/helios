@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .body import Body, Buffered, Stream
 from .cookie import Cookies
@@ -8,12 +8,24 @@ from .status import Status
 from .url import URL
 
 
-@dataclass
+@dataclass(init=False)
 class Response:
-	status: Status = Status.OK
-	headers: Headers = field(default_factory=Headers)
-	cookies: Cookies = field(default_factory=Cookies)
-	body: Body = field(default_factory=Buffered)
+	status: Status
+	headers: Headers
+	cookies: Cookies
+	body: Body
+
+	def __init__(
+		self,
+		status: Status = Status.OK,
+		headers: Headers | None = None,
+		cookies: Cookies | None = None,
+		body: Body | None = None,
+	):
+		self.status = status
+		self.headers = headers or Headers()
+		self.cookies = cookies or Cookies()
+		self.body = body or Buffered()
 
 	@classmethod
 	def empty(cls, status: Status = Status.NO_CONTENT) -> Response:
@@ -29,14 +41,17 @@ class Response:
 
 	@classmethod
 	def file(cls, content: bytes, filename: str, content_type: str) -> Response:
-		headers = Headers(
-			{
-				"Content-Type": content_type,
-				"Content-Disposition": f'attachment; filename="{filename}"',
-				"Content-Length": str(len(content)),
-			}
+		return cls(
+			Status.OK,
+			Headers(
+				{
+					"Content-Type": content_type,
+					"Content-Disposition": f'attachment; filename="{filename}"',
+					"Content-Length": str(len(content)),
+				}
+			),
+			body=Buffered(content),
 		)
-		return cls(Status.OK, headers, body=Buffered(content))
 
 	@classmethod
 	def redirect(cls, url: URL) -> Response:

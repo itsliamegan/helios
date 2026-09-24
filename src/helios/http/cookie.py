@@ -65,14 +65,13 @@ class Cookies:
 				headers["Set-Cookie"] += str(self.cookies[name])
 		return headers
 
-	def add(self, cookie: Cookie):
-		self.cookies[cookie.name] = cookie
-
 	def __getitem__(self, name: str) -> Cookie:
 		return self.cookies[name]
 
-	def __setitem__(self, name: str, val: str):
-		if name in self.cookies:
+	def __setitem__(self, name: str, val: str | Cookie):
+		if isinstance(val, Cookie):
+			self.cookies[name] = val
+		elif name in self.cookies:
 			self.cookies[name].val = val
 		else:
 			self.cookies[name] = Cookie(name, val)

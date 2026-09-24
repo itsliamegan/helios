@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-from luna.test.assertion import assert_eq
+from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Container, Kernel
 from helios.http import (
@@ -13,6 +13,7 @@ from helios.http import (
 	Response,
 	Status,
 	URL,
+	UnsupportedMethodError,
 )
 from helios.routing import NotFoundError, Pattern, Route, Router
 
@@ -121,17 +122,8 @@ def test_overrides_method_from_input():
 	assert_eq(str(response.body), "False")
 
 
-def test_ignores_unknown_method_override():
-	def create(request, context):
-		return Response.empty(Status.OK)
+def test_rejects_unknown_method_override():
+	request = Request(Method.POST, URL("/"), input=Input({"_method": "delete"}))
 
-	kernel = Kernel(
-		Container(),
-		Router([Route(Method.POST, Pattern("/"), create)]),
-		[],
-	)
-	response = kernel.handle(
-		Request(Method.POST, URL("/"), input=Input({"_method": "delete"}))
-	)
-
-	assert_eq(response.status, Status.OK)
+	with assert_raises(UnsupportedMethodError):
+		Kernel.adapt_artificial_method(request, None, lambda req, ctx: Response.empty())
