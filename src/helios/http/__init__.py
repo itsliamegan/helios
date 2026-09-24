@@ -1,3 +1,4 @@
+from . import error as error
 from .body import Body as Body
 from .body import Buffered as Buffered
 from .body import Stream as Stream
@@ -32,4 +33,5 @@ __all__ = [
 	"Status",
 	"Stream",
 	"body",
+	"error",
 ]

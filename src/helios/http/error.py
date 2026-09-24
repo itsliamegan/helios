@@ -1,4 +1,4 @@
-from helios.http import Status
+from .status import Status
 
 
 class HTTPError(Exception):
