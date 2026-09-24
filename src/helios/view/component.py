@@ -22,12 +22,15 @@ class Component:
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
-		props = dict(cls.props)
+		props = {}
 		for name, annotation in get_annotations(cls, format=Format.FORWARDREF).items():
-			if annotation is not ClassVar and get_origin(annotation) is not ClassVar:
+			class_variable = (
+				annotation is ClassVar or get_origin(annotation) is ClassVar
+			)
+			if not class_variable:
 				props[name] = vars(cls).get(name, MISSING)
-		cls.props = props
-		check_component(cls)
+		cls.props = cls.props | props
+		check_declaration(cls)
 
 	@classmethod
 	def accepts_attribute(cls, name: str) -> bool:
@@ -35,33 +38,33 @@ class Component:
 
 	def __init__(self, **keywords: Any):
 		component = type(self)
-		passed_props = {}
-		passed_attributes = {}
+		props = {}
+		attributes = {}
 		for name, value in keywords.items():
 			if name in component.props:
-				passed_props[name] = value
+				props[name] = value
 			else:
-				passed_attributes[name] = value
+				attributes[name] = value
 
-		if passed_attributes:
+		if attributes:
 			if "attributes" not in component.props:
 				raise TypeError(
 					f"{component.__name__} got unexpected keywords: "
-					f"{", ".join(passed_attributes)}"
+					f"{", ".join(attributes)}"
 				)
-			if "attributes" in passed_props:
+			if "attributes" in props:
 				raise TypeError(
 					f"{component.__name__} takes either attributes= "
 					"or attribute keywords, not both"
 				)
-			passed_props["attributes"] = Attributes.from_html_names(
-				{html_name(name): value for name, value in passed_attributes.items()}
+			props["attributes"] = Attributes.from_html_names(
+				{html_name(name): value for name, value in attributes.items()}
 			)
 
 		missing = [
 			name
 			for name, default in component.props.items()
-			if name not in passed_props and default is MISSING
+			if name not in props and default is MISSING
 		]
 		if missing:
 			raise TypeError(
@@ -69,11 +72,10 @@ class Component:
 			)
 
 		for name, default in component.props.items():
-			setattr(self, name, passed_props.get(name, default))
+			setattr(self, name, props.get(name, default))
 
 		if "attributes" in component.props:
-			attributes: Attributes = vars(self)["attributes"]
-			for name in sorted(attributes.names()):
+			for name in sorted(vars(self)["attributes"].names()):
 				if not component.accepts_attribute(name):
 					raise TypeError(
 						f'{component.__name__} does not accept the attribute "{name}"'
@@ -99,7 +101,7 @@ class Component:
 		return f"{type(self).__name__}({values})"
 
 
-def check_component(component: type[Component]):
+def check_declaration(component: type[Component]):
 	name = component.__name__
 	for prop_name, default in component.props.items():
 		if prop_name == "component":
