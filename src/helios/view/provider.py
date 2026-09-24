@@ -1,9 +1,10 @@
-from helios.app import Application, Container, Provider
+from helios.app import Application, Container, Context, Provider
 
 from .config import Config
-from .engine import Views
+from .engine import Engine
 from .file import Driver
 from .helpers import Helpers
+from .views import Views
 
 
 class Provider(Provider):
@@ -13,10 +14,14 @@ class Provider(Provider):
 		self.helpers = helpers
 
 	def register(self, container: Container):
-		container.singleton(Views, self.views)
+		container.singleton(Engine, self.engine)
+		container.scoped(Views, self.views)
 
 	def boot(self, application: Application):
-		application.container.get(Views)
+		application.container.get(Engine)
 
-	def views(self, container: Container) -> Views:
-		return Views(Driver(self.dir), self.helpers, self.reload)
+	def engine(self, container: Container) -> Engine:
+		return Engine(Driver(self.dir), self.helpers, self.reload)
+
+	def views(self, context: Context) -> Views:
+		return Views(context.get(Engine))
