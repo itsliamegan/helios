@@ -2,7 +2,7 @@ from annotationlib import get_annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
-from typing import Any, ClassVar, get_origin
+from typing import Any, ClassVar, dataclass_transform, get_origin
 from uuid import UUID, uuid4
 
 from .attribute import Attribute, Declaration, MISSING, attribute, declare
@@ -93,6 +93,11 @@ def declare_attributes(model_type: type) -> dict[str, Attribute[Any, Any]]:
 	return declared
 
 
+@dataclass_transform(
+	kw_only_default=True,
+	eq_default=False,
+	field_specifiers=(attribute,),
+)
 class Model(metaclass=ModelMeta):
 	table: ClassVar[str] = ""
 	attributes: ClassVar[dict[str, Attribute[Any, Any]]]
