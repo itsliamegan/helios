@@ -1,3 +1,4 @@
+from typing import ClassVar
 from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
@@ -8,9 +9,9 @@ from helios.database import Model, ModelError, attribute
 def test_constructs_model_with_table_defaults_and_nulls():
 	class Post(Model):
 		table = "posts"
-		title = attribute(str)
-		published = attribute(bool, default=False)
-		summary = attribute(str, nullable=True)
+		title: str
+		published: bool = False
+		summary: str | None = None
 
 	post = Post(title="Intro")
 
@@ -24,15 +25,15 @@ def test_constructs_model_with_table_defaults_and_nulls():
 
 def test_preserves_explicit_null_instead_of_default():
 	class Post(Model):
-		title = attribute(str, default="Untitled", nullable=True)
+		title: str | None = "Untitled"
 
 	assert_that(Post(title=None).title is None)
 
 
 def test_assigns_canonical_values_and_nulls():
 	class Post(Model):
-		title = attribute(str)
-		summary = attribute(str, nullable=True)
+		title: str
+		summary: str | None = None
 
 	post = Post(title="Intro")
 	post.title = "Revised"
@@ -45,7 +46,7 @@ def test_assigns_canonical_values_and_nulls():
 
 def test_failed_assignment_preserves_value():
 	class Post(Model):
-		points = attribute(int)
+		points: int
 
 	post = Post(points=3)
 	with assert_raises(ModelError):
@@ -56,7 +57,7 @@ def test_failed_assignment_preserves_value():
 
 def test_rejects_missing_extra_non_init_and_null_attributes():
 	class Post(Model):
-		title = attribute(str)
+		title: str
 
 	with assert_raises(ModelError):
 		Post()
@@ -68,14 +69,82 @@ def test_rejects_missing_extra_non_init_and_null_attributes():
 		Post(title=None)
 
 
+def test_requires_nullable_attributes_without_defaults():
+	class Post(Model):
+		summary: str | None
+
+	with assert_raises(ModelError):
+		Post()
+	assert_that(Post(summary=None).summary is None)
+
+
+def test_declares_attributes_only_from_instance_annotations():
+	class Post(Model):
+		table = "posts"
+		kind: ClassVar[str] = "post"
+		title: str
+
+	assert_eq(list(Post.attributes), ["id", "created_at", "title"])
+
+
+def test_resolves_codecs_nested_in_the_model():
+	class Post(Model):
+		class Slug:
+			def __init__(self, text: str):
+				self.text = text
+
+			@classmethod
+			def check(cls, value: object):
+				if not isinstance(value, cls):
+					raise TypeError("expected a Slug")
+
+			@classmethod
+			def encode(cls, value: Post.Slug) -> str:
+				return value.text
+
+			@classmethod
+			def decode(cls, value: object) -> Post.Slug:
+				return cls(str(value))
+
+		slug: Slug
+
+	post = Post(slug=Post.Slug("intro"))
+
+	assert_eq(post.slug.text, "intro")
+	with assert_raises(ModelError):
+		Post(slug="intro")
+
+
+def test_rejects_attributes_without_supported_annotations():
+	with assert_raises(ModelError):
+
+		class Unannotated(Model):
+			title = attribute(default="")
+
+	with assert_raises(ModelError):
+
+		class Unsupported(Model):
+			score: float
+
+	with assert_raises(ModelError):
+
+		class Ambiguous(Model):
+			value: str | int | None
+
+	with assert_raises(ModelError):
+
+		class Unresolved(Model):
+			author: Author  # noqa: F821
+
+
 def test_inherits_and_overrides_attributes():
 	class Content(Model):
-		title = attribute(str)
-		score = attribute(str)
+		title: str
+		score: str
 
 	class Post(Content):
 		table = "posts"
-		score = attribute(int)
+		score: int
 
 	post = Post(title="Intro", score=3)
 
@@ -87,10 +156,10 @@ def test_rejects_reserved_and_invalid_inherited_overrides():
 	with assert_raises(ModelError):
 
 		class Reserved(Model):
-			id = attribute(UUID)
+			id: UUID
 
 	class Content(Model):
-		title = attribute(str)
+		title: str
 
 	with assert_raises(ModelError):
 

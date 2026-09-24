@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Literal, TYPE_CHECKING, cast, overload
+from types import NoneType
+from typing import Any, TYPE_CHECKING, Union, cast, get_args, get_origin, overload
 from uuid import UUID
 
 from helios.http import URL
@@ -17,7 +18,7 @@ MISSING: Any = object()
 @dataclass
 class Attribute[StoredT, ValueT = StoredT]:
 	name: str | None
-	owner: type[Model] | None
+	owner: type | None
 	type: types.Type[StoredT]
 	default: ValueT | None
 	required: bool
@@ -33,14 +34,14 @@ class Attribute[StoredT, ValueT = StoredT]:
 		init: bool,
 	):
 		self.name: str | None = None
-		self.owner: type[Model] | None = None
+		self.owner: type | None = None
 		self.type = typ
 		self.default = None if default is MISSING else default
 		self.required = default is MISSING
 		self.nullable = nullable
 		self.init = init
 
-	def __set_name__(self, owner: type[Model], name: str):
+	def __set_name__(self, owner: type, name: str):
 		self.owner = owner
 		self.name = name
 
@@ -97,39 +98,53 @@ class Attribute[StoredT, ValueT = StoredT]:
 		instance._changes.mark(self.name)
 
 
-@overload
-def attribute[T](
-	typ: type[T] | types.Type[T],
-	*,
-	default: T = MISSING,
-	nullable: Literal[False] = False,
-	init: bool = True,
-) -> Attribute[T]: ...
+@dataclass(init=False)
+class Declaration:
+	default: Any
+	init: bool
+	type: types.Type[Any] | None
 
-
-@overload
-def attribute[T](
-	typ: type[T] | types.Type[T],
-	*,
-	default: T | None = MISSING,
-	nullable: Literal[True],
-	init: bool = True,
-) -> Attribute[T, T | None]: ...
+	def __init__(
+		self,
+		default: Any,
+		init: bool,
+		type: types.Type[Any] | None,
+	):
+		self.default = default
+		self.init = init
+		self.type = type
 
 
 def attribute(
-	typ: type[Any] | types.Type[Any],
-	*,
 	default: Any = MISSING,
-	nullable: bool = False,
 	init: bool = True,
-) -> Attribute[Any, Any]:
+	type: types.Type[Any] | None = None,
+) -> Any:
+	return Declaration(default, init, type)
+
+
+def declare(annotation: Any, value: Any) -> Attribute[Any, Any]:
+	if isinstance(value, Declaration):
+		declaration = value
+	else:
+		declaration = Declaration(value, True, None)
+	value_type, nullable = split_nullable(annotation)
 	return Attribute(
-		resolve_type(typ),
-		default=default,
+		declaration.type or resolve_type(value_type),
+		default=declaration.default,
 		nullable=nullable,
-		init=init,
+		init=declaration.init,
 	)
+
+
+def split_nullable(annotation: Any) -> tuple[Any, bool]:
+	if get_origin(annotation) is not Union:
+		return annotation, False
+	members = get_args(annotation)
+	value_types = [member for member in members if member is not NoneType]
+	if len(members) != 2 or len(value_types) != 1:
+		raise TypeError(f"unsupported attribute type: {annotation!r}")
+	return value_types[0], True
 
 
 def resolve_type[T](typ: type[T] | types.Type[T]) -> types.Type[T]:

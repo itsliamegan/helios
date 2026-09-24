@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from luna.test.assertion import assert_eq, assert_not, assert_raises, assert_that
 
 from helios.auth.password import Digest, Password
-from helios.database import Config, Model, Store, attribute
+from helios.database import Config, Model, Store
 from helios.database.sqlite import connect
 
 Digest.method = "pbkdf2:sha256:1"
@@ -30,8 +30,8 @@ def test_round_trips_password_attrs():
 	class Account(Model):
 		table = "accounts"
 
-		password = attribute(Password)
-		backup_password = attribute(Password, nullable=True)
+		password: Password
+		backup_password: Password | None = None
 
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")

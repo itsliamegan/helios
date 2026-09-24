@@ -6,7 +6,7 @@ from luna.test.assertion import assert_eq, assert_that
 
 import helios.app
 from helios.app import Application
-from helios.database import Config, Model, Provider, Store, attribute
+from helios.database import Config, Model, Provider, Store
 from helios.http import Method, Request, Response, Status, URL
 from helios.http.error import NotFoundError
 from helios.routing import Pattern, Route, Router
@@ -15,13 +15,13 @@ from helios.routing import Pattern, Route, Router
 class Post(Model):
 	table = "posts"
 
-	title = attribute(str)
+	title: str
 
 
 class Child(Model):
 	table = "children"
 
-	parent_id = attribute(str)
+	parent_id: str
 
 
 def request() -> Request:

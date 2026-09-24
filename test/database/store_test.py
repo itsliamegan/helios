@@ -43,14 +43,14 @@ class TokenCodec:
 class Record(Model):
 	table = "records"
 
-	name = attribute(str)
-	count = attribute(int)
-	active = attribute(bool)
-	owner_id = attribute(UUID)
-	link = attribute(http.URL)
-	published_at = attribute(datetime)
-	note = attribute(str, nullable=True)
-	token = attribute(TokenCodec())
+	name: str
+	count: int
+	active: bool
+	owner_id: UUID
+	link: http.URL
+	published_at: datetime
+	note: str | None = None
+	token: Token = attribute(type=TokenCodec())
 
 
 SCHEMA = """
@@ -350,7 +350,7 @@ def test_malformed_stored_scalar_is_database_error():
 def test_quotes_declared_table_and_column_identifiers():
 	class OddRecord(Model):
 		table = 'odd"records'
-		select = attribute(str)
+		select: str
 
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
