@@ -1,0 +1,46 @@
+from datetime import UTC, datetime
+
+from luna.test.assertion import assert_eq
+
+from helios.view import helpers
+
+
+def test_formats_elapsed_seconds():
+	then = datetime(year=2025, month=9, day=1, hour=12, minute=0, second=0, tzinfo=UTC)
+	now = datetime(year=2025, month=9, day=1, hour=12, minute=0, second=25, tzinfo=UTC)
+
+	assert_eq(helpers.elapsed(then, now), "less than a minute ago")
+
+
+def test_formats_elapsed_minutes():
+	then = datetime(year=2025, month=9, day=1, hour=12, minute=0, second=0, tzinfo=UTC)
+	now = datetime(year=2025, month=9, day=1, hour=12, minute=30, second=0, tzinfo=UTC)
+
+	assert_eq(helpers.elapsed(then, now), "30 minutes ago")
+
+
+def test_formats_elapsed_hours():
+	then = datetime(year=2025, month=9, day=1, hour=12, minute=0, second=0, tzinfo=UTC)
+	now = datetime(year=2025, month=9, day=1, hour=14, minute=10, second=0, tzinfo=UTC)
+
+	assert_eq(helpers.elapsed(then, now), "2 hours ago")
+
+
+def test_formats_elapsed_days():
+	then = datetime(year=2025, month=9, day=1, hour=12, minute=0, second=0, tzinfo=UTC)
+	now = datetime(year=2025, month=9, day=3, hour=14, minute=0, second=0, tzinfo=UTC)
+
+	assert_eq(helpers.elapsed(then, now), "2 days ago")
+
+
+def test_formats_then_if_elapsed_over_a_week():
+	then = datetime(year=2025, month=9, day=1, hour=12, minute=0, second=0, tzinfo=UTC)
+	now = datetime(year=2025, month=9, day=8, hour=12, minute=0, second=0, tzinfo=UTC)
+
+	assert_eq(helpers.elapsed(then, now), "Sep 1, 2025")
+
+
+def test_formats_date():
+	date = datetime(year=2026, month=4, day=7, tzinfo=UTC)
+
+	assert_eq(helpers.date(date), "Apr 7, 2026")
