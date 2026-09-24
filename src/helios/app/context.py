@@ -24,7 +24,7 @@ class Context:
 		if binding is None:
 			raise DependencyError(f"nothing provides {key.__qualname__}")
 		if not isinstance(binding, Scoped):
-			return self.container.resolve(key)
+			return self.container.get(key)
 
 		factory = cast(Callable[[Context], T], binding.factory)
 		value = factory(self)
