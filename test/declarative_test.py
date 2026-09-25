@@ -2,7 +2,7 @@ from typing import ClassVar
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.declaration import (
+from helios.declarative import (
 	Declaration,
 	DeclarationError,
 	MISSING,

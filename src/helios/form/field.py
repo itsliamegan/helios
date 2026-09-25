@@ -2,7 +2,7 @@ from copy import copy
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
-from helios.declaration import (
+from helios.declarative import (
 	Declaration,
 	DeclarationError,
 	MISSING,

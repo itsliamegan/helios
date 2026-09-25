@@ -5,7 +5,7 @@ from enum import Enum, auto
 from typing import Any, ClassVar, dataclass_transform
 from uuid import UUID, uuid4
 
-from helios.declaration import check_init_keywords, check_single_base, declarations
+from helios.declarative import check_init_keywords, check_single_base, declarations
 
 from .attribute import Attribute, declare, generated
 from .error import ModelError

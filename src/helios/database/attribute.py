@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
-from helios.declaration import Declaration, DeclarationError, MISSING, split_nullable
+from helios.declarative import Declaration, DeclarationError, MISSING, split_nullable
 
 from .codec import Codec, Scalar, encode, for_type
 from .error import ModelError

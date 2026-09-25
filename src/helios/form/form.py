@@ -2,7 +2,7 @@ from typing import Any, ClassVar, Self, dataclass_transform
 
 from luna.inflect import sentence
 
-from helios.declaration import check_init_keywords, check_single_base, declarations
+from helios.declarative import check_init_keywords, check_single_base, declarations
 from helios.http import Input
 
 from .error import FormError

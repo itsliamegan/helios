@@ -4,7 +4,7 @@ from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform
 
 from markupsafe import Markup
 
-from helios.declaration import (
+from helios.declarative import (
 	Declaration,
 	MISSING,
 	check_init_keywords,

@@ -1,6 +1,6 @@
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.declaration import MISSING
+from helios.declarative import MISSING
 from helios.form import RuleError, parser
 from helios.form.form import Failure, Field
 from helios.form.rule import Required
