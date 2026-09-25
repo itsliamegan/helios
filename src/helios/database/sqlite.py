@@ -2,9 +2,9 @@ from collections.abc import Iterable
 import sqlite3
 from typing import Any, Self
 
+from .codec import Scalar
 from .config import Config
 from .error import DatabaseBusy, DatabaseError
-from .types import Scalar
 
 
 def quote_identifier(identifier: str) -> str:

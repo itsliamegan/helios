@@ -8,7 +8,7 @@ type Scalar = int | float | str | bytes
 
 
 @runtime_checkable
-class Type[T](Protocol):
+class Codec[T](Protocol):
 	def check(self, value: object): ...
 
 	def encode(self, value: Any) -> Scalar:
@@ -19,8 +19,8 @@ class Type[T](Protocol):
 	def decode(self, value: Scalar) -> T: ...
 
 
-def encode[T](codec: Type[T], value: T) -> Scalar:
-	return Type.encode(codec, codec.encode(value))
+def encode[T](codec: Codec[T], value: T) -> Scalar:
+	return Codec.encode(codec, codec.encode(value))
 
 
 class Str:
@@ -30,7 +30,7 @@ class Str:
 
 	def encode(self, value: str) -> Scalar:
 		self.check(value)
-		return Type.encode(self, value)
+		return Codec.encode(self, value)
 
 	def decode(self, value: Scalar) -> str:
 		if not isinstance(value, str):
@@ -45,7 +45,7 @@ class Bool:
 
 	def encode(self, value: bool) -> Scalar:
 		self.check(value)
-		return Type.encode(self, 1 if value else 0)
+		return Codec.encode(self, 1 if value else 0)
 
 	def decode(self, value: Scalar) -> bool:
 		if not isinstance(value, int) or isinstance(value, bool) or value not in (0, 1):
@@ -60,7 +60,7 @@ class Int:
 
 	def encode(self, value: int) -> Scalar:
 		self.check(value)
-		return Type.encode(self, value)
+		return Codec.encode(self, value)
 
 	def decode(self, value: Scalar) -> int:
 		if not isinstance(value, int) or isinstance(value, bool):
@@ -75,7 +75,7 @@ class UUID:
 
 	def encode(self, value: uuid.UUID) -> Scalar:
 		self.check(value)
-		return Type.encode(self, str(value))
+		return Codec.encode(self, str(value))
 
 	def decode(self, value: Scalar) -> uuid.UUID:
 		if not isinstance(value, str):
@@ -99,7 +99,7 @@ class Date:
 
 	def encode(self, value: datetime) -> Scalar:
 		self.check(value)
-		return Type.encode(self, value.astimezone(UTC).strftime(self.FORMAT))
+		return Codec.encode(self, value.astimezone(UTC).strftime(self.FORMAT))
 
 	def decode(self, value: Scalar) -> datetime:
 		if not isinstance(value, str):
@@ -117,9 +117,31 @@ class URL:
 
 	def encode(self, value: http.URL) -> Scalar:
 		self.check(value)
-		return Type.encode(self, str(value))
+		return Codec.encode(self, str(value))
 
 	def decode(self, value: Scalar) -> http.URL:
 		if not isinstance(value, str):
 			raise TypeError(f"expected a URL string, got {type(value).__name__}")
 		return http.URL(value)
+
+
+CODECS: dict[object, Codec[Any]] = {
+	str: Str(),
+	bool: Bool(),
+	int: Int(),
+	uuid.UUID: UUID(),
+	datetime: Date(),
+	http.URL: URL(),
+}
+
+
+def for_type(value_type: object) -> Codec[Any] | None:
+	try:
+		found = CODECS.get(value_type)
+	except TypeError:
+		found = None
+
+	if found is None and isinstance(value_type, Codec):
+		return value_type
+	else:
+		return found

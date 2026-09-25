@@ -1,12 +1,9 @@
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, TYPE_CHECKING, cast
-from uuid import UUID
+from typing import Any, TYPE_CHECKING
 
 from helios.declaration import DeclarationError, Declared, MISSING, split_nullable
-from helios.http import URL
 
-from . import types
+from .codec import Codec, Scalar, encode, for_type
 from .error import ModelError
 
 if TYPE_CHECKING:
@@ -18,7 +15,7 @@ class Attribute:
 	name: str | None
 	entry: Declared
 	declaration: Declaration
-	resolved: types.Type[object] | None
+	resolved: Codec[object] | None
 	default: object
 	required: bool
 	nullable: bool
@@ -41,17 +38,24 @@ class Attribute:
 		return self.resolved is None
 
 	@property
-	def codec(self) -> types.Type[object]:
+	def codec(self) -> Codec[object]:
 		if self.resolved is None:
 			raise AttributeError(f"attribute {self.name!r} has not been resolved")
 		return self.resolved
 
 	def settle(self, entry: Declared):
 		value_type, self.nullable = split_nullable(entry.name, entry.annotation)
-		if self.declaration.type is None:
-			self.resolved = resolve_type(entry.name, value_type)
-		else:
+		if self.declaration.type is not None:
 			self.resolved = self.declaration.type
+			return
+
+		found = for_type(value_type)
+		if found is None:
+			raise DeclarationError(
+				entry.name,
+				f"unsupported attribute type: {value_type!r}",
+			)
+		self.resolved = found
 
 	def resolve(self):
 		if not self.pending:
@@ -88,13 +92,13 @@ class Attribute:
 		except (TypeError, ValueError) as error:
 			raise ModelError(f"{model_type.__name__}.{self.name}: {error}") from error
 
-	def encode(self, value: object, model_type: type) -> types.Scalar | None:
+	def encode(self, value: object, model_type: type) -> Scalar | None:
 		self.check(value, model_type)
 		if value is None:
 			return None
-		return types.encode(self.codec, value)
+		return encode(self.codec, value)
 
-	def decode(self, raw: types.Scalar | None, model_type: type) -> object:
+	def decode(self, raw: Scalar | None, model_type: type) -> object:
 		value = None if raw is None else self.codec.decode(raw)
 		self.check(value, model_type)
 		return value
@@ -111,13 +115,13 @@ class Attribute:
 class Declaration:
 	default: object
 	init: bool
-	type: types.Type[object] | None
+	type: Codec[object] | None
 
 	def __init__(
 		self,
 		default: object,
 		init: bool,
-		type: types.Type[object] | None,
+		type: Codec[object] | None,
 	):
 		self.default = default
 		self.init = init
@@ -127,7 +131,7 @@ class Declaration:
 def attribute(
 	default: object = MISSING,
 	init: bool = True,
-	type: types.Type[object] | None = None,
+	type: Codec[object] | None = None,
 ) -> Any:
 	return Declaration(default, init, type)
 
@@ -137,21 +141,3 @@ def declare(entry: Declared) -> Attribute:
 		return Attribute(entry, entry.default)
 	else:
 		return Attribute(entry, Declaration(entry.default, True, None))
-
-
-def resolve_type[T](name: str, typ: type[T] | types.Type[T]) -> types.Type[T]:
-	if typ is str:
-		return cast(types.Type[T], types.Str())
-	if typ is bool:
-		return cast(types.Type[T], types.Bool())
-	if typ is int:
-		return cast(types.Type[T], types.Int())
-	if typ is UUID:
-		return cast(types.Type[T], types.UUID())
-	if typ is datetime:
-		return cast(types.Type[T], types.Date())
-	if typ is URL:
-		return cast(types.Type[T], types.URL())
-	if isinstance(typ, types.Type):
-		return typ
-	raise DeclarationError(name, f"unsupported attribute type: {typ!r}")
