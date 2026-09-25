@@ -1,9 +1,8 @@
-from dataclasses import replace
 from typing import Any, ClassVar, Self, dataclass_transform
 
 from luna.inflect import sentence
 
-from helios.declaration import check_init_keywords, declarations
+from helios.declaration import check_init_keywords, check_single_base, declarations
 from helios.http import Input
 
 from .error import FormError
@@ -20,25 +19,24 @@ class Form:
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
-		fields = dict(cls.fields)
+		check_single_base(cls, Form, FormError)
+		cls.fields = {}
 		for declaration in declarations(cls, declare, FormError):
 			if declaration.name in RESERVED:
 				raise FormError(
 					f"Form {cls.__name__} has a field named '{declaration.name}', "
 					"which Form uses"
 				)
-			fields[declaration.name] = declaration.resolve()
+			field = declaration.resolve()
+			field.extra_rules = cls.rules.get(declaration.name, [])
+			cls.fields[declaration.name] = field
+			setattr(cls, declaration.name, field)
 
 		for name in cls.rules:
-			if name not in fields:
+			if name not in cls.fields:
 				raise FormError(
 					f"Form {cls.__name__} has rules for '{name}', which is not a field"
 				)
-
-		cls.fields = {}
-		for name, field in fields.items():
-			cls.fields[name] = replace(field, extra_rules=cls.rules.get(name, []))
-			setattr(cls, name, cls.fields[name])
 
 	def __init__(self, **values: Any):
 		form = type(self)
