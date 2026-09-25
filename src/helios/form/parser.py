@@ -4,7 +4,7 @@ import uuid
 
 from helios import http
 
-from .rules import Rule, RuleError
+from .rule import Rule, RuleError
 
 Verbatim = NewType("Verbatim", str)
 
@@ -25,7 +25,7 @@ class Scalar:
 
 
 class Str(Scalar):
-	def check(self, value: RawValue, /) -> str:
+	def check(self, value: RawValue) -> str:
 		return self.single(value)
 
 
@@ -33,7 +33,7 @@ class Int(Scalar):
 	name = "integer"
 	message = "must be a whole number"
 
-	def check(self, value: RawValue, /) -> int:
+	def check(self, value: RawValue) -> int:
 		raw = self.single(value)
 		if re.fullmatch(r"-?[0-9]+", raw) is None:
 			raise RuleError()
@@ -45,7 +45,7 @@ class UUID(Scalar):
 	name = "uuid"
 	message = "must be a valid UUID"
 
-	def check(self, value: RawValue, /) -> uuid.UUID:
+	def check(self, value: RawValue) -> uuid.UUID:
 		raw = self.single(value)
 		try:
 			return uuid.UUID(raw)
@@ -57,7 +57,7 @@ class URL(Scalar):
 	name = "url"
 	message = "must be a valid URL"
 
-	def check(self, value: RawValue, /) -> http.URL:
+	def check(self, value: RawValue) -> http.URL:
 		raw = self.single(value)
 		try:
 			return http.URL(raw)
@@ -69,7 +69,7 @@ class Bool:
 	name = "boolean"
 	message = 'must be "on" or omitted'
 
-	def check(self, value: RawValue, /) -> bool:
+	def check(self, value: RawValue) -> bool:
 		if value == "on":
 			return True
 		else:
@@ -88,7 +88,7 @@ class List[T]:
 	def message(self) -> str:
 		return self.parser.message
 
-	def check(self, value: RawValue, /) -> list[T]:
+	def check(self, value: RawValue) -> list[T]:
 		if isinstance(value, str):
 			values = [value]
 		else:

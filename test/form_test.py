@@ -252,7 +252,7 @@ class MaxLength:
 	def message(self) -> str:
 		return f"must be at most {self.limit} characters"
 
-	def check(self, value: str, /) -> str:
+	def check(self, value: str) -> str:
 		if len(value) > self.limit:
 			raise RuleError()
 		else:

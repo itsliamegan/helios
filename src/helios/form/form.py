@@ -16,7 +16,7 @@ from helios.http import Input
 
 from .errors import Errors
 from .parser import Parser, RawValue, is_verbatim, resolve
-from .rules import Required, Rule, RuleError
+from .rule import Required, Rule, RuleError
 
 MISSING: Any = object()
 

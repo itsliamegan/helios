@@ -16,7 +16,7 @@ class Rule[In, Out](Protocol):
 	@property
 	def message(self) -> str: ...
 
-	def check(self, value: In, /) -> Out: ...
+	def check(self, value: In) -> Out: ...
 
 
 class FunctionRule[T]:
@@ -25,7 +25,7 @@ class FunctionRule[T]:
 		self.message = message
 		self.function = function
 
-	def check(self, value: T, /) -> T:
+	def check(self, value: T) -> T:
 		return self.function(value)
 
 
@@ -43,7 +43,7 @@ class Required:
 	name = "required"
 	message = "must be provided"
 
-	def check[T](self, value: T | None, /) -> T:
+	def check[T](self, value: T | None) -> T:
 		if value is None:
 			raise RuleError()
 		else:
