@@ -36,7 +36,7 @@ class Changes:
 
 
 class ModelMeta(type):
-	attributes: dict[str, Attribute]
+	declared_attributes: dict[str, Attribute]
 
 	def __new__(
 		metaclass,
@@ -54,7 +54,7 @@ class ModelMeta(type):
 			raise ModelError(f"{name} cannot inherit from multiple model classes")
 
 		model_type = super().__new__(metaclass, name, bases, namespace)
-		attributes = dict(model_bases[0].attributes) if model_bases else {}
+		attributes = dict(model_bases[0].declared_attributes) if model_bases else {}
 		own_attributes = declare_attributes(model_type)
 		for attribute_name, value in namespace.items():
 			if isinstance(value, Declaration) and attribute_name not in own_attributes:
@@ -71,8 +71,14 @@ class ModelMeta(type):
 			setattr(model_type, attribute_name, declared_attribute)
 			attributes[attribute_name] = declared_attribute
 
-		model_type.attributes = attributes
+		model_type.declared_attributes = attributes
 		return model_type
+
+	@property
+	def attributes(cls) -> dict[str, Attribute]:
+		for declared_attribute in cls.declared_attributes.values():
+			declared_attribute.resolve()
+		return cls.declared_attributes
 
 
 def declare_attributes(model_type: type) -> dict[str, Attribute]:
@@ -89,7 +95,6 @@ def declare_attributes(model_type: type) -> dict[str, Attribute]:
 )
 class Model(metaclass=ModelMeta):
 	table: ClassVar[str] = ""
-	attributes: ClassVar[dict[str, Attribute]]
 
 	id: UUID = attribute(init=False)
 	created_at: datetime | None = attribute(init=False)
@@ -104,7 +109,7 @@ class Model(metaclass=ModelMeta):
 	@classmethod
 	def hydrate(cls, values: dict[str, Any]) -> Model:
 		model = cls.__new__(cls)
-		model.values = dict(values)
+		model.values = {name: values[name] for name in cls.attributes}
 		model._changes = Changes()
 		model._status = Status.PERSISTED
 		return model

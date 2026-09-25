@@ -347,6 +347,57 @@ def test_malformed_stored_scalar_is_database_error():
 			connection.close()
 
 
+def test_round_trips_models_with_codecs_declared_later():
+	class Badge(Model):
+		table = "badges"
+		label: Label
+
+	class Label:
+		def __init__(self, text: str):
+			self.text = text
+
+		@classmethod
+		def check(cls, value: object):
+			if not isinstance(value, cls):
+				raise TypeError("expected a Label")
+
+		@classmethod
+		def encode(cls, value: Label) -> str:
+			return value.text
+
+		@classmethod
+		def decode(cls, value: object) -> Label:
+			return cls(str(value))
+
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(
+			path,
+			"""CREATE TABLE badges (
+				id TEXT PRIMARY KEY,
+				created_at TEXT NOT NULL,
+				label TEXT NOT NULL
+			)""",
+		)
+		connection = connect(Config(path))
+		connection.begin()
+		try:
+			created = Store(connection, [Badge]).create(Badge, label=Label("new"))
+			connection.commit()
+		finally:
+			connection.close()
+
+		second_connection = connect(Config(path))
+		second_connection.begin()
+		try:
+			found = Store(second_connection, [Badge]).find_one(Badge, created.id)
+		finally:
+			second_connection.close()
+
+		assert_that(found is not created)
+		assert_eq(found.label.text, "new")
+
+
 def test_quotes_declared_table_and_column_identifiers():
 	class OddRecord(Model):
 		table = 'odd"records'

@@ -13,28 +13,53 @@ if TYPE_CHECKING:
 	from .model import Model
 
 
-@dataclass
+@dataclass(init=False)
 class Attribute:
 	name: str | None
-	type: types.Type[object]
+	entry: Declared
+	declaration: Declaration
+	resolved: types.Type[object] | None
 	default: object
 	required: bool
 	nullable: bool
 	init: bool
 
-	def __init__(
-		self,
-		type: types.Type[object],
-		default: object,
-		nullable: bool,
-		init: bool,
-	):
+	def __init__(self, entry: Declared, declaration: Declaration):
 		self.name = None
-		self.type = type
-		self.default = None if default is MISSING else default
-		self.required = default is MISSING
-		self.nullable = nullable
-		self.init = init
+		self.entry = entry
+		self.declaration = declaration
+		self.resolved = None
+		self.default = None if declaration.default is MISSING else declaration.default
+		self.required = declaration.default is MISSING
+		self.nullable = False
+		self.init = declaration.init
+		if not entry.pending:
+			self.settle(entry)
+
+	@property
+	def pending(self) -> bool:
+		return self.resolved is None
+
+	@property
+	def codec(self) -> types.Type[object]:
+		if self.resolved is None:
+			raise AttributeError(f"attribute {self.name!r} has not been resolved")
+		return self.resolved
+
+	def settle(self, entry: Declared):
+		value_type, self.nullable = split_nullable(entry.name, entry.annotation)
+		if self.declaration.type is None:
+			self.resolved = resolve_type(entry.name, value_type)
+		else:
+			self.resolved = self.declaration.type
+
+	def resolve(self):
+		if not self.pending:
+			return
+		try:
+			self.settle(self.entry.resolve())
+		except DeclarationError as error:
+			raise ModelError(f"{self.entry.owner.__name__}.{error}") from error
 
 	def __set_name__(self, _owner: type, name: str):
 		self.name = name
@@ -59,7 +84,7 @@ class Attribute:
 				return
 			raise ModelError(f"{model_type.__name__}.{self.name}: cannot be null")
 		try:
-			self.type.check(value)
+			self.codec.check(value)
 		except (TypeError, ValueError) as error:
 			raise ModelError(f"{model_type.__name__}.{self.name}: {error}") from error
 
@@ -67,10 +92,10 @@ class Attribute:
 		self.check(value, model_type)
 		if value is None:
 			return None
-		return types.encode(self.type, value)
+		return types.encode(self.codec, value)
 
 	def decode(self, raw: types.Scalar | None, model_type: type) -> object:
-		value = None if raw is None else self.type.decode(raw)
+		value = None if raw is None else self.codec.decode(raw)
 		self.check(value, model_type)
 		return value
 
@@ -109,20 +134,9 @@ def attribute(
 
 def declare(entry: Declared) -> Attribute:
 	if isinstance(entry.default, Declaration):
-		declaration = entry.default
+		return Attribute(entry, entry.default)
 	else:
-		declaration = Declaration(entry.default, True, None)
-	value_type, nullable = split_nullable(entry.name, entry.annotation)
-	if declaration.type is None:
-		codec = resolve_type(entry.name, value_type)
-	else:
-		codec = declaration.type
-	return Attribute(
-		codec,
-		declaration.default,
-		nullable,
-		declaration.init,
-	)
+		return Attribute(entry, Declaration(entry.default, True, None))
 
 
 def resolve_type[T](name: str, typ: type[T] | types.Type[T]) -> types.Type[T]:

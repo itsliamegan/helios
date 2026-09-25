@@ -1,6 +1,6 @@
 from annotationlib import Format, ForwardRef, get_annotations
 from collections.abc import Collection
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import NoneType
 from typing import Any, ClassVar, Union, get_args, get_origin
 
@@ -21,6 +21,20 @@ class Declared:
 	annotation: Any
 	default: object
 
+	@property
+	def pending(self) -> bool:
+		return forward_reference(self.annotation) is not None
+
+	def resolve(self) -> Declared:
+		try:
+			annotation = get_annotations(self.owner)[self.name]
+		except NameError as error:
+			raise DeclarationError(
+				self.name,
+				f"unresolved annotation: {error.name}",
+			) from error
+		return replace(self, annotation=annotation)
+
 
 def declared(owner: type) -> list[Declared]:
 	entries = []
@@ -31,12 +45,6 @@ def declared(owner: type) -> list[Declared]:
 			raise DeclarationError(
 				name,
 				f"string annotations are not supported: {annotation!r}",
-			)
-		reference = forward_reference(annotation)
-		if reference is not None:
-			raise DeclarationError(
-				name,
-				f"unresolved annotation: {reference.__forward_arg__}",
 			)
 		entries.append(
 			Declared(owner, name, annotation, vars(owner).get(name, MISSING))

@@ -31,6 +31,8 @@ class Form:
 						f"Form {cls.__name__} has a field named '{entry.name}', "
 						"which Form uses"
 					)
+				if entry.pending:
+					entry = entry.resolve()
 				field = declare(entry, cls.rules.get(entry.name, []))
 				setattr(cls, entry.name, field)
 				fields[entry.name] = field

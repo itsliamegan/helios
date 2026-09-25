@@ -4,7 +4,13 @@ from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform
 
 from markupsafe import Markup
 
-from helios.declaration import DeclarationError, MISSING, check_keywords, declared
+from helios.declaration import (
+	DeclarationError,
+	Declared,
+	MISSING,
+	check_keywords,
+	declared,
+)
 
 from .attributes import Attributes, html_name
 from .error import ComponentError
@@ -20,6 +26,7 @@ class Component:
 	template: ClassVar[str]
 	accepts: ClassVar[set[str]] = set()
 	props: ClassVar[dict[str, Any]] = {}
+	pending_props: ClassVar[list[Declared]] = []
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
@@ -29,6 +36,10 @@ class Component:
 			raise ComponentError(f"{cls.__name__}.{error}") from error
 		props = {entry.name: entry.default for entry in entries}
 		cls.props = cls.props | props
+		cls.pending_props = [
+			*(entry for entry in cls.pending_props if entry.name not in props),
+			*(entry for entry in entries if entry.pending),
+		]
 		check_declaration(cls)
 
 	@classmethod
@@ -37,6 +48,8 @@ class Component:
 
 	def __init__(self, **keywords: Any):
 		component = type(self)
+		if component.pending_props:
+			resolve_props(component)
 		props = {}
 		attributes = {}
 		for name, value in keywords.items():
@@ -96,6 +109,15 @@ class Component:
 			f"{name}={getattr(self, name)!r}" for name in type(self).props
 		)
 		return f"{type(self).__name__}({values})"
+
+
+def resolve_props(component: type[Component]):
+	for entry in component.pending_props:
+		try:
+			entry.resolve()
+		except DeclarationError as error:
+			raise ComponentError(f"{entry.owner.__name__}.{error}") from error
+	component.pending_props = []
 
 
 def check_declaration(component: type[Component]):

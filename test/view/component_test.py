@@ -1,5 +1,5 @@
 from jinja2 import UndefinedError
-from luna.test.assertion import assert_eq, assert_raises
+from luna.test.assertion import assert_eq, assert_raises, assert_that
 from markupsafe import Markup
 
 from helios.view import (
@@ -395,12 +395,29 @@ def test_rejects_mutable_defaults():
 			names: list[str] = []
 
 
-def test_rejects_undefined_annotations():
+def test_accepts_props_typed_with_later_classes():
+	class Card(Component):
+		template = "card"
+
+		pin: Pin
+
+	class Pin:
+		pass
+
+	pin = Pin()
+
+	card = Card(pin=pin)
+
+	assert_that(card.pin is pin)
+
+
+def test_rejects_undefined_annotations_on_construction():
+	class Card(Component):
+		template = "card"
+
+		pin: Pin  # noqa: F821
+
 	with assert_raises(ComponentError) as raised:
-
-		class Card(Component):
-			template = "card"
-
-			pin: Pin  # noqa: F821
+		Card(pin=None)
 
 	assert_eq(str(raised.exception), "Card.pin: unresolved annotation: Pin")

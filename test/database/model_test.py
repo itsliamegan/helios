@@ -119,6 +119,70 @@ def test_resolves_codecs_nested_in_the_model():
 		Post(slug="intro")
 
 
+def test_resolves_codecs_that_refer_to_the_model():
+	class Post(Model):
+		class Slug:
+			def __init__(self, text: str):
+				self.text = text
+
+			@classmethod
+			def check(cls, value: object):
+				if not isinstance(value, cls):
+					raise TypeError("expected a Slug")
+
+			@classmethod
+			def encode(cls, value: Post.Slug) -> str:
+				return value.text
+
+			@classmethod
+			def decode(cls, value: object) -> Post.Slug:
+				return cls(str(value))
+
+		slug: Post.Slug | None = None
+
+	post = Post(slug=Post.Slug("intro"))
+
+	assert_eq(post.slug.text, "intro")
+	with assert_raises(ModelError):
+		Post(slug="intro")
+
+
+def test_resolves_codecs_declared_after_the_model():
+	class Post(Model):
+		slug: Slug
+
+	class Slug:
+		def __init__(self, text: str):
+			self.text = text
+
+		@classmethod
+		def check(cls, value: object):
+			if not isinstance(value, cls):
+				raise TypeError("expected a Slug")
+
+		@classmethod
+		def encode(cls, value: Slug) -> str:
+			return value.text
+
+		@classmethod
+		def decode(cls, value: object) -> Slug:
+			return cls(str(value))
+
+	post = Post(slug=Slug("intro"))
+
+	assert_eq(post.slug.text, "intro")
+
+
+def test_rejects_unresolved_annotations_on_construction():
+	class Post(Model):
+		author: Author  # noqa: F821
+
+	with assert_raises(ModelError) as raised:
+		Post(author=None)
+
+	assert_eq(str(raised.exception), "Post.author: unresolved annotation: Author")
+
+
 def test_rejects_attributes_without_supported_annotations():
 	with assert_raises(ModelError):
 
@@ -139,11 +203,6 @@ def test_rejects_attributes_without_supported_annotations():
 
 		class Alternative(Model):
 			value: str | int
-
-	with assert_raises(ModelError):
-
-		class Unresolved(Model):
-			author: Author  # noqa: F821
 
 
 def test_declaration_errors_are_type_errors():
