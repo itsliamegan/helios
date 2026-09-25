@@ -19,9 +19,6 @@ class Errors:
 		else:
 			return None
 
-	def __getitem__(self, name: str) -> list[str]:
-		return list(self.messages.get(name, []))
-
 	def __contains__(self, name: str) -> bool:
 		return name in self.messages
 

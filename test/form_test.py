@@ -57,7 +57,7 @@ def test_copies_mutable_defaults():
 def test_requires_fields_without_defaults():
 	form, errors = PinForm.validate(Input())
 
-	assert_eq(errors["title"], ["Title must be provided."])
+	assert_eq(errors.messages["title"], ["Title must be provided."])
 	with assert_raises(AttributeError) as raised:
 		_ = form.title
 	assert_eq(str(raised.exception), "PinForm.title has not been initialized")
@@ -76,7 +76,7 @@ def test_trims_strings():
 def test_treats_blank_strings_as_missing():
 	form, errors = PinForm.validate(Input({"title": "   ", "return_to": ""}))
 
-	assert_eq(errors["title"], ["Title must be provided."])
+	assert_eq(errors.messages["title"], ["Title must be provided."])
 	assert_that(form.return_to is None)
 
 
@@ -101,7 +101,7 @@ def test_keeps_verbatim_fields_exactly_as_sent():
 	assert_eq(indented.note, "  - item\n")
 	assert_that(not blank_errors)
 	assert_eq(blank.password, "")
-	assert_eq(missing_errors["password"], ["Password must be provided."])
+	assert_eq(missing_errors.messages["password"], ["Password must be provided."])
 
 
 def test_records_parse_errors_with_readable_field_names():
@@ -117,7 +117,7 @@ def test_records_parse_errors_with_readable_field_names():
 def test_rejects_repeated_scalar_values():
 	_, errors = PinForm.validate(Input({"title": ["Intro", "Outro"]}))
 
-	assert_eq(errors["title"], ["Title must be a single value."])
+	assert_eq(errors.messages["title"], ["Title must be a single value."])
 
 
 def test_parses_checkboxes_and_other_scalar_types():
@@ -306,8 +306,8 @@ def test_runs_rules_with_parameters():
 	_, note_errors = NoteForm.validate(Input({"title": "Too long"}))
 	_, comment_errors = CommentForm.validate(Input({"body": "Hello"}))
 
-	assert_eq(note_errors["title"], ["Keep the title short."])
-	assert_eq(comment_errors["body"], ["Body must be at most 3 characters."])
+	assert_eq(note_errors.messages["title"], ["Keep the title short."])
+	assert_eq(comment_errors.messages["body"], ["Body must be at most 3 characters."])
 
 
 def test_rule_errors_can_replace_the_default_message():
@@ -322,7 +322,7 @@ def test_rule_errors_can_replace_the_default_message():
 
 	_, errors = HandleForm.validate(Input({"handle": "admin"}))
 
-	assert_eq(errors["handle"], ["Handle must not be a reserved name."])
+	assert_eq(errors.messages["handle"], ["Handle must not be a reserved name."])
 
 
 def test_stops_at_the_first_failing_rule():
@@ -340,7 +340,7 @@ def test_stops_at_the_first_failing_rule():
 
 	_, errors = LinkForm.validate(Input({"url": "example.com"}))
 
-	assert_eq(errors["url"], ["Url must start with http:// or https://."])
+	assert_eq(errors.messages["url"], ["Url must start with http:// or https://."])
 	assert_eq(calls, [])
 
 
@@ -364,7 +364,7 @@ def test_skips_rules_after_a_parse_error():
 
 	_, errors = LinkForm.validate(Input({"board_ids": ["not-a-uuid"]}))
 
-	assert_eq(errors["board_ids"], ["Board ids must be a valid UUID."])
+	assert_eq(errors.messages["board_ids"], ["Board ids must be a valid UUID."])
 
 
 def test_subclasses_replace_rules_for_inherited_fields():
@@ -379,7 +379,7 @@ def test_subclasses_replace_rules_for_inherited_fields():
 	_, link_errors = LinkForm.validate(Input({"url": "example.com"}))
 	form, any_link_errors = AnyLinkForm.validate(Input({"url": "example.com"}))
 
-	assert_eq(link_errors["url"], ["Url must start with http:// or https://."])
+	assert_eq(link_errors.messages["url"], ["Url must start with http:// or https://."])
 	assert_that(not any_link_errors)
 	assert_eq(form.url, "example.com")
 
