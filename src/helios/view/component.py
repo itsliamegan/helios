@@ -8,6 +8,7 @@ from helios.declaration import (
 	Declaration,
 	MISSING,
 	check_init_keywords,
+	check_single_base,
 	declarations,
 )
 
@@ -28,10 +29,11 @@ class Component:
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
-		props = dict(cls.props)
-		for declaration in declarations(cls, prop_type, ComponentError):
-			props[declaration.name] = declaration
-		cls.props = props
+		check_single_base(cls, Component, ComponentError)
+		cls.props = {
+			declaration.name: declaration
+			for declaration in declarations(cls, prop_type, ComponentError)
+		}
 		check_declaration(cls)
 
 	@classmethod
