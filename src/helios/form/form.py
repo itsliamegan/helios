@@ -6,23 +6,17 @@ from types import NoneType
 from typing import (
 	Any,
 	ClassVar,
-	NewType,
 	Self,
 	Union,
 	dataclass_transform,
 	get_args,
 	get_origin,
 )
-import uuid
 
-from helios import http
 from helios.http import Input
 
-from . import parser
 from .errors import Errors
-from .parser import ParseError, Parser, RawValue
-
-Verbatim = NewType("Verbatim", str)
+from .parser import ParseError, Parser, RawValue, is_verbatim, resolve
 
 type Rule = Callable[[Any], Any]
 
@@ -31,16 +25,6 @@ MISSING: Any = object()
 
 class RuleError(ValueError):
 	pass
-
-
-SCALARS: dict[Any, Parser[Any]] = {
-	str: parser.Str(),
-	Verbatim: parser.Str(),
-	bool: parser.Bool(),
-	int: parser.Int(),
-	uuid.UUID: parser.UUID(),
-	http.URL: parser.URL(),
-}
 
 
 @dataclass
@@ -181,26 +165,17 @@ RESERVED = {"values", *vars(Form)}
 
 def declare(name: str, annotation: Any, default: object) -> Field:
 	annotation = unwrap_nullable(annotation)
-	if get_origin(annotation) is list:
-		(item,) = get_args(annotation)
-		return Field(name, parser.List(scalar(item)), default, item is Verbatim)
-	return Field(name, scalar(annotation), default, annotation is Verbatim)
+	return Field(name, resolve(annotation), default, is_verbatim(annotation))
 
 
 def unwrap_nullable(annotation: Any) -> Any:
 	if get_origin(annotation) is not Union:
 		return annotation
+
 	members = [member for member in get_args(annotation) if member is not NoneType]
 	if len(members) != 1 or len(get_args(annotation)) != 2:
 		raise TypeError(f"unsupported field type: {annotation!r}")
 	return members[0]
-
-
-def scalar(annotation: Any) -> Parser[Any]:
-	try:
-		return SCALARS[annotation]
-	except KeyError, TypeError:
-		raise TypeError(f"unsupported field type: {annotation!r}") from None
 
 
 def trim(value: RawValue) -> RawValue | None:

@@ -1,8 +1,10 @@
 import re
-from typing import ClassVar, Protocol
+from typing import Any, ClassVar, NewType, Protocol, get_args, get_origin
 import uuid
 
 from helios import http
+
+Verbatim = NewType("Verbatim", str)
 
 type RawValue = str | list[str]
 
@@ -84,3 +86,36 @@ class List[T]:
 		else:
 			values = value
 		return [self.parser.parse(item) for item in values]
+
+
+SCALARS: dict[Any, Parser[Any]] = {
+	str: Str(),
+	Verbatim: Str(),
+	bool: Bool(),
+	int: Int(),
+	uuid.UUID: UUID(),
+	http.URL: URL(),
+}
+
+
+def resolve(annotation: Any) -> Parser[Any]:
+	if get_origin(annotation) is list:
+		(item,) = get_args(annotation)
+		return List(scalar(item))
+	else:
+		return scalar(annotation)
+
+
+def is_verbatim(annotation: Any) -> bool:
+	if get_origin(annotation) is list:
+		(item,) = get_args(annotation)
+		return item is Verbatim
+	else:
+		return annotation is Verbatim
+
+
+def scalar(annotation: Any) -> Parser[Any]:
+	try:
+		return SCALARS[annotation]
+	except KeyError, TypeError:
+		raise TypeError(f"unsupported field type: {annotation!r}") from None
