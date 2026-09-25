@@ -4,10 +4,12 @@ from typing import Any, ClassVar, Self, dataclass_transform, get_origin
 
 from luna.inflect import sentence
 
+from helios.declaration import DeclarationError, MISSING, check_keywords
 from helios.http import Input
 
+from .error import FormError
 from .errors import Errors
-from .field import Failure, Field, MISSING, declare
+from .field import Failure, Field, declare
 from .rule import Rule
 
 
@@ -28,7 +30,7 @@ class Form:
 				continue
 
 			if name in RESERVED:
-				raise TypeError(
+				raise FormError(
 					f"Form {cls.__name__} has a field named '{name}', which Form uses"
 				)
 			try:
@@ -38,34 +40,27 @@ class Form:
 					vars(cls).get(name, MISSING),
 					cls.rules.get(name, []),
 				)
-			except TypeError as error:
-				raise TypeError(f"{cls.__name__}.{name}: {error}") from error
+			except DeclarationError as error:
+				raise FormError(f"{cls.__name__}.{error}") from error
 			setattr(cls, name, field)
 			fields[name] = field
 
 		for name in cls.rules:
 			if name not in fields:
-				raise TypeError(
+				raise FormError(
 					f"Form {cls.__name__} has rules for '{name}', which is not a field"
 				)
 		cls.fields = fields
 
 	def __init__(self, **values: Any):
 		form = type(self)
-
-		extra = [name for name in values if name not in form.fields]
-		if extra:
-			raise TypeError(
-				f"{form.__name__} got unexpected fields: {", ".join(extra)}"
-			)
-
-		missing = [
-			name
-			for name, field in form.fields.items()
-			if field.required and name not in values
-		]
-		if missing:
-			raise TypeError(f"{form.__name__} is missing fields: {", ".join(missing)}")
+		check_keywords(
+			form,
+			"fields",
+			values,
+			form.fields,
+			[name for name, field in form.fields.items() if field.required],
+		)
 
 		self.values: dict[str, Any] = {}
 		for name, field in form.fields.items():

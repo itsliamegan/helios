@@ -200,7 +200,7 @@ class Store:
 		try:
 			for name, raw_value in zip(column_names, row, strict=True):
 				values[name] = model_type.attributes[name].decode(raw_value, model_type)
-		except (TypeError, ValueError, ModelError) as error:
+		except (TypeError, ValueError) as error:
 			raise DatabaseError(
 				"database row contains an invalid model value"
 			) from error

@@ -4,14 +4,15 @@ from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform, get_origin
 
 from markupsafe import Markup
 
+from helios.declaration import MISSING, check_keywords
+
 from .attributes import Attributes, html_name
+from .error import ComponentError
 
 if TYPE_CHECKING:
 	from .engine import Engine
 
 rendering: ContextVar[Engine] = ContextVar("rendering")
-
-MISSING: Any = object()
 
 
 @dataclass_transform(kw_only_default=True, eq_default=False)
@@ -61,15 +62,13 @@ class Component:
 				{html_name(name): value for name, value in attributes.items()}
 			)
 
-		missing = [
-			name
-			for name, default in component.props.items()
-			if name not in props and default is MISSING
-		]
-		if missing:
-			raise TypeError(
-				f"{component.__name__} is missing props: {", ".join(missing)}"
-			)
+		check_keywords(
+			component,
+			"props",
+			props,
+			component.props,
+			[name for name, default in component.props.items() if default is MISSING],
+		)
 
 		for name, default in component.props.items():
 			setattr(self, name, props.get(name, default))
@@ -105,21 +104,21 @@ def check_declaration(component: type[Component]):
 	name = component.__name__
 	for prop_name, default in component.props.items():
 		if prop_name == "component":
-			raise ValueError(f'Component {name} has a prop named "component"')
+			raise ComponentError(f'Component {name} has a prop named "component"')
 		if prop_name in vars(Component) or prop_name in get_annotations(Component):
-			raise ValueError(
+			raise ComponentError(
 				f'Component {name} has a prop named "{prop_name}", which Component uses'
 			)
 		if default is not MISSING and default.__hash__ is None:
-			raise ValueError(
+			raise ComponentError(
 				f'Component {name} has a mutable default for "{prop_name}"'
 			)
 		if html_name(prop_name) in component.accepts:
-			raise ValueError(
+			raise ComponentError(
 				f'Component {name} accepts "{html_name(prop_name)}", '
 				"which is also a prop"
 			)
 	if component.accepts and "attributes" not in component.props:
-		raise ValueError(
+		raise ComponentError(
 			f"Component {name} declares accepts but has no attributes prop"
 		)

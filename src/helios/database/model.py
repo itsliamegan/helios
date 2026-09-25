@@ -5,7 +5,9 @@ from enum import Enum, auto
 from typing import Any, ClassVar, dataclass_transform, get_origin
 from uuid import UUID, uuid4
 
-from .attribute import Attribute, Declaration, MISSING, attribute, declare
+from helios.declaration import DeclarationError, MISSING, check_keywords
+
+from .attribute import Attribute, Declaration, attribute, declare
 from .error import ModelError
 
 
@@ -88,9 +90,13 @@ def declare_attributes(model_type: type) -> dict[str, Attribute]:
 			continue
 
 		try:
-			declared[name] = declare(annotation, vars(model_type).get(name, MISSING))
-		except TypeError as error:
-			raise ModelError(f"{model_type.__name__}.{name}: {error}") from error
+			declared[name] = declare(
+				name,
+				annotation,
+				vars(model_type).get(name, MISSING),
+			)
+		except DeclarationError as error:
+			raise ModelError(f"{model_type.__name__}.{error}") from error
 	return declared
 
 
@@ -130,22 +136,21 @@ class Model(metaclass=ModelMeta):
 
 	@classmethod
 	def initialize(cls, raw_attributes: dict[str, Any]) -> dict[str, Any]:
-		for name in raw_attributes:
-			attribute = cls.attributes.get(name)
-			if attribute is None or not attribute.init:
-				raise ModelError(f"extra attribute '{name}'")
+		initialized = {
+			name: declared for name, declared in cls.attributes.items() if declared.init
+		}
+		check_keywords(
+			cls,
+			"attributes",
+			raw_attributes,
+			initialized,
+			[name for name, declared in initialized.items() if declared.required],
+		)
 
 		values = {}
-		for name, attribute in cls.attributes.items():
-			if not attribute.init:
-				continue
-			if name in raw_attributes:
-				value = raw_attributes[name]
-			elif not attribute.required:
-				value = attribute.default
-			else:
-				raise ModelError(f"missing attribute '{name}'")
-			attribute.check(value, cls)
+		for name, declared in initialized.items():
+			value = raw_attributes.get(name, declared.default)
+			declared.check(value, cls)
 			values[name] = value
 		return values
 

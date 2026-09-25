@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 	from .model import Model
 
 
-class ModelError(RuntimeError):
+class ModelError(TypeError):
 	pass
 
 

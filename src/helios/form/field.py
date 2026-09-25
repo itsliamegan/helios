@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from types import NoneType
 from typing import Any, TYPE_CHECKING, Union, get_args, get_origin
 
+from helios.declaration import DeclarationError, MISSING
 from helios.http import Input
 
 from .parser import Parser, RawValue, is_verbatim, resolve
@@ -10,8 +11,6 @@ from .rule import Required, Rule, RuleError
 
 if TYPE_CHECKING:
 	from .form import Form
-
-MISSING: Any = object()
 
 
 class Failure(ValueError):
@@ -87,23 +86,23 @@ def declare(
 	default: object,
 	rules: list[Rule[Any, Any]],
 ) -> Field:
-	annotation = unwrap_nullable(annotation)
+	annotation = unwrap_nullable(name, annotation)
 	return Field(
 		name,
-		resolve(annotation),
+		resolve(name, annotation),
 		default,
 		is_verbatim(annotation),
 		rules,
 	)
 
 
-def unwrap_nullable(annotation: Any) -> Any:
+def unwrap_nullable(name: str, annotation: Any) -> Any:
 	if get_origin(annotation) is not Union:
 		return annotation
 
 	members = [member for member in get_args(annotation) if member is not NoneType]
 	if len(members) != 1 or len(get_args(annotation)) != 2:
-		raise TypeError(f"unsupported field type: {annotation!r}")
+		raise DeclarationError(name, f"unsupported field type: {annotation!r}")
 	return members[0]
 
 

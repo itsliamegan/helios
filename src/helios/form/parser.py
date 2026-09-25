@@ -3,6 +3,7 @@ from typing import Any, NewType, get_args, get_origin
 import uuid
 
 from helios import http
+from helios.declaration import DeclarationError
 
 from .rule import Rule, RuleError
 
@@ -106,12 +107,12 @@ SCALARS: dict[Any, Parser[Any]] = {
 }
 
 
-def resolve(annotation: Any) -> Parser[Any]:
+def resolve(name: str, annotation: Any) -> Parser[Any]:
 	if get_origin(annotation) is list:
 		(item,) = get_args(annotation)
-		return List(scalar(item))
+		return List(scalar(name, item))
 	else:
-		return scalar(annotation)
+		return scalar(name, annotation)
 
 
 def is_verbatim(annotation: Any) -> bool:
@@ -122,8 +123,11 @@ def is_verbatim(annotation: Any) -> bool:
 		return annotation is Verbatim
 
 
-def scalar(annotation: Any) -> Parser[Any]:
+def scalar(name: str, annotation: Any) -> Parser[Any]:
 	try:
 		return SCALARS[annotation]
 	except KeyError, TypeError:
-		raise TypeError(f"unsupported field type: {annotation!r}") from None
+		raise DeclarationError(
+			name,
+			f"unsupported field type: {annotation!r}",
+		) from None
