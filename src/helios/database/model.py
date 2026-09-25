@@ -5,7 +5,7 @@ from enum import Enum, auto
 from typing import Any, ClassVar, dataclass_transform
 from uuid import UUID, uuid4
 
-from helios.declaration import check_init_keywords, declarations
+from helios.declaration import check_init_keywords, check_single_base, declarations
 
 from .attribute import Attribute, declare, generated
 from .error import ModelError
@@ -58,17 +58,12 @@ class Model:
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
+		check_single_base(cls, Model, ModelError)
 		annotations = get_annotations(cls, format=Format.FORWARDREF)
 		for name in METADATA:
 			if name in vars(cls) or name in annotations:
 				raise ModelError(f"{cls.__name__}.{name} is model metadata")
-
-		model_bases = [base for base in cls.__bases__ if issubclass(base, Model)]
-		if len(model_bases) > 1:
-			raise ModelError(
-				f"{cls.__name__} cannot inherit from multiple model classes"
-			)
-		declare_attributes(cls, dict(model_bases[0]._attributes))
+		declare_attributes(cls, dict(Model._attributes))
 
 	def __init__(self, **attributes: Any):
 		self.values = type(self).initialize(attributes)
@@ -133,15 +128,12 @@ def declare_attributes(model_type: type[Model], attributes: dict[str, Attribute]
 	for attribute_name, value in vars(model_type).items():
 		if isinstance(value, Attribute) and attribute_name not in own_attributes:
 			raise ModelError(f"'{name}.{attribute_name}' has no annotation")
-		if attribute_name in attributes and attribute_name not in own_attributes:
-			raise ModelError(
-				f"'{name}.{attribute_name}' replaces an inherited attribute "
-				"without an annotation"
-			)
+
+	for attribute_name in [*vars(model_type), *own_attributes]:
+		if attribute_name in attributes:
+			raise ModelError(f"'{name}.{attribute_name}' is a reserved attribute")
 
 	for attribute_name, declared_attribute in own_attributes.items():
-		if attribute_name in attributes and not attributes[attribute_name].init:
-			raise ModelError(f"'{name}.{attribute_name}' is a reserved attribute")
 		setattr(model_type, attribute_name, declared_attribute)
 		attributes[attribute_name] = declared_attribute
 	model_type._attributes = attributes

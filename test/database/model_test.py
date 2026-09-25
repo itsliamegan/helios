@@ -208,34 +208,26 @@ def test_rejects_attributes_without_supported_annotations():
 			value: str | int
 
 
-def test_inherits_and_overrides_attributes():
-	class Content(Model):
-		title: str
-		score: str
-
-	class Post(Content):
-		table = "posts"
-		score: int
-
-	post = Post(title="Intro", score=3)
-
-	assert_eq(post.title, "Intro")
-	assert_eq(post.score, 3)
-
-
-def test_rejects_reserved_and_invalid_inherited_overrides():
-	with assert_raises(ModelError):
-
-		class Reserved(Model):
-			id: UUID
-
+def test_rejects_subclassing_a_model():
 	class Content(Model):
 		title: str
 
 	with assert_raises(ModelError):
 
 		class Post(Content):
-			title = "Intro"
+			table = "posts"
+
+
+def test_rejects_redeclaring_model_attributes():
+	with assert_raises(ModelError):
+
+		class Annotated(Model):
+			id: UUID
+
+	with assert_raises(ModelError):
+
+		class Assigned(Model):
+			created_at = None
 
 
 def test_rejects_attributes_named_like_model_metadata():
