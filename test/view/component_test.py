@@ -393,3 +393,14 @@ def test_rejects_mutable_defaults():
 			template = "row"
 
 			names: list[str] = []
+
+
+def test_rejects_undefined_annotations():
+	with assert_raises(ComponentError) as raised:
+
+		class Card(Component):
+			template = "card"
+
+			pin: Pin  # noqa: F821
+
+	assert_eq(str(raised.exception), "Card.pin: unresolved annotation: Pin")

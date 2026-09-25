@@ -1,10 +1,10 @@
-from annotationlib import Format, get_annotations
+from annotationlib import get_annotations
 from contextvars import ContextVar
-from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform, get_origin
+from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform
 
 from markupsafe import Markup
 
-from helios.declaration import MISSING, check_keywords
+from helios.declaration import DeclarationError, MISSING, check_keywords, declared
 
 from .attributes import Attributes, html_name
 from .error import ComponentError
@@ -23,13 +23,11 @@ class Component:
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
-		props = {}
-		for name, annotation in get_annotations(cls, format=Format.FORWARDREF).items():
-			is_class_variable = (
-				annotation is ClassVar or get_origin(annotation) is ClassVar
-			)
-			if not is_class_variable:
-				props[name] = vars(cls).get(name, MISSING)
+		try:
+			entries = declared(cls)
+		except DeclarationError as error:
+			raise ComponentError(f"{cls.__name__}.{error}") from error
+		props = {entry.name: entry.default for entry in entries}
 		cls.props = cls.props | props
 		check_declaration(cls)
 

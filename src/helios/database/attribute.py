@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from datetime import datetime
-from types import NoneType
-from typing import Any, TYPE_CHECKING, Union, cast, get_args, get_origin
+from typing import Any, TYPE_CHECKING, cast
 from uuid import UUID
 
-from helios.declaration import DeclarationError, MISSING
+from helios.declaration import DeclarationError, Declared, MISSING, split_nullable
 from helios.http import URL
 
 from . import types
@@ -108,14 +107,14 @@ def attribute(
 	return Declaration(default, init, type)
 
 
-def declare(name: str, annotation: Any, value: object) -> Attribute:
-	if isinstance(value, Declaration):
-		declaration = value
+def declare(entry: Declared) -> Attribute:
+	if isinstance(entry.default, Declaration):
+		declaration = entry.default
 	else:
-		declaration = Declaration(value, True, None)
-	value_type, nullable = split_nullable(name, annotation)
+		declaration = Declaration(entry.default, True, None)
+	value_type, nullable = split_nullable(entry.name, entry.annotation)
 	if declaration.type is None:
-		codec = resolve_type(name, value_type)
+		codec = resolve_type(entry.name, value_type)
 	else:
 		codec = declaration.type
 	return Attribute(
@@ -124,19 +123,6 @@ def declare(name: str, annotation: Any, value: object) -> Attribute:
 		nullable,
 		declaration.init,
 	)
-
-
-def split_nullable(name: str, annotation: Any) -> tuple[Any, bool]:
-	if get_origin(annotation) is not Union:
-		return annotation, False
-
-	members = get_args(annotation)
-	if len(members) != 2:
-		raise DeclarationError(name, f"unsupported attribute type: {annotation!r}")
-	value_index = 1 if members[0] is NoneType else 0
-	if members[1 - value_index] is not NoneType:
-		raise DeclarationError(name, f"unsupported attribute type: {annotation!r}")
-	return members[value_index], True
 
 
 def resolve_type[T](name: str, typ: type[T] | types.Type[T]) -> types.Type[T]:

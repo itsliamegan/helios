@@ -1,9 +1,8 @@
 from copy import copy
 from dataclasses import dataclass
-from types import NoneType
-from typing import Any, TYPE_CHECKING, Union, get_args, get_origin
+from typing import Any, TYPE_CHECKING
 
-from helios.declaration import DeclarationError, MISSING
+from helios.declaration import Declared, MISSING, split_nullable
 from helios.http import Input
 
 from .parser import Parser, RawValue, is_verbatim, resolve
@@ -80,30 +79,15 @@ class Field:
 		form.values[self.name] = value
 
 
-def declare(
-	name: str,
-	annotation: Any,
-	default: object,
-	rules: list[Rule[Any, Any]],
-) -> Field:
-	annotation = unwrap_nullable(name, annotation)
+def declare(entry: Declared, rules: list[Rule[Any, Any]]) -> Field:
+	annotation, _ = split_nullable(entry.name, entry.annotation)
 	return Field(
-		name,
-		resolve(name, annotation),
-		default,
+		entry.name,
+		resolve(entry.name, annotation),
+		entry.default,
 		is_verbatim(annotation),
 		rules,
 	)
-
-
-def unwrap_nullable(name: str, annotation: Any) -> Any:
-	if get_origin(annotation) is not Union:
-		return annotation
-
-	members = [member for member in get_args(annotation) if member is not NoneType]
-	if len(members) != 1 or len(get_args(annotation)) != 2:
-		raise DeclarationError(name, f"unsupported field type: {annotation!r}")
-	return members[0]
 
 
 def trim(value: RawValue) -> RawValue | None:

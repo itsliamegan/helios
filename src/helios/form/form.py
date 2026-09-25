@@ -1,10 +1,9 @@
-from annotationlib import get_annotations
 from dataclasses import replace
-from typing import Any, ClassVar, Self, dataclass_transform, get_origin
+from typing import Any, ClassVar, Self, dataclass_transform
 
 from luna.inflect import sentence
 
-from helios.declaration import DeclarationError, MISSING, check_keywords
+from helios.declaration import DeclarationError, check_keywords, declared
 from helios.http import Input
 
 from .error import FormError
@@ -25,25 +24,18 @@ class Form:
 		for name, field in cls.fields.items():
 			fields[name] = replace(field, extra_rules=cls.rules.get(name, []))
 
-		for name, annotation in get_annotations(cls, eval_str=True).items():
-			if annotation is ClassVar or get_origin(annotation) is ClassVar:
-				continue
-
-			if name in RESERVED:
-				raise FormError(
-					f"Form {cls.__name__} has a field named '{name}', which Form uses"
-				)
-			try:
-				field = declare(
-					name,
-					annotation,
-					vars(cls).get(name, MISSING),
-					cls.rules.get(name, []),
-				)
-			except DeclarationError as error:
-				raise FormError(f"{cls.__name__}.{error}") from error
-			setattr(cls, name, field)
-			fields[name] = field
+		try:
+			for entry in declared(cls):
+				if entry.name in RESERVED:
+					raise FormError(
+						f"Form {cls.__name__} has a field named '{entry.name}', "
+						"which Form uses"
+					)
+				field = declare(entry, cls.rules.get(entry.name, []))
+				setattr(cls, entry.name, field)
+				fields[entry.name] = field
+		except DeclarationError as error:
+			raise FormError(f"{cls.__name__}.{error}") from error
 
 		for name in cls.rules:
 			if name not in fields:

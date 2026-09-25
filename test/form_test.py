@@ -218,6 +218,27 @@ def test_rejects_unsupported_field_types():
 	)
 
 
+def test_rejects_string_annotations():
+	with assert_raises(FormError) as raised:
+
+		class BadForm(Form):
+			title: "str"  # noqa: UP037
+
+	assert_eq(
+		str(raised.exception),
+		"BadForm.title: string annotations are not supported: 'str'",
+	)
+
+
+def test_rejects_undefined_annotations():
+	with assert_raises(FormError) as raised:
+
+		class BadForm(Form):
+			board: Board  # noqa: F821
+
+	assert_eq(str(raised.exception), "BadForm.board: unresolved annotation: Board")
+
+
 def test_rejects_field_names_form_uses():
 	with assert_raises(FormError) as raised:
 

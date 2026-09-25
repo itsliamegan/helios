@@ -1,11 +1,10 @@
-from annotationlib import get_annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
-from typing import Any, ClassVar, dataclass_transform, get_origin
+from typing import Any, ClassVar, dataclass_transform
 from uuid import UUID, uuid4
 
-from helios.declaration import DeclarationError, MISSING, check_keywords
+from helios.declaration import DeclarationError, check_keywords, declared
 
 from .attribute import Attribute, Declaration, attribute, declare
 from .error import ModelError
@@ -56,16 +55,16 @@ class ModelMeta(type):
 
 		model_type = super().__new__(metaclass, name, bases, namespace)
 		attributes = dict(model_bases[0].attributes) if model_bases else {}
-		declared = declare_attributes(model_type)
+		own_attributes = declare_attributes(model_type)
 		for attribute_name, value in namespace.items():
-			if isinstance(value, Declaration) and attribute_name not in declared:
+			if isinstance(value, Declaration) and attribute_name not in own_attributes:
 				raise ModelError(f"'{name}.{attribute_name}' has no annotation")
-			if attribute_name in attributes and attribute_name not in declared:
+			if attribute_name in attributes and attribute_name not in own_attributes:
 				raise ModelError(
 					f"'{name}.{attribute_name}' replaces an inherited attribute "
 					"without an annotation"
 				)
-		for attribute_name, declared_attribute in declared.items():
+		for attribute_name, declared_attribute in own_attributes.items():
 			if attribute_name in attributes and not attributes[attribute_name].init:
 				raise ModelError(f"'{name}.{attribute_name}' is a reserved attribute")
 			declared_attribute.__set_name__(model_type, attribute_name)
@@ -78,26 +77,9 @@ class ModelMeta(type):
 
 def declare_attributes(model_type: type) -> dict[str, Attribute]:
 	try:
-		annotations = get_annotations(model_type, eval_str=True)
-	except NameError as error:
-		raise ModelError(
-			f"{model_type.__name__} has an unresolved annotation: {error}"
-		) from error
-
-	declared = {}
-	for name, annotation in annotations.items():
-		if annotation is ClassVar or get_origin(annotation) is ClassVar:
-			continue
-
-		try:
-			declared[name] = declare(
-				name,
-				annotation,
-				vars(model_type).get(name, MISSING),
-			)
-		except DeclarationError as error:
-			raise ModelError(f"{model_type.__name__}.{error}") from error
-	return declared
+		return {entry.name: declare(entry) for entry in declared(model_type)}
+	except DeclarationError as error:
+		raise ModelError(f"{model_type.__name__}.{error}") from error
 
 
 @dataclass_transform(
@@ -137,20 +119,22 @@ class Model(metaclass=ModelMeta):
 	@classmethod
 	def initialize(cls, raw_attributes: dict[str, Any]) -> dict[str, Any]:
 		initialized = {
-			name: declared for name, declared in cls.attributes.items() if declared.init
+			name: definition
+			for name, definition in cls.attributes.items()
+			if definition.init
 		}
 		check_keywords(
 			cls,
 			"attributes",
 			raw_attributes,
 			initialized,
-			[name for name, declared in initialized.items() if declared.required],
+			[name for name, definition in initialized.items() if definition.required],
 		)
 
 		values = {}
-		for name, declared in initialized.items():
-			value = raw_attributes.get(name, declared.default)
-			declared.check(value, cls)
+		for name, definition in initialized.items():
+			value = raw_attributes.get(name, definition.default)
+			definition.check(value, cls)
 			values[name] = value
 		return values
 
