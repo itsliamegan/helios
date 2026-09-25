@@ -13,6 +13,14 @@ def test_converts_python_names_to_html_names():
 	assert_eq(html, 'class="card" data-turbo-frame="modal"')
 
 
+def test_drops_leading_underscores_from_names():
+	attributes = Attributes(_private=True)
+
+	html = str(attributes)
+
+	assert_eq(html, "private")
+
+
 def test_renders_true_as_bare_name():
 	attributes = Attributes(hidden=True)
 

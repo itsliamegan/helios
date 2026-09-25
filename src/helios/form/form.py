@@ -2,6 +2,8 @@ from annotationlib import get_annotations
 from dataclasses import replace
 from typing import Any, ClassVar, Self, dataclass_transform, get_origin
 
+from luna.inflect import sentence
+
 from helios.http import Input
 
 from .errors import Errors
@@ -87,7 +89,7 @@ class Form:
 		if key in cls.messages:
 			return cls.messages[key]
 		else:
-			return f"{readable(name)} {failure.message}."
+			return f"{sentence(name)} {failure.message}."
 
 	def __repr__(self) -> str:
 		values = ", ".join(
@@ -99,8 +101,3 @@ class Form:
 
 
 RESERVED = {"values", *vars(Form)}
-
-
-def readable(name: str) -> str:
-	words = name.replace("_", " ")
-	return words[:1].upper() + words[1:]

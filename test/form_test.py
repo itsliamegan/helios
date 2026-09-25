@@ -197,6 +197,15 @@ def test_ignores_class_variables():
 	assert_eq(list(NoteForm.fields), ["body"])
 
 
+def test_names_fields_with_trailing_underscores_in_messages():
+	class StyleForm(Form):
+		class_: str
+
+	_, errors = StyleForm.validate(Input({}))
+
+	assert_eq(errors.messages, {"class_": ["Class must be provided."]})
+
+
 def test_rejects_unsupported_field_types():
 	with assert_raises(TypeError) as raised:
 

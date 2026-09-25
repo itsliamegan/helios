@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from luna.inflect import dash
 from markupsafe import Markup
 
 GLOBAL_ATTRIBUTES = {"class", "id", "hidden"}
@@ -53,7 +54,7 @@ class Attributes:
 
 
 def html_name(name: str) -> str:
-	return name.removesuffix("_").replace("_", "-")
+	return dash(name)
 
 
 def split_class_names(values: dict[str, Any]) -> dict[str, Any]:
