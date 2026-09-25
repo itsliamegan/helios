@@ -1,6 +1,6 @@
 from annotationlib import get_annotations
 from collections.abc import Callable
-import copy
+from copy import copy
 from dataclasses import dataclass
 from types import NoneType
 from typing import (
@@ -55,15 +55,17 @@ class Field:
 		return self.default is MISSING
 
 	def initial(self) -> object:
-		return copy.copy(self.default)
+		return copy(self.default)
 
 	def raw(self, input: Input) -> RawValue | None:
 		if self.name not in input:
 			return None
+
 		value = input[self.name]
 		if self.verbatim:
 			return value
-		return trim(value)
+		else:
+			return trim(value)
 
 	def validate(self, input: Input, rules: list[Rule]) -> object:
 		raw = self.raw(input)
@@ -105,9 +107,10 @@ class Form:
 		for name, annotation in get_annotations(cls, eval_str=True).items():
 			if annotation is ClassVar or get_origin(annotation) is ClassVar:
 				continue
+
 			if name in RESERVED:
 				raise TypeError(
-					f'{cls.__name__} has a field named "{name}", which Form uses'
+					f"Form {cls.__name__} has a field named '{name}', which Form uses"
 				)
 			try:
 				field = declare(name, annotation, vars(cls).get(name, MISSING))
@@ -119,11 +122,13 @@ class Form:
 
 	def __init__(self, **values: Any):
 		form = type(self)
+
 		extra = [name for name in values if name not in form.fields]
 		if extra:
 			raise TypeError(
 				f"{form.__name__} got unexpected fields: {", ".join(extra)}"
 			)
+
 		missing = [
 			name
 			for name, field in form.fields.items()
@@ -159,7 +164,8 @@ class Form:
 		key = f"{name}.{error.rule}"
 		if key in cls.messages:
 			return cls.messages[key]
-		return f"{readable(name)} {error}."
+		else:
+			return f"{readable(name)} {error}."
 
 	def __repr__(self) -> str:
 		values = ", ".join(
@@ -200,8 +206,9 @@ def scalar(annotation: Any) -> Parser[Any]:
 def trim(value: RawValue) -> RawValue | None:
 	if isinstance(value, str):
 		return value.strip() or None
-	items = [item.strip() for item in value]
-	return [item for item in items if item] or None
+	else:
+		items = [item.strip() for item in value]
+		return [item for item in items if item] or None
 
 
 def rule_name(rule: Rule) -> str:

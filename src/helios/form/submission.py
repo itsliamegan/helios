@@ -25,19 +25,21 @@ class Submission:
 		value = self.input[name]
 		if collection and isinstance(value, str):
 			return [value]
-		return value
+		else:
+			return value
 
 	def error(self, name: str) -> str | None:
 		return self.errors.first(name)
 
-	def invalid(self, name: str) -> bool:
+	def is_invalid(self, name: str) -> bool:
 		return self.error(name) is not None
 
 
 def encode(value: object) -> str | list[str]:
 	if isinstance(value, COLLECTIONS):
 		return [encode_item(item) for item in value]
-	return encode_item(value)
+	else:
+		return encode_item(value)
 
 
 def encode_item(value: object) -> str:

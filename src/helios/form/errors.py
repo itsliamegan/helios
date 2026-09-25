@@ -16,7 +16,8 @@ class Errors:
 	def first(self, name: str) -> str | None:
 		if name in self.messages:
 			return self.messages[name][0]
-		return None
+		else:
+			return None
 
 	def __getitem__(self, name: str) -> list[str]:
 		return list(self.messages.get(name, []))

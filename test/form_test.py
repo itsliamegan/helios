@@ -1,13 +1,10 @@
 from typing import ClassVar
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
 from helios.form import Errors, Form, RuleError, Verbatim
 from helios.http import Input, URL
-
-FIRST_ID = "102ddad7-06d1-484f-a3f8-3cf4711e91ba"
-SECOND_ID = "f262c72c-92e8-4e1f-9644-b1d24afad614"
 
 
 class PinForm(Form):
@@ -18,12 +15,14 @@ class PinForm(Form):
 
 
 def test_validates_annotated_fields():
+	read_later_id = uuid4()
+	inbox_id = uuid4()
 	form, errors = PinForm.validate(
 		Input(
 			{
 				"title": "Intro",
 				"note": "Read later",
-				"board_ids": [FIRST_ID, SECOND_ID],
+				"board_ids": [str(read_later_id), str(inbox_id)],
 				"return_to": "/boards",
 			}
 		)
@@ -32,7 +31,7 @@ def test_validates_annotated_fields():
 	assert_eq(errors, Errors())
 	assert_eq(form.title, "Intro")
 	assert_eq(form.note, "Read later")
-	assert_eq(form.board_ids, [UUID(FIRST_ID), UUID(SECOND_ID)])
+	assert_eq(form.board_ids, [read_later_id, inbox_id])
 	assert_eq(form.return_to, "/boards")
 
 
@@ -49,7 +48,7 @@ def test_copies_mutable_defaults():
 	first, _ = PinForm.validate(Input({"title": "Intro"}))
 	second, _ = PinForm.validate(Input({"title": "Intro"}))
 
-	first.board_ids.append(UUID(FIRST_ID))
+	first.board_ids.append(uuid4())
 
 	assert_eq(second.board_ids, [])
 	assert_eq(PinForm(title="Intro").board_ids, [])
@@ -82,12 +81,13 @@ def test_treats_blank_strings_as_missing():
 
 
 def test_trims_list_items_and_drops_blank_ones():
+	board_id = uuid4()
 	form, errors = PinForm.validate(
-		Input({"title": "Intro", "board_ids": [f" {FIRST_ID} ", " ", ""]})
+		Input({"title": "Intro", "board_ids": [f" {board_id} ", " ", ""]})
 	)
 
 	assert_that(not errors)
-	assert_eq(form.board_ids, [UUID(FIRST_ID)])
+	assert_eq(form.board_ids, [board_id])
 
 
 def test_keeps_verbatim_fields_exactly_as_sent():
@@ -105,8 +105,9 @@ def test_keeps_verbatim_fields_exactly_as_sent():
 
 
 def test_records_parse_errors_with_readable_field_names():
+	board_id = uuid4()
 	form, errors = PinForm.validate(
-		Input({"title": "Intro", "board_ids": [FIRST_ID, "not-a-uuid"]})
+		Input({"title": "Intro", "board_ids": [str(board_id), "not-a-uuid"]})
 	)
 
 	assert_eq(form.title, "Intro")
@@ -155,11 +156,12 @@ def test_parses_checkboxes_and_other_scalar_types():
 
 
 def test_constructs_with_fields():
-	form = PinForm(title="Intro", board_ids=[UUID(FIRST_ID)])
+	board_id = uuid4()
+	form = PinForm(title="Intro", board_ids=[board_id])
 
 	assert_eq(form.title, "Intro")
 	assert_eq(form.note, "")
-	assert_eq(form.board_ids, [UUID(FIRST_ID)])
+	assert_eq(form.board_ids, [board_id])
 	assert_that(form.return_to is None)
 
 
@@ -215,7 +217,7 @@ def test_rejects_field_names_form_uses():
 
 	assert_eq(
 		str(raised.exception),
-		'BadForm has a field named "values", which Form uses',
+		"Form BadForm has a field named 'values', which Form uses",
 	)
 
 
@@ -242,11 +244,18 @@ def test_runs_rules_on_parsed_values():
 		url: str
 		board_ids: list[UUID] = []
 
+	read_later_id = uuid4()
+	inbox_id = uuid4()
 	form, errors = LinkForm.validate(
-		Input({"url": " HTTPS://Example.com ", "board_ids": [FIRST_ID, SECOND_ID]})
+		Input(
+			{
+				"url": " HTTPS://Example.com ",
+				"board_ids": [str(read_later_id), str(inbox_id)],
+			}
+		)
 	)
 	_, invalid_errors = LinkForm.validate(
-		Input({"url": "example.com", "board_ids": [FIRST_ID, FIRST_ID]})
+		Input({"url": "example.com", "board_ids": [str(inbox_id), str(inbox_id)]})
 	)
 
 	assert_that(not errors)

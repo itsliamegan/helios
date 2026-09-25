@@ -23,7 +23,8 @@ class Scalar:
 	def single(self, value: RawValue) -> str:
 		if isinstance(value, list):
 			raise ParseError(self.rule, "must be a single value")
-		return value
+		else:
+			return value
 
 
 class Str(Scalar):
@@ -69,7 +70,8 @@ class Bool:
 	def parse(self, value: RawValue) -> bool:
 		if value == "on":
 			return True
-		raise ParseError(self.rule, 'must be "on" or omitted')
+		else:
+			raise ParseError(self.rule, 'must be "on" or omitted')
 
 
 class List[T]:

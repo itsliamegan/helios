@@ -145,7 +145,7 @@ def test_shares_submission_with_views():
 		views_dir.joinpath("edit.html").write_text(
 			'{{ submission.value("title", "Old title") }}|'
 			'{{ submission.error("title") }}|'
-			'{{ submission.invalid("note") }}'
+			'{{ submission.is_invalid("note") }}'
 		)
 		session = Session(
 			uuid4(),
