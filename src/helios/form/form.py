@@ -1,0 +1,106 @@
+from annotationlib import get_annotations
+from dataclasses import replace
+from typing import Any, ClassVar, Self, dataclass_transform, get_origin
+
+from helios.http import Input
+
+from .errors import Errors
+from .field import Failure, Field, MISSING, declare
+from .rule import Rule
+
+
+@dataclass_transform(kw_only_default=True, eq_default=False)
+class Form:
+	fields: ClassVar[dict[str, Field]] = {}
+	rules: ClassVar[dict[str, list[Rule[Any, Any]]]] = {}
+	messages: ClassVar[dict[str, str]] = {}
+
+	def __init_subclass__(cls, **keywords: Any):
+		super().__init_subclass__(**keywords)
+		fields = {}
+		for name, field in cls.fields.items():
+			fields[name] = replace(field, extra_rules=cls.rules.get(name, []))
+
+		for name, annotation in get_annotations(cls, eval_str=True).items():
+			if annotation is ClassVar or get_origin(annotation) is ClassVar:
+				continue
+
+			if name in RESERVED:
+				raise TypeError(
+					f"Form {cls.__name__} has a field named '{name}', which Form uses"
+				)
+			try:
+				field = declare(
+					name,
+					annotation,
+					vars(cls).get(name, MISSING),
+					cls.rules.get(name, []),
+				)
+			except TypeError as error:
+				raise TypeError(f"{cls.__name__}.{name}: {error}") from error
+			setattr(cls, name, field)
+			fields[name] = field
+
+		for name in cls.rules:
+			if name not in fields:
+				raise TypeError(
+					f"Form {cls.__name__} has rules for '{name}', which is not a field"
+				)
+		cls.fields = fields
+
+	def __init__(self, **values: Any):
+		form = type(self)
+
+		extra = [name for name in values if name not in form.fields]
+		if extra:
+			raise TypeError(
+				f"{form.__name__} got unexpected fields: {", ".join(extra)}"
+			)
+
+		missing = [
+			name
+			for name, field in form.fields.items()
+			if field.required and name not in values
+		]
+		if missing:
+			raise TypeError(f"{form.__name__} is missing fields: {", ".join(missing)}")
+
+		self.values: dict[str, Any] = {}
+		for name, field in form.fields.items():
+			self.values[name] = values.get(name, field.initial)
+
+	@classmethod
+	def validate(cls, input: Input) -> tuple[Self, Errors]:
+		form = cls.__new__(cls)
+		form.values = {}
+		errors = Errors()
+		for name, field in cls.fields.items():
+			try:
+				form.values[name] = field.validate(input)
+			except Failure as failure:
+				errors.add(name, cls.message(name, failure))
+		return form, errors
+
+	@classmethod
+	def message(cls, name: str, failure: Failure) -> str:
+		key = f"{name}.{failure.rule}"
+		if key in cls.messages:
+			return cls.messages[key]
+		else:
+			return f"{readable(name)} {failure.message}."
+
+	def __repr__(self) -> str:
+		values = ", ".join(
+			f"{name}={self.values[name]!r}"
+			for name in type(self).fields
+			if name in self.values
+		)
+		return f"{type(self).__name__}({values})"
+
+
+RESERVED = {"values", *vars(Form)}
+
+
+def readable(name: str) -> str:
+	words = name.replace("_", " ")
+	return words[:1].upper() + words[1:]
