@@ -5,7 +5,7 @@ from helios.view import Engine, View
 
 from .errors import Errors
 from .submission import Submission
-from .submissions import Submissions
+from .submissions import ERRORS_KEY, INPUT_KEY, Submissions
 
 
 class Provider(Provider):
@@ -22,8 +22,8 @@ class Provider(Provider):
 
 	def submission(self, context: Context) -> Submission:
 		flash = context.get(Flashes)
-		input = flash.get("_input")
-		errors = flash.get("_errors")
+		input = flash.get(INPUT_KEY)
+		errors = flash.get(ERRORS_KEY)
 		return Submission(
 			Input(input) if input is not None else None,
 			Errors(errors) if errors is not None else None,
