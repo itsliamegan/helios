@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
-from helios.declaration import DeclarationError, Declared, MISSING, split_nullable
+from helios.declaration import Declaration, DeclarationError, MISSING, split_nullable
 
 from .codec import Codec, Scalar, encode, for_type
 from .error import ModelError
@@ -10,69 +10,45 @@ if TYPE_CHECKING:
 	from .model import Model
 
 
-@dataclass(init=False)
-class Attribute:
-	name: str | None
-	entry: Declared
-	declaration: Declaration
-	resolved: Codec[object] | None
-	default: object
-	required: bool
+@dataclass
+class Column:
+	codec: Codec[object]
 	nullable: bool
-	init: bool
 
-	def __init__(self, entry: Declared, declaration: Declaration):
-		self.name = None
-		self.entry = entry
+
+class Attribute:
+	name: str
+	declaration: Declaration[Column]
+
+	def __init__(self, init: bool = True):
+		self.init = init
+
+	def bind(self, declaration: Declaration[Column]):
+		self.name = declaration.name
 		self.declaration = declaration
-		self.resolved = None
-		self.default = None if declaration.default is MISSING else declaration.default
-		self.required = declaration.default is MISSING
-		self.nullable = False
-		self.init = declaration.init
-		if not entry.pending:
-			self.settle(entry)
 
 	@property
-	def pending(self) -> bool:
-		return self.resolved is None
+	def default(self) -> object:
+		if self.declaration.default is self:
+			return MISSING
+		else:
+			return self.declaration.default
+
+	@property
+	def required(self) -> bool:
+		return self.default is MISSING
 
 	@property
 	def codec(self) -> Codec[object]:
-		if self.resolved is None:
-			raise AttributeError(f"attribute {self.name!r} has not been resolved")
-		return self.resolved
+		return self.declaration.resolve().codec
 
-	def settle(self, entry: Declared):
-		value_type, self.nullable = split_nullable(entry.name, entry.annotation)
-		if self.declaration.type is not None:
-			self.resolved = self.declaration.type
-			return
-
-		found = for_type(value_type)
-		if found is None:
-			raise DeclarationError(
-				entry.name,
-				f"unsupported attribute type: {value_type!r}",
-			)
-		self.resolved = found
-
-	def resolve(self):
-		if not self.pending:
-			return
-		try:
-			self.settle(self.entry.resolve())
-		except DeclarationError as error:
-			raise ModelError(f"{self.entry.owner.__name__}.{error}") from error
-
-	def __set_name__(self, _owner: type, name: str):
-		self.name = name
+	@property
+	def nullable(self) -> bool:
+		return self.declaration.resolve().nullable
 
 	def __get__(self, instance: Model | None, owner: type) -> object:
 		if instance is None:
 			return self
-		if self.name is None:
-			raise AttributeError("attribute has not been assigned to a model")
 		try:
 			return instance.values[self.name]
 		except KeyError:
@@ -81,8 +57,6 @@ class Attribute:
 			) from None
 
 	def check(self, value: object, model_type: type):
-		if self.name is None:
-			raise AttributeError("attribute has not been assigned to a model")
 		if value is None:
 			if self.nullable:
 				return
@@ -104,40 +78,21 @@ class Attribute:
 		return value
 
 	def __set__(self, instance: Model, value: object):
-		if self.name is None:
-			raise AttributeError("attribute has not been assigned to a model")
 		self.check(value, type(instance))
 		instance.values[self.name] = value
 		instance._changes.mark(self.name)
 
 
-@dataclass(init=False)
-class Declaration:
-	default: object
-	init: bool
-	type: Codec[object] | None
-
-	def __init__(
-		self,
-		default: object,
-		init: bool,
-		type: Codec[object] | None,
-	):
-		self.default = default
-		self.init = init
-		self.type = type
+def generated(init: bool = False) -> Any:
+	return Attribute(init)
 
 
-def attribute(
-	default: object = MISSING,
-	init: bool = True,
-	type: Codec[object] | None = None,
-) -> Any:
-	return Declaration(default, init, type)
-
-
-def declare(entry: Declared) -> Attribute:
-	if isinstance(entry.default, Declaration):
-		return Attribute(entry, entry.default)
-	else:
-		return Attribute(entry, Declaration(entry.default, True, None))
+def declare(declaration: Declaration[Column]) -> Column:
+	value_type, nullable = split_nullable(declaration.name, declaration.annotation)
+	codec = for_type(value_type)
+	if codec is None:
+		raise DeclarationError(
+			declaration.name,
+			f"unsupported attribute type: {value_type!r}",
+		)
+	return Column(codec, nullable)

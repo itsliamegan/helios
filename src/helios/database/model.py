@@ -4,9 +4,9 @@ from enum import Enum, auto
 from typing import Any, ClassVar, dataclass_transform
 from uuid import UUID, uuid4
 
-from helios.declaration import DeclarationError, check_keywords, declared
+from helios.declaration import check_init_keywords, declarations
 
-from .attribute import Attribute, Declaration, attribute, declare
+from .attribute import Attribute, declare, generated
 from .error import ModelError
 
 
@@ -35,69 +35,40 @@ class Changes:
 				del self.revisions[name]
 
 
-class ModelMeta(type):
-	declared_attributes: dict[str, Attribute]
-
-	def __new__(
-		metaclass,
-		name: str,
-		bases: tuple[type, ...],
-		namespace: dict[str, Any],
-	):
-		if bases and "attributes" in namespace:
-			raise ModelError(
-				f"{name}.attributes is model metadata; declare named attributes instead"
-			)
-
-		model_bases = [base for base in bases if isinstance(base, ModelMeta)]
-		if len(model_bases) > 1:
-			raise ModelError(f"{name} cannot inherit from multiple model classes")
-
-		model_type = super().__new__(metaclass, name, bases, namespace)
-		attributes = dict(model_bases[0].declared_attributes) if model_bases else {}
-		own_attributes = declare_attributes(model_type)
-		for attribute_name, value in namespace.items():
-			if isinstance(value, Declaration) and attribute_name not in own_attributes:
-				raise ModelError(f"'{name}.{attribute_name}' has no annotation")
-			if attribute_name in attributes and attribute_name not in own_attributes:
-				raise ModelError(
-					f"'{name}.{attribute_name}' replaces an inherited attribute "
-					"without an annotation"
-				)
-		for attribute_name, declared_attribute in own_attributes.items():
-			if attribute_name in attributes and not attributes[attribute_name].init:
-				raise ModelError(f"'{name}.{attribute_name}' is a reserved attribute")
-			declared_attribute.__set_name__(model_type, attribute_name)
-			setattr(model_type, attribute_name, declared_attribute)
-			attributes[attribute_name] = declared_attribute
-
-		model_type.declared_attributes = attributes
-		return model_type
-
-	@property
-	def attributes(cls) -> dict[str, Attribute]:
-		for declared_attribute in cls.declared_attributes.values():
-			declared_attribute.resolve()
-		return cls.declared_attributes
-
-
-def declare_attributes(model_type: type) -> dict[str, Attribute]:
-	try:
-		return {entry.name: declare(entry) for entry in declared(model_type)}
-	except DeclarationError as error:
-		raise ModelError(f"{model_type.__name__}.{error}") from error
+class ResolvedAttributes:
+	def __get__(self, instance: object, owner: type[Model]) -> dict[str, Attribute]:
+		for declared_attribute in owner.declared_attributes.values():
+			declared_attribute.declaration.resolve()
+		return owner.declared_attributes
 
 
 @dataclass_transform(
 	kw_only_default=True,
 	eq_default=False,
-	field_specifiers=(attribute,),
+	field_specifiers=(generated,),
 )
-class Model(metaclass=ModelMeta):
+class Model:
 	table: ClassVar[str] = ""
+	declared_attributes: ClassVar[dict[str, Attribute]] = {}
+	attributes = ResolvedAttributes()
 
-	id: UUID = attribute(init=False)
-	created_at: datetime | None = attribute(init=False)
+	id: UUID = generated()
+	created_at: datetime | None = generated()
+
+	def __init_subclass__(cls, **keywords: Any):
+		super().__init_subclass__(**keywords)
+		if "attributes" in vars(cls):
+			raise ModelError(
+				f"{cls.__name__}.attributes is model metadata; "
+				"declare named attributes instead"
+			)
+
+		model_bases = [base for base in cls.__bases__ if issubclass(base, Model)]
+		if len(model_bases) > 1:
+			raise ModelError(
+				f"{cls.__name__} cannot inherit from multiple model classes"
+			)
+		declare_attributes(cls, dict(model_bases[0].declared_attributes))
 
 	def __init__(self, **attributes: Any):
 		self.values = type(self).initialize(attributes)
@@ -128,7 +99,7 @@ class Model(metaclass=ModelMeta):
 			for name, definition in cls.attributes.items()
 			if definition.init
 		}
-		check_keywords(
+		check_init_keywords(
 			cls,
 			"attributes",
 			raw_attributes,
@@ -145,3 +116,32 @@ class Model(metaclass=ModelMeta):
 
 	def __repr__(self) -> str:
 		return f"{type(self).__name__}({self.id!r})"
+
+
+def declare_attributes(model_type: type[Model], attributes: dict[str, Attribute]):
+	name = model_type.__name__
+	own_attributes = {}
+	for declaration in declarations(model_type, declare, ModelError):
+		default = declaration.default
+		declared_attribute = default if isinstance(default, Attribute) else Attribute()
+		declared_attribute.bind(declaration)
+		own_attributes[declaration.name] = declared_attribute
+
+	for attribute_name, value in vars(model_type).items():
+		if isinstance(value, Attribute) and attribute_name not in own_attributes:
+			raise ModelError(f"'{name}.{attribute_name}' has no annotation")
+		if attribute_name in attributes and attribute_name not in own_attributes:
+			raise ModelError(
+				f"'{name}.{attribute_name}' replaces an inherited attribute "
+				"without an annotation"
+			)
+
+	for attribute_name, declared_attribute in own_attributes.items():
+		if attribute_name in attributes and not attributes[attribute_name].init:
+			raise ModelError(f"'{name}.{attribute_name}' is a reserved attribute")
+		setattr(model_type, attribute_name, declared_attribute)
+		attributes[attribute_name] = declared_attribute
+	model_type.declared_attributes = attributes
+
+
+declare_attributes(Model, {})

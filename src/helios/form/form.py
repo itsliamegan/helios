@@ -3,7 +3,7 @@ from typing import Any, ClassVar, Self, dataclass_transform
 
 from luna.inflect import sentence
 
-from helios.declaration import DeclarationError, check_keywords, declared
+from helios.declaration import check_init_keywords, declarations
 from helios.http import Input
 
 from .error import FormError
@@ -20,35 +20,29 @@ class Form:
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
-		fields = {}
-		for name, field in cls.fields.items():
-			fields[name] = replace(field, extra_rules=cls.rules.get(name, []))
-
-		try:
-			for entry in declared(cls):
-				if entry.name in RESERVED:
-					raise FormError(
-						f"Form {cls.__name__} has a field named '{entry.name}', "
-						"which Form uses"
-					)
-				if entry.pending:
-					entry = entry.resolve()
-				field = declare(entry, cls.rules.get(entry.name, []))
-				setattr(cls, entry.name, field)
-				fields[entry.name] = field
-		except DeclarationError as error:
-			raise FormError(f"{cls.__name__}.{error}") from error
+		fields = dict(cls.fields)
+		for declaration in declarations(cls, declare, FormError):
+			if declaration.name in RESERVED:
+				raise FormError(
+					f"Form {cls.__name__} has a field named '{declaration.name}', "
+					"which Form uses"
+				)
+			fields[declaration.name] = declaration.resolve()
 
 		for name in cls.rules:
 			if name not in fields:
 				raise FormError(
 					f"Form {cls.__name__} has rules for '{name}', which is not a field"
 				)
-		cls.fields = fields
+
+		cls.fields = {}
+		for name, field in fields.items():
+			cls.fields[name] = replace(field, extra_rules=cls.rules.get(name, []))
+			setattr(cls, name, cls.fields[name])
 
 	def __init__(self, **values: Any):
 		form = type(self)
-		check_keywords(
+		check_init_keywords(
 			form,
 			"fields",
 			values,

@@ -1,4 +1,4 @@
-from .attribute import attribute
+from .attribute import generated
 from .codec import Codec, Scalar
 from .config import Config
 from .error import DatabaseBusy, DatabaseError, ModelError, NotFoundError
@@ -19,5 +19,5 @@ __all__ = [
 	"Query",
 	"Scalar",
 	"Store",
-	"attribute",
+	"generated",
 ]

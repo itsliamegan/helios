@@ -2,7 +2,7 @@ from copy import copy
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
-from helios.declaration import Declared, MISSING, split_nullable
+from helios.declaration import Declaration, MISSING, split_nullable
 from helios.http import Input
 
 from .parser import Parser, RawValue, is_verbatim, resolve
@@ -79,14 +79,14 @@ class Field:
 		form.values[self.name] = value
 
 
-def declare(entry: Declared, rules: list[Rule[Any, Any]]) -> Field:
-	annotation, _ = split_nullable(entry.name, entry.annotation)
+def declare(declaration: Declaration[Field]) -> Field:
+	annotation, _ = split_nullable(declaration.name, declaration.annotation)
 	return Field(
-		entry.name,
-		resolve(entry.name, annotation),
-		entry.default,
+		declaration.name,
+		resolve(declaration.name, annotation),
+		declaration.default,
 		is_verbatim(annotation),
-		rules,
+		[],
 	)
 
 

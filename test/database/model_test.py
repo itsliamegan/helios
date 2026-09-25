@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.database import Model, ModelError, attribute
+from helios.database import Model, ModelError, generated
 
 
 def test_constructs_model_with_table_defaults_and_nulls():
@@ -187,7 +187,7 @@ def test_rejects_attributes_without_supported_annotations():
 	with assert_raises(ModelError):
 
 		class Unannotated(Model):
-			title = attribute(default="")
+			title = generated()
 
 	with assert_raises(ModelError):
 

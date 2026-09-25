@@ -15,7 +15,6 @@ from helios.database import (
 	ModelError,
 	NotFoundError,
 	Store,
-	attribute,
 )
 from helios.database.sqlite import connect
 
@@ -24,20 +23,21 @@ class Token:
 	def __init__(self, value: str):
 		self.value = value
 
-
-class TokenCodec:
-	def check(self, value: object):
-		if not isinstance(value, Token):
+	@classmethod
+	def check(cls, value: object):
+		if not isinstance(value, cls):
 			raise TypeError("expected a Token")
 
-	def encode(self, value: Token):
-		self.check(value)
+	@classmethod
+	def encode(cls, value: Token):
+		cls.check(value)
 		return value.value
 
-	def decode(self, value: float | str | bytes):
+	@classmethod
+	def decode(cls, value: float | str | bytes):
 		if not isinstance(value, str):
 			raise TypeError("expected token text")
-		return Token(value)
+		return cls(value)
 
 
 class Record(Model):
@@ -50,7 +50,7 @@ class Record(Model):
 	link: http.URL
 	published_at: datetime
 	note: str | None = None
-	token: Token = attribute(type=TokenCodec())
+	token: Token
 
 
 SCHEMA = """
