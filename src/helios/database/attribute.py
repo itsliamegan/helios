@@ -11,19 +11,19 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class Column:
+class Encoding:
 	codec: Codec[object]
 	nullable: bool
 
 
 class Attribute:
 	name: str
-	declaration: Declaration[Column]
+	declaration: Declaration[Encoding]
 
 	def __init__(self, init: bool = True):
 		self.init = init
 
-	def bind(self, declaration: Declaration[Column]):
+	def bind(self, declaration: Declaration[Encoding]):
 		self.name = declaration.name
 		self.declaration = declaration
 
@@ -87,7 +87,7 @@ def generated(init: bool = False) -> Any:
 	return Attribute(init)
 
 
-def declare(declaration: Declaration[Column]) -> Column:
+def declare(declaration: Declaration[Encoding]) -> Encoding:
 	value_type, nullable = split_nullable(declaration.name, declaration.annotation)
 	codec = for_type(value_type)
 	if codec is None:
@@ -95,4 +95,4 @@ def declare(declaration: Declaration[Column]) -> Column:
 			declaration.name,
 			f"unsupported attribute type: {value_type!r}",
 		)
-	return Column(codec, nullable)
+	return Encoding(codec, nullable)
