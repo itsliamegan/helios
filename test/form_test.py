@@ -175,17 +175,11 @@ def test_construction_rejects_missing_and_extra_fields():
 	assert_eq(str(extra.exception), "PinForm got unexpected fields: body")
 
 
-def test_subclasses_inherit_fields():
-	class ArchivablePinForm(PinForm):
-		archived: bool = False
+def test_rejects_subclassing_a_form():
+	with assert_raises(FormError):
 
-	form, errors = ArchivablePinForm.validate(
-		Input({"title": "Intro", "archived": "on"})
-	)
-
-	assert_that(not errors)
-	assert_eq(form.title, "Intro")
-	assert_that(form.archived is True)
+		class ArchivablePinForm(PinForm):
+			archived: bool = False
 
 
 def test_ignores_class_variables():
@@ -287,25 +281,6 @@ def test_runs_rules_on_parsed_values():
 			"board_ids": ["Board ids must not repeat a value."],
 		},
 	)
-
-
-def test_subclasses_replace_rules_for_inherited_fields():
-	class LinkForm(Form):
-		rules = {"url": [WebURL()]}
-
-		url: str
-
-	class AnyLinkForm(LinkForm):
-		rules = {}
-
-	_, link_errors = LinkForm.validate(Input({"url": "example.com"}))
-	form, any_link_errors = AnyLinkForm.validate(Input({"url": "example.com"}))
-
-	assert_eq(
-		link_errors.messages, {"url": ["Url must start with http:// or https://."]}
-	)
-	assert_that(not any_link_errors)
-	assert_eq(form.url, "example.com")
 
 
 def test_overrides_messages_by_field_and_rule():

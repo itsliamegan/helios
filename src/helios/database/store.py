@@ -16,8 +16,7 @@ class Registry:
 		for model_type in model_types:
 			if not isinstance(model_type, type) or not issubclass(model_type, Model):
 				raise ModelError("registered model must be a Model subclass")
-			table = model_type.__dict__.get("table")
-			if not isinstance(table, str) or not table:
+			if not isinstance(model_type.table, str) or not model_type.table:
 				raise ModelError(
 					f"{model_type.__name__} must declare a non-empty table"
 				)

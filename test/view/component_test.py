@@ -80,15 +80,13 @@ def test_rejects_positional_arguments_from_python():
 		Chip("Travel")  # ty: ignore[missing-argument, too-many-positional-arguments]
 
 
-def test_inherits_props():
-	class Badge(Chip):
-		template = "badge"
+def test_rejects_subclassing_a_component():
+	with assert_raises(ComponentError):
 
-		count: int = 0
+		class Badge(Chip):
+			template = "badge"
 
-	badge = Badge(name="Travel")
-
-	assert_eq(repr(badge), "Badge(name='Travel', count=0)")
+			count: int = 0
 
 
 def test_accepts_global_and_declared_attributes_from_python():

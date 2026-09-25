@@ -7,6 +7,7 @@ from helios.declaration import (
 	DeclarationError,
 	MISSING,
 	check_init_keywords,
+	check_single_base,
 	declarations,
 	split_nullable,
 )
@@ -122,3 +123,32 @@ def test_rejects_missing_init_keywords():
 		check_init_keywords(Post, "attributes", [], ["title", "body"], ["title"])
 
 	assert_eq(str(raised.exception), "Post is missing attributes: title")
+
+
+def test_requires_a_single_base():
+	class Record:
+		pass
+
+	class Post(Record):
+		pass
+
+	class Content(Record):
+		pass
+
+	class Article(Content):
+		pass
+
+	class Timestamped:
+		pass
+
+	class Note(Record, Timestamped):
+		pass
+
+	check_single_base(Post, Record, ExampleError)
+	with assert_raises(ExampleError) as subclass_raised:
+		check_single_base(Article, Record, ExampleError)
+	with assert_raises(ExampleError) as mixin_raised:
+		check_single_base(Note, Record, ExampleError)
+
+	assert_eq(str(subclass_raised.exception), "Article must inherit only from Record")
+	assert_eq(str(mixin_raised.exception), "Note must inherit only from Record")

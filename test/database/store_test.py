@@ -453,12 +453,6 @@ def test_validates_registry_and_rejects_unregistered_models():
 	class Abstract(Model):
 		pass
 
-	class Parent(Model):
-		table = "parents"
-
-	class InheritedTable(Parent):
-		pass
-
 	class Other(Model):
 		table = "others"
 
@@ -469,8 +463,6 @@ def test_validates_registry_and_rejects_unregistered_models():
 		try:
 			with assert_raises(ModelError):
 				Store(connection, [Abstract])
-			with assert_raises(ModelError):
-				Store(connection, [InheritedTable])
 			with assert_raises(ModelError):
 				Store(connection, cast(Any, [object]))
 

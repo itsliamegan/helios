@@ -121,3 +121,8 @@ def check_init_keywords(
 	missing = [name for name in required if name not in given]
 	if missing:
 		raise TypeError(f"{owner.__name__} is missing {noun}: {", ".join(missing)}")
+
+
+def check_single_base(owner: type, base: type, error: type[Exception]):
+	if owner.__bases__ != (base,):
+		raise error(f"{owner.__name__} must inherit only from {base.__name__}")
