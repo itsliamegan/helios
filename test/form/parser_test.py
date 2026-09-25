@@ -11,7 +11,18 @@ def test_parses_strings_without_coercion():
 	value_parser = parser.Str()
 
 	assert_eq(value_parser.parse("title"), "title")
-	assert_parse_error(value_parser, ["first", "second"], "must be a single value")
+	assert_parse_error(
+		value_parser, ["first", "second"], "string", "must be a single value"
+	)
+
+
+def test_parses_integers():
+	value_parser = parser.Int()
+
+	assert_eq(value_parser.parse("42"), 42)
+	assert_eq(value_parser.parse("-3"), -3)
+	assert_parse_error(value_parser, "4.5", "integer", "must be a whole number")
+	assert_parse_error(value_parser, "1_000", "integer", "must be a whole number")
 
 
 def test_parses_uuid():
@@ -19,7 +30,8 @@ def test_parses_uuid():
 	raw = "102ddad7-06d1-484f-a3f8-3cf4711e91ba"
 
 	assert_eq(value_parser.parse(raw), UUID(raw))
-	assert_parse_error(value_parser, "not-a-uuid", "must be a valid UUID")
+	assert_parse_error(value_parser, "not-a-uuid", "uuid", "must be a valid UUID")
+	assert_parse_error(value_parser, [raw], "uuid", "must be a single value")
 
 
 def test_parses_url():
@@ -30,33 +42,16 @@ def test_parses_url():
 	assert_that(isinstance(value, URL))
 	assert_eq(str(value), raw)
 	assert_parse_error(
-		value_parser, "https://example.com:invalid", "must be a valid URL"
+		value_parser, "https://example.com:invalid", "url", "must be a valid URL"
 	)
-
-
-def test_parses_required_value():
-	value_parser = parser.Required(parser.Str())
-
-	assert_eq(value_parser.parse("title"), "title")
-	assert_parse_error(value_parser, None, "must be provided")
-	assert_parse_error(value_parser, "", "must not be empty")
-
-
-def test_parses_optional_blank_and_value():
-	value_parser = parser.Optional(parser.UUID())
-	raw = "102ddad7-06d1-484f-a3f8-3cf4711e91ba"
-
-	assert_that(value_parser.parse("") is None)
-	assert_eq(value_parser.parse(raw), UUID(raw))
-	assert_parse_error(value_parser, [raw], "must be a single value")
 
 
 def test_parses_checked_boolean_strictly():
 	value_parser = parser.Bool()
 
 	assert_that(value_parser.parse("on") is True)
-	assert_parse_error(value_parser, "true", 'must be "on" or omitted')
-	assert_parse_error(value_parser, ["on"], 'must be "on" or omitted')
+	assert_parse_error(value_parser, "true", "boolean", 'must be "on" or omitted')
+	assert_parse_error(value_parser, ["on"], "boolean", 'must be "on" or omitted')
 
 
 def test_parses_list_from_scalar_and_list():
@@ -71,11 +66,12 @@ def test_parses_list_from_scalar_and_list():
 def test_list_preserves_item_parse_error():
 	value_parser = parser.List(parser.UUID())
 
-	assert_parse_error(value_parser, ["not-a-uuid"], "must be a valid UUID")
+	assert_parse_error(value_parser, ["not-a-uuid"], "uuid", "must be a valid UUID")
 
 
-def assert_parse_error(value_parser, value, message):
+def assert_parse_error(value_parser, value, rule, message):
 	with assert_raises(ParseError) as raised:
 		value_parser.parse(value)
 
+	assert_eq(raised.exception.rule, rule)
 	assert_eq(str(raised.exception), message)

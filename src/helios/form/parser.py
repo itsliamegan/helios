@@ -1,13 +1,16 @@
-from typing import Any, Protocol
+import re
+from typing import ClassVar, Protocol
 import uuid
 
 from helios import http
 
-type RawValue = str | list[str] | None
+type RawValue = str | list[str]
 
 
 class ParseError(ValueError):
-	pass
+	def __init__(self, rule: str, message: str):
+		super().__init__(message)
+		self.rule = rule
 
 
 class Parser[T](Protocol):
@@ -15,64 +18,58 @@ class Parser[T](Protocol):
 
 
 class Scalar:
-	def parse(self, value: RawValue) -> Any:
+	rule: ClassVar[str] = "string"
+
+	def single(self, value: RawValue) -> str:
 		if isinstance(value, list):
-			raise ParseError("must be a single value")
+			raise ParseError(self.rule, "must be a single value")
 		return value
 
 
 class Str(Scalar):
 	def parse(self, value: RawValue) -> str:
-		return super().parse(value)
+		return self.single(value)
+
+
+class Int(Scalar):
+	rule = "integer"
+
+	def parse(self, value: RawValue) -> int:
+		raw = self.single(value)
+		if re.fullmatch(r"-?[0-9]+", raw) is None:
+			raise ParseError(self.rule, "must be a whole number")
+		return int(raw)
 
 
 class UUID(Scalar):
+	rule = "uuid"
+
 	def parse(self, value: RawValue) -> uuid.UUID:
-		raw = super().parse(value)
+		raw = self.single(value)
 		try:
 			return uuid.UUID(raw)
 		except ValueError as err:
-			raise ParseError("must be a valid UUID") from err
+			raise ParseError(self.rule, "must be a valid UUID") from err
 
 
 class URL(Scalar):
+	rule = "url"
+
 	def parse(self, value: RawValue) -> http.URL:
-		raw = super().parse(value)
+		raw = self.single(value)
 		try:
 			return http.URL(raw)
 		except ValueError as err:
-			raise ParseError("must be a valid URL") from err
-
-
-class Required[T]:
-	def __init__(self, parser: Parser[T]):
-		self.parser = parser
-
-	def parse(self, value: RawValue) -> T:
-		if value is None:
-			raise ParseError("must be provided")
-		if value == "" or value == []:
-			raise ParseError("must not be empty")
-		return self.parser.parse(value)
-
-
-class Optional[T]:
-	def __init__(self, parser: Parser[T]):
-		self.parser = parser
-
-	def parse(self, value: RawValue) -> T | None:
-		if value is None or value == "":
-			return None
-		return self.parser.parse(value)
+			raise ParseError(self.rule, "must be a valid URL") from err
 
 
 class Bool:
+	rule: ClassVar[str] = "boolean"
+
 	def parse(self, value: RawValue) -> bool:
-		if value is None:
-			return False
 		if value == "on":
 			return True
-		raise ParseError('must be "on" or omitted')
+		raise ParseError(self.rule, 'must be "on" or omitted')
 
 
 class List[T]:
@@ -80,8 +77,6 @@ class List[T]:
 		self.parser = parser
 
 	def parse(self, value: RawValue) -> list[T]:
-		if value is None:
-			return []
 		if isinstance(value, str):
 			values = [value]
 		else:

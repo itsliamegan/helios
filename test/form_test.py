@@ -1,111 +1,219 @@
+from typing import ClassVar
 from uuid import UUID
 
-from luna.test.assertion import assert_eq
+from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import Field, Form, parser
-from helios.form.parser import ParseError
-from helios.http import Input
+from helios.form import Errors, Form, Verbatim
+from helios.http import Input, URL
 
-
-def test_validates_required_when_provided():
-	form = Form([Field("title", parser.Required(parser.Str()))])
-
-	input, errs = form.validate(Input({"title": "Intro"}))
-
-	assert_eq(input, {"title": "Intro"})
-	assert_eq(errs, {})
+FIRST_ID = "102ddad7-06d1-484f-a3f8-3cf4711e91ba"
+SECOND_ID = "f262c72c-92e8-4e1f-9644-b1d24afad614"
 
 
-def test_validates_required_when_missing():
-	form = Form([Field("title", parser.Required(parser.Str()))])
-
-	input, errs = form.validate(Input())
-
-	assert_eq(input, {})
-	assert_eq(errs, {"title": ["must be provided"]})
+class PinForm(Form):
+	title: str
+	note: Verbatim = Verbatim("")
+	board_ids: list[UUID] = []
+	return_to: str | None = None
 
 
-def test_validates_required_when_empty():
-	form = Form([Field("title", parser.Required(parser.Str()))])
-
-	input, errs = form.validate(Input({"title": ""}))
-
-	assert_eq(input, {})
-	assert_eq(errs, {"title": ["must not be empty"]})
-
-
-def test_parses_uuid():
-	raw = "102ddad7-06d1-484f-a3f8-3cf4711e91ba"
-	form = Form([Field("user_id", parser.UUID())])
-
-	data, errors = form.validate(Input({"user_id": raw}))
-
-	assert_eq(data, {"user_id": UUID(raw)})
-	assert_eq(errors, {})
-
-
-def test_custom_parser_can_handle_missing_input():
-	class DefaultParser:
-		def parse(self, value: str | list[str] | None) -> str:
-			if value is None:
-				return "default"
-			if isinstance(value, list):
-				raise ParseError("must be a single value")
-			return value
-
-	form = Form([Field("value", DefaultParser())])
-
-	data, errors = form.validate(Input())
-
-	assert_eq(data, {"value": "default"})
-	assert_eq(errors, {})
-
-
-def test_records_parse_errors():
-	form = Form([Field("user_id", parser.UUID())])
-
-	data, errors = form.validate(Input({"user_id": "not-a-uuid"}))
-
-	assert_eq(data, {})
-	assert_eq(errors, {"user_id": ["must be a valid UUID"]})
-
-
-def test_parses_missing_optional_boolean_and_list_fields():
-	form = Form(
-		[
-			Field("parent_id", parser.Optional(parser.UUID())),
-			Field("archived", parser.Bool()),
-			Field("user_id", parser.List(parser.UUID())),
-		]
+def test_validates_annotated_fields():
+	form, errors = PinForm.validate(
+		Input(
+			{
+				"title": "Intro",
+				"note": "Read later",
+				"board_ids": [FIRST_ID, SECOND_ID],
+				"return_to": "/boards",
+			}
+		)
 	)
 
-	data, errors = form.validate(Input())
-
-	assert_eq(data, {"parent_id": None, "archived": False, "user_id": []})
-	assert_eq(errors, {})
-
-
-def test_parses_list_uuid_field_from_browser_input():
-	first = "102ddad7-06d1-484f-a3f8-3cf4711e91ba"
-	second = "f262c72c-92e8-4e1f-9644-b1d24afad614"
-	form = Form([Field("user_id", parser.List(parser.UUID()))])
-
-	scalar, scalar_errors = form.validate(Input({"user_id": first}))
-	repeated, repeated_errors = form.validate(Input({"user_id": [first, second]}))
-
-	assert_eq(scalar, {"user_id": [UUID(first)]})
-	assert_eq(scalar_errors, {})
-	assert_eq(repeated, {"user_id": [UUID(first), UUID(second)]})
-	assert_eq(repeated_errors, {})
+	assert_eq(errors, Errors())
+	assert_eq(form.title, "Intro")
+	assert_eq(form.note, "Read later")
+	assert_eq(form.board_ids, [UUID(FIRST_ID), UUID(SECOND_ID)])
+	assert_eq(form.return_to, "/boards")
 
 
-def test_parses_checkbox_presence():
-	form = Form([Field("archived", parser.Bool())])
+def test_fills_missing_optional_fields_with_defaults():
+	form, errors = PinForm.validate(Input({"title": "Intro"}))
 
-	checked, checked_errors = form.validate(Input({"archived": "on"}))
-	unexpected, unexpected_errors = form.validate(Input({"archived": "yes"}))
+	assert_that(not errors)
+	assert_eq(form.note, "")
+	assert_eq(form.board_ids, [])
+	assert_that(form.return_to is None)
 
-	assert_eq(checked, {"archived": True})
-	assert_eq(checked_errors, {})
-	assert_eq(unexpected, {})
-	assert_eq(unexpected_errors, {"archived": ['must be "on" or omitted']})
+
+def test_copies_mutable_defaults():
+	first, _ = PinForm.validate(Input({"title": "Intro"}))
+	second, _ = PinForm.validate(Input({"title": "Intro"}))
+
+	first.board_ids.append(UUID(FIRST_ID))
+
+	assert_eq(second.board_ids, [])
+	assert_eq(PinForm(title="Intro").board_ids, [])
+
+
+def test_requires_fields_without_defaults():
+	form, errors = PinForm.validate(Input())
+
+	assert_eq(errors["title"], ["Title must be provided."])
+	with assert_raises(AttributeError) as raised:
+		_ = form.title
+	assert_eq(str(raised.exception), "PinForm.title has not been initialized")
+
+
+def test_trims_strings():
+	form, errors = PinForm.validate(
+		Input({"title": "  Intro  ", "return_to": "  /boards "})
+	)
+
+	assert_that(not errors)
+	assert_eq(form.title, "Intro")
+	assert_eq(form.return_to, "/boards")
+
+
+def test_treats_blank_strings_as_missing():
+	form, errors = PinForm.validate(Input({"title": "   ", "return_to": ""}))
+
+	assert_eq(errors["title"], ["Title must be provided."])
+	assert_that(form.return_to is None)
+
+
+def test_trims_list_items_and_drops_blank_ones():
+	form, errors = PinForm.validate(
+		Input({"title": "Intro", "board_ids": [f" {FIRST_ID} ", " ", ""]})
+	)
+
+	assert_that(not errors)
+	assert_eq(form.board_ids, [UUID(FIRST_ID)])
+
+
+def test_keeps_verbatim_fields_exactly_as_sent():
+	class PasswordForm(Form):
+		password: Verbatim
+
+	indented, _ = PinForm.validate(Input({"title": "Intro", "note": "  - item\n"}))
+	blank, blank_errors = PasswordForm.validate(Input({"password": ""}))
+	_, missing_errors = PasswordForm.validate(Input())
+
+	assert_eq(indented.note, "  - item\n")
+	assert_that(not blank_errors)
+	assert_eq(blank.password, "")
+	assert_eq(missing_errors["password"], ["Password must be provided."])
+
+
+def test_records_parse_errors_with_readable_field_names():
+	form, errors = PinForm.validate(
+		Input({"title": "Intro", "board_ids": [FIRST_ID, "not-a-uuid"]})
+	)
+
+	assert_eq(form.title, "Intro")
+	assert_eq(errors.messages, {"board_ids": ["Board ids must be a valid UUID."]})
+
+
+def test_rejects_repeated_scalar_values():
+	_, errors = PinForm.validate(Input({"title": ["Intro", "Outro"]}))
+
+	assert_eq(errors["title"], ["Title must be a single value."])
+
+
+def test_parses_checkboxes_and_other_scalar_types():
+	class SettingsForm(Form):
+		open_in_new_tab: bool = False
+		page_size: int = 20
+		homepage: URL | None = None
+
+	checked, checked_errors = SettingsForm.validate(
+		Input(
+			{
+				"open_in_new_tab": "on",
+				"page_size": "50",
+				"homepage": "https://example.com",
+			}
+		)
+	)
+	unchecked, _ = SettingsForm.validate(Input())
+	_, invalid_errors = SettingsForm.validate(
+		Input({"open_in_new_tab": "yes", "page_size": "many"})
+	)
+
+	assert_that(not checked_errors)
+	assert_that(checked.open_in_new_tab is True)
+	assert_eq(checked.page_size, 50)
+	assert_eq(str(checked.homepage), "https://example.com")
+	assert_that(unchecked.open_in_new_tab is False)
+	assert_eq(unchecked.page_size, 20)
+	assert_eq(
+		invalid_errors.messages,
+		{
+			"open_in_new_tab": ['Open in new tab must be "on" or omitted.'],
+			"page_size": ["Page size must be a whole number."],
+		},
+	)
+
+
+def test_constructs_with_fields():
+	form = PinForm(title="Intro", board_ids=[UUID(FIRST_ID)])
+
+	assert_eq(form.title, "Intro")
+	assert_eq(form.note, "")
+	assert_eq(form.board_ids, [UUID(FIRST_ID)])
+	assert_that(form.return_to is None)
+
+
+def test_construction_rejects_missing_and_extra_fields():
+	with assert_raises(TypeError) as missing:
+		PinForm()  # ty: ignore[missing-argument]
+	with assert_raises(TypeError) as extra:
+		PinForm(title="Intro", body="Hello")  # ty: ignore[unknown-argument]
+
+	assert_eq(str(missing.exception), "PinForm is missing fields: title")
+	assert_eq(str(extra.exception), "PinForm got unexpected fields: body")
+
+
+def test_subclasses_inherit_fields():
+	class ArchivablePinForm(PinForm):
+		archived: bool = False
+
+	form, errors = ArchivablePinForm.validate(
+		Input({"title": "Intro", "archived": "on"})
+	)
+
+	assert_that(not errors)
+	assert_eq(form.title, "Intro")
+	assert_that(form.archived is True)
+
+
+def test_ignores_class_variables():
+	class NoteForm(Form):
+		limit: ClassVar[int] = 10
+
+		body: str
+
+	assert_eq(list(NoteForm.fields), ["body"])
+
+
+def test_rejects_unsupported_field_types():
+	with assert_raises(TypeError) as raised:
+
+		class BadForm(Form):
+			tags: dict[str, str]
+
+	assert_eq(
+		str(raised.exception),
+		"BadForm.tags: unsupported field type: dict[str, str]",
+	)
+
+
+def test_rejects_field_names_form_uses():
+	with assert_raises(TypeError) as raised:
+
+		class BadForm(Form):
+			values: str
+
+	assert_eq(
+		str(raised.exception),
+		'BadForm has a field named "values", which Form uses',
+	)
