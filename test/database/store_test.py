@@ -103,9 +103,7 @@ def test_crud_and_scalar_round_trip():
 			assert_eq(store.find_all(Record), [created])
 			assert_eq(store.find_by(Record, active=True), [created])
 			assert_that(isinstance(found.id, UUID))
-			created_at = found.created_at
-			assert created_at is not None
-			assert_eq(created_at.tzinfo, UTC)
+			assert_eq(found.created_at.tzinfo, UTC)
 			assert_eq(found.count, 3)
 			assert_eq(found.active, True)
 			assert_that(isinstance(found.owner_id, UUID))
@@ -146,11 +144,12 @@ def test_failed_insert_leaves_model_new_for_later_save():
 		try:
 			with assert_raises(DatabaseError):
 				store.save(model)
-			assert_that(model.created_at is None)
+			with assert_raises(AttributeError):
+				_ = model.created_at
 
 			model.name = "Valid"
 			store.save(model)
-			assert_that(model.created_at is not None)
+			assert_that(isinstance(model.created_at, datetime))
 			assert_that(store.find_one(Record, model.id) is model)
 		finally:
 			connection.close()

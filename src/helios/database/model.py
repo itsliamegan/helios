@@ -53,7 +53,7 @@ class Model:
 	attributes = ResolvedAttributes()
 
 	id: UUID = generated()
-	created_at: datetime | None = generated()
+	created_at: datetime = generated()
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
@@ -73,7 +73,6 @@ class Model:
 	def __init__(self, **attributes: Any):
 		self.values = type(self).initialize(attributes)
 		self.values["id"] = uuid4()
-		self.values["created_at"] = None
 		self._changes = Changes()
 		self._status = Status.NEW
 

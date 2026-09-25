@@ -20,7 +20,16 @@ def test_constructs_model_with_table_defaults_and_nulls():
 	assert_eq(post.published, False)
 	assert_eq(post.summary, None)
 	assert_that(isinstance(post.id, UUID))
-	assert_that(post.created_at is None)
+
+
+def test_leaves_created_at_unset_until_saved():
+	class Post(Model):
+		title: str
+
+	post = Post(title="Intro")
+
+	with assert_raises(AttributeError):
+		_ = post.created_at
 
 
 def test_preserves_explicit_null_instead_of_default():
