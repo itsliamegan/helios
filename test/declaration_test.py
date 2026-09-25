@@ -125,24 +125,17 @@ def test_rejects_missing_init_keywords():
 	assert_eq(str(raised.exception), "Post is missing attributes: title")
 
 
-def test_accepts_a_single_base():
+def test_requires_a_single_base():
 	class Record:
 		pass
 
 	class Post(Record):
 		pass
 
-	check_single_base(Post, Record, ExampleError)
-
-
-def test_rejects_other_bases():
-	class Record:
-		pass
-
 	class Content(Record):
 		pass
 
-	class Post(Content):
+	class Article(Content):
 		pass
 
 	class Timestamped:
@@ -151,10 +144,11 @@ def test_rejects_other_bases():
 	class Note(Record, Timestamped):
 		pass
 
+	check_single_base(Post, Record, ExampleError)
 	with assert_raises(ExampleError) as subclass_raised:
-		check_single_base(Post, Record, ExampleError)
+		check_single_base(Article, Record, ExampleError)
 	with assert_raises(ExampleError) as mixin_raised:
 		check_single_base(Note, Record, ExampleError)
 
-	assert_eq(str(subclass_raised.exception), "Post must inherit only from Record")
+	assert_eq(str(subclass_raised.exception), "Article must inherit only from Record")
 	assert_eq(str(mixin_raised.exception), "Note must inherit only from Record")
