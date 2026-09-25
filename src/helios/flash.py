@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from helios.app import Application, Container, Context, Next, Provider
-from helios.form import Errors, Submission
-from helios.http import Input, Request, Response
+from helios.http import Request, Response
 from helios.session.store import Session
 from helios.view import Engine, View
 
@@ -48,22 +47,6 @@ class Flashes:
 	def __contains__(self, name: str) -> bool:
 		return name in self.flashes
 
-	def errors(self, errors: Errors):
-		self["_errors"] = {
-			name: list(messages) for name, messages in errors.messages.items()
-		}
-
-	def input(self, input: Input):
-		self["_input"] = dict(input.items)
-
-	def submission(self) -> Submission:
-		input = self.get("_input")
-		errors = self.get("_errors")
-		return Submission(
-			Input(input) if input is not None else None,
-			Errors(errors) if errors is not None else None,
-		)
-
 
 @dataclass
 class Flash:
@@ -90,9 +73,7 @@ class Provider(Provider):
 		return Flashes()
 
 	def compose(self, view: View, context: Context):
-		flashes = context.get(Flashes)
-		view.assign("flash", flashes)
-		view.assign("submission", flashes.submission())
+		view.assign("flash", context.get(Flashes))
 
 	def middleware(self, request: Request, context: Context, next: Next) -> Response:
 		response = next(request, context)
