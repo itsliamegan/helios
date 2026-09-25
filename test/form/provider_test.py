@@ -110,7 +110,7 @@ def test_resolves_empty_submission_without_flashes():
 
 	assert_that(submissions[0].input is None)
 	assert_eq(submissions[0].value("title", "Old title"), "Old title")
-	assert_that(not submissions[0].is_invalid("title"))
+	assert_that(not submissions[0].invalid("title"))
 
 
 def test_shares_submission_with_views():
@@ -119,7 +119,7 @@ def test_shares_submission_with_views():
 		views_dir.joinpath("edit.html").write_text(
 			'{{ submission.value("title", "Old title") }}|'
 			'{{ submission.error("title") }}|'
-			'{{ submission.is_invalid("note") }}'
+			'{{ submission.invalid("note") }}'
 		)
 		session = Session(
 			uuid4(),

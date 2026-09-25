@@ -17,13 +17,15 @@ class Submission:
 		self.errors = errors if errors is not None else Errors()
 
 	def value(self, name: str, default: object = "") -> str | list[str]:
-		collection = isinstance(default, COLLECTIONS)
+		is_collection = isinstance(default, COLLECTIONS)
 		if self.input is None:
 			return encode(default)
+
 		if name not in self.input:
-			return [] if collection else ""
+			return [] if is_collection else ""
+
 		value = self.input[name]
-		if collection and isinstance(value, str):
+		if is_collection and isinstance(value, str):
 			return [value]
 		else:
 			return value
@@ -31,7 +33,7 @@ class Submission:
 	def error(self, name: str) -> str | None:
 		return self.errors.first(name)
 
-	def is_invalid(self, name: str) -> bool:
+	def invalid(self, name: str) -> bool:
 		return self.error(name) is not None
 
 
