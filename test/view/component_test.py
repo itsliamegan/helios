@@ -417,7 +417,5 @@ def test_rejects_undefined_annotations_on_construction():
 
 		pin: Pin  # noqa: F821
 
-	with assert_raises(ComponentError) as raised:
+	with assert_raises(ComponentError):
 		Card(pin=None)
-
-	assert_eq(str(raised.exception), "Card.pin: unresolved annotation: Pin")

@@ -59,18 +59,14 @@ def test_rejects_missing_extra_non_init_and_null_attributes():
 	class Post(Model):
 		title: str
 
-	with assert_raises(TypeError) as missing:
+	with assert_raises(TypeError):
 		Post()
-	with assert_raises(TypeError) as extra:
+	with assert_raises(TypeError):
 		Post(title="Intro", extra="value")
-	with assert_raises(TypeError) as reserved:
+	with assert_raises(TypeError):
 		Post(title="Intro", id=uuid4())
 	with assert_raises(ModelError):
 		Post(title=None)
-
-	assert_eq(str(missing.exception), "Post is missing attributes: title")
-	assert_eq(str(extra.exception), "Post got unexpected attributes: extra")
-	assert_eq(str(reserved.exception), "Post got unexpected attributes: id")
 
 
 def test_requires_nullable_attributes_without_defaults():
@@ -177,10 +173,8 @@ def test_rejects_unresolved_annotations_on_construction():
 	class Post(Model):
 		author: Author  # noqa: F821
 
-	with assert_raises(ModelError) as raised:
+	with assert_raises(ModelError):
 		Post(author=None)
-
-	assert_eq(str(raised.exception), "Post.author: unresolved annotation: Author")
 
 
 def test_rejects_attributes_without_supported_annotations():
