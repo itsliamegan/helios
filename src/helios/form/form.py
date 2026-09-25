@@ -1,4 +1,5 @@
 from annotationlib import get_annotations
+from collections.abc import Callable
 import copy
 from dataclasses import dataclass
 from types import NoneType
@@ -23,7 +24,14 @@ from .parser import ParseError, Parser, RawValue
 
 Verbatim = NewType("Verbatim", str)
 
+type Rule = Callable[[Any], Any]
+
 MISSING: Any = object()
+
+
+class RuleError(ValueError):
+	pass
+
 
 SCALARS: dict[Any, Parser[Any]] = {
 	str: parser.Str(),
@@ -57,13 +65,19 @@ class Field:
 			return value
 		return trim(value)
 
-	def validate(self, input: Input) -> object:
+	def validate(self, input: Input, rules: list[Rule]) -> object:
 		raw = self.raw(input)
 		if raw is None:
 			if self.required:
 				raise ParseError("required", "must be provided")
 			return self.initial()
-		return self.parser.parse(raw)
+		value = self.parser.parse(raw)
+		for rule in rules:
+			try:
+				value = rule(value)
+			except RuleError as error:
+				raise ParseError(rule_name(rule), str(error)) from error
+		return value
 
 	def __get__(self, form: Form | None, owner: type) -> Any:
 		if form is None:
@@ -82,6 +96,8 @@ class Field:
 @dataclass_transform(kw_only_default=True, eq_default=False)
 class Form:
 	fields: ClassVar[dict[str, Field]] = {}
+	rules: ClassVar[dict[str, list[Rule]]] = {}
+	messages: ClassVar[dict[str, str]] = {}
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
@@ -122,15 +138,28 @@ class Form:
 
 	@classmethod
 	def validate(cls, input: Input) -> tuple[Self, Errors]:
+		for name in cls.rules:
+			if name not in cls.fields:
+				raise TypeError(
+					f'{cls.__name__}.rules names "{name}", which is not a field'
+				)
+
 		form = cls.__new__(cls)
 		form.values = {}
 		errors = Errors()
 		for name, field in cls.fields.items():
 			try:
-				form.values[name] = field.validate(input)
+				form.values[name] = field.validate(input, cls.rules.get(name, []))
 			except ParseError as error:
-				errors.add(name, f"{readable(name)} {error}.")
+				errors.add(name, cls.message(name, error))
 		return form, errors
+
+	@classmethod
+	def message(cls, name: str, error: ParseError) -> str:
+		key = f"{name}.{error.rule}"
+		if key in cls.messages:
+			return cls.messages[key]
+		return f"{readable(name)} {error}."
 
 	def __repr__(self) -> str:
 		values = ", ".join(
@@ -173,6 +202,10 @@ def trim(value: RawValue) -> RawValue | None:
 		return value.strip() or None
 	items = [item.strip() for item in value]
 	return [item for item in items if item] or None
+
+
+def rule_name(rule: Rule) -> str:
+	return getattr(rule, "__name__", type(rule).__name__)
 
 
 def readable(name: str) -> str:

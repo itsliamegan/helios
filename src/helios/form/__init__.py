@@ -1,4 +1,4 @@
 from .errors import Errors
-from .form import Form, Verbatim
+from .form import Form, Rule, RuleError, Verbatim
 
-__all__ = ["Errors", "Form", "Verbatim"]
+__all__ = ["Errors", "Form", "Rule", "RuleError", "Verbatim"]

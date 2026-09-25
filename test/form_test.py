@@ -3,7 +3,7 @@ from uuid import UUID
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import Errors, Form, Verbatim
+from helios.form import Errors, Form, RuleError, Verbatim
 from helios.http import Input, URL
 
 FIRST_ID = "102ddad7-06d1-484f-a3f8-3cf4711e91ba"
@@ -217,3 +217,136 @@ def test_rejects_field_names_form_uses():
 		str(raised.exception),
 		'BadForm has a field named "values", which Form uses',
 	)
+
+
+def web_url(value: str) -> str:
+	if not value.startswith(("http://", "https://")):
+		raise RuleError("must start with http:// or https://")
+	return value
+
+
+def distinct(values: list[UUID]) -> list[UUID]:
+	if len(set(values)) != len(values):
+		raise RuleError("must not repeat a value")
+	return values
+
+
+def lowercase(value: str) -> str:
+	return value.lower()
+
+
+def test_runs_rules_on_parsed_values():
+	class LinkForm(Form):
+		rules = {"url": [lowercase, web_url], "board_ids": [distinct]}
+
+		url: str
+		board_ids: list[UUID] = []
+
+	form, errors = LinkForm.validate(
+		Input({"url": " HTTPS://Example.com ", "board_ids": [FIRST_ID, SECOND_ID]})
+	)
+	_, invalid_errors = LinkForm.validate(
+		Input({"url": "example.com", "board_ids": [FIRST_ID, FIRST_ID]})
+	)
+
+	assert_that(not errors)
+	assert_eq(form.url, "https://example.com")
+	assert_eq(
+		invalid_errors.messages,
+		{
+			"url": ["Url must start with http:// or https://."],
+			"board_ids": ["Board ids must not repeat a value."],
+		},
+	)
+
+
+def test_stops_at_the_first_failing_rule():
+	calls = []
+
+	def expensive(value: str) -> str:
+		calls.append(value)
+		return value
+
+	class LinkForm(Form):
+		rules = {"url": [web_url, expensive]}
+
+		url: str
+
+	_, errors = LinkForm.validate(Input({"url": "example.com"}))
+
+	assert_eq(errors["url"], ["Url must start with http:// or https://."])
+	assert_eq(calls, [])
+
+
+def test_skips_rules_for_missing_fields():
+	class LinkForm(Form):
+		rules = {"url": [web_url], "board_ids": [distinct]}
+
+		url: str
+		board_ids: list[UUID] = []
+
+	_, errors = LinkForm.validate(Input())
+
+	assert_eq(errors.messages, {"url": ["Url must be provided."]})
+
+
+def test_skips_rules_after_a_parse_error():
+	class LinkForm(Form):
+		rules = {"board_ids": [distinct]}
+
+		board_ids: list[UUID] = []
+
+	_, errors = LinkForm.validate(Input({"board_ids": ["not-a-uuid"]}))
+
+	assert_eq(errors["board_ids"], ["Board ids must be a valid UUID."])
+
+
+def test_overrides_messages_by_field_and_rule():
+	class LinkForm(Form):
+		rules = {"url": [web_url]}
+		messages = {
+			"title.required": "Give the pin a title.",
+			"url.web_url": "Use a web address.",
+			"board_ids.uuid": "Choose boards from the list.",
+		}
+
+		title: str
+		url: str
+		board_ids: list[UUID] = []
+
+	_, errors = LinkForm.validate(
+		Input({"url": "example.com", "board_ids": "not-a-uuid"})
+	)
+
+	assert_eq(
+		errors.messages,
+		{
+			"title": ["Give the pin a title."],
+			"url": ["Use a web address."],
+			"board_ids": ["Choose boards from the list."],
+		},
+	)
+
+
+def test_rejects_rules_for_undeclared_fields():
+	class LinkForm(Form):
+		rules = {"link": [web_url]}
+
+		url: str
+
+	with assert_raises(TypeError) as raised:
+		LinkForm.validate(Input({"url": "https://example.com"}))
+
+	assert_eq(
+		str(raised.exception),
+		'LinkForm.rules names "link", which is not a field',
+	)
+
+
+def test_controllers_add_their_own_errors():
+	form, errors = PinForm.validate(Input({"title": "Intro"}))
+
+	if form.title == "Intro":
+		errors.add("title", "That title is taken.")
+
+	assert_eq(errors.messages, {"title": ["That title is taken."]})
