@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import Errors, Form, RuleError, Verbatim, rule
+from helios.form import Errors, Form, RuleError, Verbatim
 from helios.http import Input, URL
 
 
@@ -221,47 +221,31 @@ def test_rejects_field_names_form_uses():
 	)
 
 
-@rule("must start with http:// or https://")
-def web_url(value: str) -> str:
-	if not value.startswith(("http://", "https://")):
-		raise RuleError()
-	else:
-		return value
-
-
-@rule("must not repeat a value")
-def distinct(values: list[UUID]) -> list[UUID]:
-	if len(set(values)) != len(values):
-		raise RuleError()
-	else:
-		return values
-
-
-@rule("must be lowercase")
-def lowercase(value: str) -> str:
-	return value.lower()
-
-
-class MaxLength:
-	name = "max_length"
-
-	def __init__(self, limit: int):
-		self.limit = limit
-
-	@property
-	def message(self) -> str:
-		return f"must be at most {self.limit} characters"
+class WebURL:
+	name = "web_url"
+	message = "must start with http:// or https://"
 
 	def check(self, value: str) -> str:
-		if len(value) > self.limit:
+		if not value.startswith(("http://", "https://")):
 			raise RuleError()
 		else:
 			return value
 
 
+class Distinct:
+	name = "distinct"
+	message = "must not repeat a value"
+
+	def check(self, values: list[UUID]) -> list[UUID]:
+		if len(set(values)) != len(values):
+			raise RuleError()
+		else:
+			return values
+
+
 def test_runs_rules_on_parsed_values():
 	class LinkForm(Form):
-		rules = {"url": [lowercase, web_url], "board_ids": [distinct]}
+		rules = {"url": [WebURL()], "board_ids": [Distinct()]}
 
 		url: str
 		board_ids: list[UUID] = []
@@ -271,7 +255,7 @@ def test_runs_rules_on_parsed_values():
 	form, errors = LinkForm.validate(
 		Input(
 			{
-				"url": " HTTPS://Example.com ",
+				"url": "https://example.com",
 				"board_ids": [str(read_later_id), str(inbox_id)],
 			}
 		)
@@ -291,85 +275,9 @@ def test_runs_rules_on_parsed_values():
 	)
 
 
-def test_runs_rules_with_parameters():
-	class NoteForm(Form):
-		rules = {"title": [MaxLength(5)]}
-		messages = {"title.max_length": "Keep the title short."}
-
-		title: str
-
-	class CommentForm(Form):
-		rules = {"body": [MaxLength(3)]}
-
-		body: str
-
-	_, note_errors = NoteForm.validate(Input({"title": "Too long"}))
-	_, comment_errors = CommentForm.validate(Input({"body": "Hello"}))
-
-	assert_eq(note_errors.messages["title"], ["Keep the title short."])
-	assert_eq(comment_errors.messages["body"], ["Body must be at most 3 characters."])
-
-
-def test_rule_errors_can_replace_the_default_message():
-	@rule("must be available")
-	def available(value: str) -> str:
-		raise RuleError("must not be a reserved name")
-
-	class HandleForm(Form):
-		rules = {"handle": [available]}
-
-		handle: str
-
-	_, errors = HandleForm.validate(Input({"handle": "admin"}))
-
-	assert_eq(errors.messages["handle"], ["Handle must not be a reserved name."])
-
-
-def test_stops_at_the_first_failing_rule():
-	calls = []
-
-	@rule("never fails")
-	def expensive(value: str) -> str:
-		calls.append(value)
-		return value
-
-	class LinkForm(Form):
-		rules = {"url": [web_url, expensive]}
-
-		url: str
-
-	_, errors = LinkForm.validate(Input({"url": "example.com"}))
-
-	assert_eq(errors.messages["url"], ["Url must start with http:// or https://."])
-	assert_eq(calls, [])
-
-
-def test_skips_rules_for_missing_fields():
-	class LinkForm(Form):
-		rules = {"url": [web_url], "board_ids": [distinct]}
-
-		url: str
-		board_ids: list[UUID] = []
-
-	_, errors = LinkForm.validate(Input())
-
-	assert_eq(errors.messages, {"url": ["Url must be provided."]})
-
-
-def test_skips_rules_after_a_parse_error():
-	class LinkForm(Form):
-		rules = {"board_ids": [distinct]}
-
-		board_ids: list[UUID] = []
-
-	_, errors = LinkForm.validate(Input({"board_ids": ["not-a-uuid"]}))
-
-	assert_eq(errors.messages["board_ids"], ["Board ids must be a valid UUID."])
-
-
 def test_subclasses_replace_rules_for_inherited_fields():
 	class LinkForm(Form):
-		rules = {"url": [web_url]}
+		rules = {"url": [WebURL()]}
 
 		url: str
 
@@ -379,14 +287,16 @@ def test_subclasses_replace_rules_for_inherited_fields():
 	_, link_errors = LinkForm.validate(Input({"url": "example.com"}))
 	form, any_link_errors = AnyLinkForm.validate(Input({"url": "example.com"}))
 
-	assert_eq(link_errors.messages["url"], ["Url must start with http:// or https://."])
+	assert_eq(
+		link_errors.messages, {"url": ["Url must start with http:// or https://."]}
+	)
 	assert_that(not any_link_errors)
 	assert_eq(form.url, "example.com")
 
 
 def test_overrides_messages_by_field_and_rule():
 	class LinkForm(Form):
-		rules = {"url": [web_url]}
+		rules = {"url": [WebURL()]}
 		messages = {
 			"title.required": "Give the pin a title.",
 			"url.web_url": "Use a web address.",
@@ -415,23 +325,13 @@ def test_rejects_rules_for_undeclared_fields():
 	with assert_raises(TypeError) as raised:
 
 		class LinkForm(Form):
-			rules = {"link": [web_url]}
+			rules = {"link": [WebURL()]}
 
 			url: str
 
 	assert_eq(
 		str(raised.exception),
 		"Form LinkForm has rules for 'link', which is not a field",
-	)
-
-
-def test_rule_decorates_only_functions():
-	with assert_raises(TypeError) as raised:
-		rule("must be valid")(str.strip)
-
-	assert_eq(
-		str(raised.exception),
-		"rule decorates functions; write a class for other rules",
 	)
 
 

@@ -1,5 +1,3 @@
-from collections.abc import Callable
-from types import FunctionType
 from typing import Protocol
 
 
@@ -17,26 +15,6 @@ class Rule[In, Out](Protocol):
 	def message(self) -> str: ...
 
 	def check(self, value: In) -> Out: ...
-
-
-class FunctionRule[T]:
-	def __init__(self, name: str, message: str, function: Callable[[T], T]):
-		self.name = name
-		self.message = message
-		self.function = function
-
-	def check(self, value: T) -> T:
-		return self.function(value)
-
-
-def rule[T](message: str) -> Callable[[Callable[[T], T]], FunctionRule[T]]:
-	def decorate(function: Callable[[T], T]) -> FunctionRule[T]:
-		if not isinstance(function, FunctionType):
-			raise TypeError("rule decorates functions; write a class for other rules")
-
-		return FunctionRule(function.__name__, message, function)
-
-	return decorate
 
 
 class Required:
