@@ -11,6 +11,7 @@ from helios import http
 from helios.database import (
 	Config,
 	DatabaseError,
+	Lifecycle,
 	Model,
 	ModelError,
 	NotFoundError,
@@ -285,6 +286,30 @@ def test_identity_map_preserves_unsaved_assignment():
 
 			assert_that(found is model)
 			assert_eq(found.name, "Unsaved")
+		finally:
+			connection.close()
+
+
+def test_tracks_model_lifecycle():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path)
+		connection = connect(Config(path))
+		connection.begin()
+		try:
+			store = Store(connection, [Record])
+			model = Record(**record_values())
+			new = model.lifecycle
+			store.save(model)
+			saved = model.lifecycle
+			found = Store(connection, [Record]).find_one(Record, model.id)
+			store.delete(model)
+
+			assert_that(new is Lifecycle.NEW)
+			assert_that(saved is Lifecycle.SAVED)
+			assert_that(found is not model)
+			assert_that(found.lifecycle is Lifecycle.SAVED)
+			assert_that(model.lifecycle is Lifecycle.DELETED)
 		finally:
 			connection.close()
 

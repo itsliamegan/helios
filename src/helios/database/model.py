@@ -1,3 +1,4 @@
+from annotationlib import Format, get_annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
@@ -10,9 +11,9 @@ from .attribute import Attribute, declare, generated
 from .error import ModelError
 
 
-class Status(Enum):
+class Lifecycle(Enum):
 	NEW = auto()
-	PERSISTED = auto()
+	SAVED = auto()
 	DELETED = auto()
 
 
@@ -57,11 +58,10 @@ class Model:
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
-		if "attributes" in vars(cls):
-			raise ModelError(
-				f"{cls.__name__}.attributes is model metadata; "
-				"declare named attributes instead"
-			)
+		annotations = get_annotations(cls, format=Format.FORWARDREF)
+		for name in METADATA:
+			if name in vars(cls) or name in annotations:
+				raise ModelError(f"{cls.__name__}.{name} is model metadata")
 
 		model_bases = [base for base in cls.__bases__ if issubclass(base, Model)]
 		if len(model_bases) > 1:
@@ -74,14 +74,14 @@ class Model:
 		self.values = type(self).initialize(attributes)
 		self.values["id"] = uuid4()
 		self._changes = Changes()
-		self._status = Status.NEW
+		self._lifecycle = Lifecycle.NEW
 
 	@classmethod
 	def hydrate(cls, values: dict[str, Any]) -> Model:
 		model = cls.__new__(cls)
 		model.values = {name: values[name] for name in cls.attributes}
 		model._changes = Changes()
-		model._status = Status.PERSISTED
+		model._lifecycle = Lifecycle.SAVED
 		return model
 
 	@classmethod
@@ -113,6 +113,10 @@ class Model:
 			values[name] = value
 		return values
 
+	@property
+	def lifecycle(self) -> Lifecycle:
+		return self._lifecycle
+
 	def __repr__(self) -> str:
 		return f"{type(self).__name__}({self.id!r})"
 
@@ -142,5 +146,7 @@ def declare_attributes(model_type: type[Model], attributes: dict[str, Attribute]
 		attributes[attribute_name] = declared_attribute
 	model_type.declared_attributes = attributes
 
+
+METADATA = {"attributes", "lifecycle"}
 
 declare_attributes(Model, {})

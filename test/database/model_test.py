@@ -247,6 +247,18 @@ def test_rejects_reserved_and_invalid_inherited_overrides():
 			title = "Intro"
 
 
+def test_rejects_attributes_named_like_model_metadata():
+	with assert_raises(ModelError):
+
+		class Annotated(Model):
+			lifecycle: str
+
+	with assert_raises(ModelError):
+
+		class Assigned(Model):
+			attributes = {}
+
+
 def test_rejects_multiple_model_bases():
 	class Content(Model):
 		pass

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from .codec import Scalar
 from .error import DatabaseError, ModelError, NotFoundError
-from .model import Model, Status
+from .model import Lifecycle, Model
 from .query import Filter, Membership, Query
 from .sqlite import Connection, quote_identifier
 
@@ -49,7 +49,7 @@ class Store:
 
 	def save(self, model: Model):
 		model_type = self.registry.get(type(model))
-		if model._status is Status.NEW:
+		if model.lifecycle is Lifecycle.NEW:
 			self.insert(model_type, model)
 			return
 		self.update(model_type, model)
@@ -73,7 +73,7 @@ class Store:
 		self.connection.execute(sql, parameters).close()
 
 		model.values["created_at"] = created_at
-		model._status = Status.PERSISTED
+		model._lifecycle = Lifecycle.SAVED
 		model._changes.accept(changes)
 		self.identity[(model_type, model.id)] = model
 
@@ -103,7 +103,7 @@ class Store:
 			f"WHERE {quote_identifier("id")} = ?"
 		)
 		self.connection.execute(sql, (identifier,)).close()
-		model._status = Status.DELETED
+		model._lifecycle = Lifecycle.DELETED
 		key = (model_type, model.id)
 		if self.identity.get(key) is model:
 			del self.identity[key]
