@@ -106,12 +106,16 @@ SCALARS: dict[Any, Parser[Any]] = {
 }
 
 
-def resolve(annotation: Any) -> Parser[Any]:
-	if get_origin(annotation) is list:
-		(item,) = get_args(annotation)
-		return List(scalar(item))
-	else:
+def for_type(annotation: object) -> Parser[Any] | None:
+	if get_origin(annotation) is not list:
 		return scalar(annotation)
+
+	(item,) = get_args(annotation)
+	item_parser = scalar(item)
+	if item_parser is None:
+		return None
+	else:
+		return List(item_parser)
 
 
 def is_verbatim(annotation: Any) -> bool:
@@ -122,8 +126,8 @@ def is_verbatim(annotation: Any) -> bool:
 		return annotation is Verbatim
 
 
-def scalar(annotation: Any) -> Parser[Any]:
+def scalar(annotation: object) -> Parser[Any] | None:
 	try:
-		return SCALARS[annotation]
-	except KeyError, TypeError:
-		raise TypeError(f"unsupported field type: {annotation!r}") from None
+		return SCALARS.get(annotation)
+	except TypeError:
+		return None

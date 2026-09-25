@@ -1,8 +1,15 @@
 from jinja2 import UndefinedError
-from luna.test.assertion import assert_eq, assert_raises
+from luna.test.assertion import assert_eq, assert_raises, assert_that
 from markupsafe import Markup
 
-from helios.view import Attributes, Component, Engine, Helpers, memory
+from helios.view import (
+	Attributes,
+	Component,
+	ComponentError,
+	Engine,
+	Helpers,
+	memory,
+)
 
 
 class Chip(Component):
@@ -345,7 +352,7 @@ def test_rejects_components_with_missing_templates():
 
 
 def test_rejects_accepts_without_attributes_prop():
-	with assert_raises(ValueError):
+	with assert_raises(ComponentError):
 
 		class Button(Component):
 			template = "button"
@@ -353,7 +360,7 @@ def test_rejects_accepts_without_attributes_prop():
 
 
 def test_rejects_accepts_that_name_a_prop():
-	with assert_raises(ValueError):
+	with assert_raises(ComponentError):
 
 		class Button(Component):
 			template = "button"
@@ -364,7 +371,7 @@ def test_rejects_accepts_that_name_a_prop():
 
 
 def test_rejects_props_named_component():
-	with assert_raises(ValueError):
+	with assert_raises(ComponentError):
 
 		class Wrapper(Component):
 			template = "wrapper"
@@ -373,16 +380,42 @@ def test_rejects_props_named_component():
 
 
 def test_rejects_props_named_like_component_members():
-	with assert_raises(ValueError):
+	with assert_raises(ComponentError):
 
 		class Wrapper(Component):
 			template: str = "wrapper"  # ty: ignore[invalid-attribute-override]
 
 
 def test_rejects_mutable_defaults():
-	with assert_raises(ValueError):
+	with assert_raises(ComponentError):
 
 		class Row(Component):
 			template = "row"
 
 			names: list[str] = []
+
+
+def test_accepts_props_typed_with_later_classes():
+	class Card(Component):
+		template = "card"
+
+		pin: Pin
+
+	class Pin:
+		pass
+
+	pin = Pin()
+
+	card = Card(pin=pin)
+
+	assert_that(card.pin is pin)
+
+
+def test_rejects_undefined_annotations_on_construction():
+	class Card(Component):
+		template = "card"
+
+		pin: Pin  # noqa: F821
+
+	with assert_raises(ComponentError):
+		Card(pin=None)

@@ -11,11 +11,11 @@ from helios import http
 from helios.database import (
 	Config,
 	DatabaseError,
+	Lifecycle,
 	Model,
 	ModelError,
 	NotFoundError,
 	Store,
-	attribute,
 )
 from helios.database.sqlite import connect
 
@@ -24,20 +24,21 @@ class Token:
 	def __init__(self, value: str):
 		self.value = value
 
-
-class TokenCodec:
-	def check(self, value: object):
-		if not isinstance(value, Token):
+	@classmethod
+	def check(cls, value: object):
+		if not isinstance(value, cls):
 			raise TypeError("expected a Token")
 
-	def encode(self, value: Token):
-		self.check(value)
+	@classmethod
+	def encode(cls, value: Token):
+		cls.check(value)
 		return value.value
 
-	def decode(self, value: float | str | bytes):
+	@classmethod
+	def decode(cls, value: float | str | bytes):
 		if not isinstance(value, str):
 			raise TypeError("expected token text")
-		return Token(value)
+		return cls(value)
 
 
 class Record(Model):
@@ -50,7 +51,7 @@ class Record(Model):
 	link: http.URL
 	published_at: datetime
 	note: str | None = None
-	token: Token = attribute(type=TokenCodec())
+	token: Token
 
 
 SCHEMA = """
@@ -103,9 +104,7 @@ def test_crud_and_scalar_round_trip():
 			assert_eq(store.find_all(Record), [created])
 			assert_eq(store.find_by(Record, active=True), [created])
 			assert_that(isinstance(found.id, UUID))
-			created_at = found.created_at
-			assert created_at is not None
-			assert_eq(created_at.tzinfo, UTC)
+			assert_eq(found.created_at.tzinfo, UTC)
 			assert_eq(found.count, 3)
 			assert_eq(found.active, True)
 			assert_that(isinstance(found.owner_id, UUID))
@@ -146,11 +145,12 @@ def test_failed_insert_leaves_model_new_for_later_save():
 		try:
 			with assert_raises(DatabaseError):
 				store.save(model)
-			assert_that(model.created_at is None)
+			with assert_raises(AttributeError):
+				_ = model.created_at
 
 			model.name = "Valid"
 			store.save(model)
-			assert_that(model.created_at is not None)
+			assert_that(isinstance(model.created_at, datetime))
 			assert_that(store.find_one(Record, model.id) is model)
 		finally:
 			connection.close()
@@ -290,6 +290,30 @@ def test_identity_map_preserves_unsaved_assignment():
 			connection.close()
 
 
+def test_tracks_model_lifecycle():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path)
+		connection = connect(Config(path))
+		connection.begin()
+		try:
+			store = Store(connection, [Record])
+			model = Record(**record_values())
+			new = model.lifecycle
+			store.save(model)
+			saved = model.lifecycle
+			found = Store(connection, [Record]).find_one(Record, model.id)
+			store.delete(model)
+
+			assert_that(new is Lifecycle.NEW)
+			assert_that(saved is Lifecycle.SAVED)
+			assert_that(found is not model)
+			assert_that(found.lifecycle is Lifecycle.SAVED)
+			assert_that(model.lifecycle is Lifecycle.DELETED)
+		finally:
+			connection.close()
+
+
 def test_deletes_model_and_reports_missing_lookup():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
@@ -345,6 +369,57 @@ def test_malformed_stored_scalar_is_database_error():
 				Store(connection, [Record]).find_all(Record)
 		finally:
 			connection.close()
+
+
+def test_round_trips_models_with_codecs_declared_later():
+	class Badge(Model):
+		table = "badges"
+		label: Label
+
+	class Label:
+		def __init__(self, text: str):
+			self.text = text
+
+		@classmethod
+		def check(cls, value: object):
+			if not isinstance(value, cls):
+				raise TypeError("expected a Label")
+
+		@classmethod
+		def encode(cls, value: Label) -> str:
+			return value.text
+
+		@classmethod
+		def decode(cls, value: object) -> Label:
+			return cls(str(value))
+
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(
+			path,
+			"""CREATE TABLE badges (
+				id TEXT PRIMARY KEY,
+				created_at TEXT NOT NULL,
+				label TEXT NOT NULL
+			)""",
+		)
+		connection = connect(Config(path))
+		connection.begin()
+		try:
+			created = Store(connection, [Badge]).create(Badge, label=Label("new"))
+			connection.commit()
+		finally:
+			connection.close()
+
+		second_connection = connect(Config(path))
+		second_connection.begin()
+		try:
+			found = Store(second_connection, [Badge]).find_one(Badge, created.id)
+		finally:
+			second_connection.close()
+
+		assert_that(found is not created)
+		assert_eq(found.label.text, "new")
 
 
 def test_quotes_declared_table_and_column_identifiers():

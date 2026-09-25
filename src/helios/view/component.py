@@ -1,35 +1,37 @@
-from annotationlib import Format, get_annotations
+from annotationlib import get_annotations
 from contextvars import ContextVar
-from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform, get_origin
+from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform
 
 from markupsafe import Markup
 
+from helios.declaration import (
+	Declaration,
+	MISSING,
+	check_init_keywords,
+	declarations,
+)
+
 from .attributes import Attributes, html_name
+from .error import ComponentError
 
 if TYPE_CHECKING:
 	from .engine import Engine
 
 rendering: ContextVar[Engine] = ContextVar("rendering")
 
-MISSING: Any = object()
-
 
 @dataclass_transform(kw_only_default=True, eq_default=False)
 class Component:
 	template: ClassVar[str]
 	accepts: ClassVar[set[str]] = set()
-	props: ClassVar[dict[str, Any]] = {}
+	props: ClassVar[dict[str, Declaration[object]]] = {}
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
-		props = {}
-		for name, annotation in get_annotations(cls, format=Format.FORWARDREF).items():
-			is_class_variable = (
-				annotation is ClassVar or get_origin(annotation) is ClassVar
-			)
-			if not is_class_variable:
-				props[name] = vars(cls).get(name, MISSING)
-		cls.props = cls.props | props
+		props = dict(cls.props)
+		for declaration in declarations(cls, prop_type, ComponentError):
+			props[declaration.name] = declaration
+		cls.props = props
 		check_declaration(cls)
 
 	@classmethod
@@ -38,6 +40,8 @@ class Component:
 
 	def __init__(self, **keywords: Any):
 		component = type(self)
+		for declaration in component.props.values():
+			declaration.resolve()
 		props = {}
 		attributes = {}
 		for name, value in keywords.items():
@@ -61,18 +65,20 @@ class Component:
 				{html_name(name): value for name, value in attributes.items()}
 			)
 
-		missing = [
-			name
-			for name, default in component.props.items()
-			if name not in props and default is MISSING
-		]
-		if missing:
-			raise TypeError(
-				f"{component.__name__} is missing props: {", ".join(missing)}"
-			)
+		check_init_keywords(
+			component,
+			"props",
+			props,
+			component.props,
+			[
+				name
+				for name, declaration in component.props.items()
+				if declaration.default is MISSING
+			],
+		)
 
-		for name, default in component.props.items():
-			setattr(self, name, props.get(name, default))
+		for name, declaration in component.props.items():
+			setattr(self, name, props.get(name, declaration.default))
 
 		if "attributes" in component.props:
 			for name in sorted(vars(self)["attributes"].names()):
@@ -101,25 +107,30 @@ class Component:
 		return f"{type(self).__name__}({values})"
 
 
+def prop_type(declaration: Declaration[object]) -> object:
+	return declaration.annotation
+
+
 def check_declaration(component: type[Component]):
 	name = component.__name__
-	for prop_name, default in component.props.items():
+	for prop_name, declaration in component.props.items():
 		if prop_name == "component":
-			raise ValueError(f'Component {name} has a prop named "component"')
+			raise ComponentError(f'Component {name} has a prop named "component"')
 		if prop_name in vars(Component) or prop_name in get_annotations(Component):
-			raise ValueError(
+			raise ComponentError(
 				f'Component {name} has a prop named "{prop_name}", which Component uses'
 			)
+		default = declaration.default
 		if default is not MISSING and default.__hash__ is None:
-			raise ValueError(
+			raise ComponentError(
 				f'Component {name} has a mutable default for "{prop_name}"'
 			)
 		if html_name(prop_name) in component.accepts:
-			raise ValueError(
+			raise ComponentError(
 				f'Component {name} accepts "{html_name(prop_name)}", '
 				"which is also a prop"
 			)
 	if component.accepts and "attributes" not in component.props:
-		raise ValueError(
+		raise ComponentError(
 			f"Component {name} declares accepts but has no attributes prop"
 		)

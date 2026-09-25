@@ -1,3 +1,4 @@
+from .error import FormError
 from .errors import Errors
 from .form import Form
 from .parser import Verbatim
@@ -9,6 +10,7 @@ from .submissions import Submissions
 __all__ = [
 	"Errors",
 	"Form",
+	"FormError",
 	"Provider",
 	"Rule",
 	"RuleError",

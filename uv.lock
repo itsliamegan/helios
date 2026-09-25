@@ -8,13 +8,13 @@ version = "0.1"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
+    { name = "luna" },
     { name = "python-dotenv" },
     { name = "werkzeug" },
 ]
 
 [package.dev-dependencies]
 dev = [
-    { name = "luna" },
     { name = "ruff" },
     { name = "time-machine" },
     { name = "ty" },
@@ -23,13 +23,13 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "jinja2", specifier = "==3.1.*" },
+    { name = "luna", editable = "../luna" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "werkzeug", specifier = "==3.1.*" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "luna", editable = "../luna" },
     { name = "ruff", specifier = ">=0.16.6" },
     { name = "time-machine", specifier = ">=3.5.1" },
     { name = "ty", specifier = ">=0.0.80" },

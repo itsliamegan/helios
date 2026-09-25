@@ -1,0 +1,2 @@
+class FormError(TypeError):
+	pass

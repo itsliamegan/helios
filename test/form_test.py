@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import Errors, Form, RuleError, Verbatim
+from helios.form import Errors, Form, FormError, RuleError, Verbatim
 from helios.http import Input, URL
 
 
@@ -198,7 +198,7 @@ def test_ignores_class_variables():
 
 
 def test_rejects_unsupported_field_types():
-	with assert_raises(TypeError) as raised:
+	with assert_raises(FormError) as raised:
 
 		class BadForm(Form):
 			tags: dict[str, str]
@@ -209,8 +209,22 @@ def test_rejects_unsupported_field_types():
 	)
 
 
+def test_rejects_string_annotations():
+	with assert_raises(FormError):
+
+		class BadForm(Form):
+			title: "str"  # noqa: UP037
+
+
+def test_rejects_undefined_annotations():
+	with assert_raises(FormError):
+
+		class BadForm(Form):
+			board: Board  # noqa: F821
+
+
 def test_rejects_field_names_form_uses():
-	with assert_raises(TypeError) as raised:
+	with assert_raises(FormError) as raised:
 
 		class BadForm(Form):
 			values: str
@@ -322,7 +336,7 @@ def test_overrides_messages_by_field_and_rule():
 
 
 def test_rejects_rules_for_undeclared_fields():
-	with assert_raises(TypeError) as raised:
+	with assert_raises(FormError) as raised:
 
 		class LinkForm(Form):
 			rules = {"link": [WebURL()]}

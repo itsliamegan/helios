@@ -1,11 +1,14 @@
-from annotationlib import get_annotations
 from dataclasses import replace
-from typing import Any, ClassVar, Self, dataclass_transform, get_origin
+from typing import Any, ClassVar, Self, dataclass_transform
 
+from luna.inflect import sentence
+
+from helios.declaration import check_init_keywords, declarations
 from helios.http import Input
 
+from .error import FormError
 from .errors import Errors
-from .field import Failure, Field, MISSING, declare
+from .field import Failure, Field, declare
 from .rule import Rule
 
 
@@ -17,53 +20,35 @@ class Form:
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
-		fields = {}
-		for name, field in cls.fields.items():
-			fields[name] = replace(field, extra_rules=cls.rules.get(name, []))
-
-		for name, annotation in get_annotations(cls, eval_str=True).items():
-			if annotation is ClassVar or get_origin(annotation) is ClassVar:
-				continue
-
-			if name in RESERVED:
-				raise TypeError(
-					f"Form {cls.__name__} has a field named '{name}', which Form uses"
+		fields = dict(cls.fields)
+		for declaration in declarations(cls, declare, FormError):
+			if declaration.name in RESERVED:
+				raise FormError(
+					f"Form {cls.__name__} has a field named '{declaration.name}', "
+					"which Form uses"
 				)
-			try:
-				field = declare(
-					name,
-					annotation,
-					vars(cls).get(name, MISSING),
-					cls.rules.get(name, []),
-				)
-			except TypeError as error:
-				raise TypeError(f"{cls.__name__}.{name}: {error}") from error
-			setattr(cls, name, field)
-			fields[name] = field
+			fields[declaration.name] = declaration.resolve()
 
 		for name in cls.rules:
 			if name not in fields:
-				raise TypeError(
+				raise FormError(
 					f"Form {cls.__name__} has rules for '{name}', which is not a field"
 				)
-		cls.fields = fields
+
+		cls.fields = {}
+		for name, field in fields.items():
+			cls.fields[name] = replace(field, extra_rules=cls.rules.get(name, []))
+			setattr(cls, name, cls.fields[name])
 
 	def __init__(self, **values: Any):
 		form = type(self)
-
-		extra = [name for name in values if name not in form.fields]
-		if extra:
-			raise TypeError(
-				f"{form.__name__} got unexpected fields: {", ".join(extra)}"
-			)
-
-		missing = [
-			name
-			for name, field in form.fields.items()
-			if field.required and name not in values
-		]
-		if missing:
-			raise TypeError(f"{form.__name__} is missing fields: {", ".join(missing)}")
+		check_init_keywords(
+			form,
+			"fields",
+			values,
+			form.fields,
+			[name for name, field in form.fields.items() if field.required],
+		)
 
 		self.values: dict[str, Any] = {}
 		for name, field in form.fields.items():
@@ -87,7 +72,7 @@ class Form:
 		if key in cls.messages:
 			return cls.messages[key]
 		else:
-			return f"{readable(name)} {failure.message}."
+			return f"{sentence(name)} {failure.message}."
 
 	def __repr__(self) -> str:
 		values = ", ".join(
@@ -99,8 +84,3 @@ class Form:
 
 
 RESERVED = {"values", *vars(Form)}
-
-
-def readable(name: str) -> str:
-	words = name.replace("_", " ")
-	return words[:1].upper() + words[1:]

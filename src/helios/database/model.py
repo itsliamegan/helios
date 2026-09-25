@@ -1,17 +1,19 @@
-from annotationlib import get_annotations
+from annotationlib import Format, get_annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
-from typing import Any, ClassVar, dataclass_transform, get_origin
+from typing import Any, ClassVar, dataclass_transform
 from uuid import UUID, uuid4
 
-from .attribute import Attribute, Declaration, MISSING, attribute, declare
+from helios.declaration import check_init_keywords, declarations
+
+from .attribute import Attribute, declare, generated
 from .error import ModelError
 
 
-class Status(Enum):
+class Lifecycle(Enum):
 	NEW = auto()
-	PERSISTED = auto()
+	SAVED = auto()
 	DELETED = auto()
 
 
@@ -34,91 +36,52 @@ class Changes:
 				del self.revisions[name]
 
 
-class ModelMeta(type):
-	attributes: dict[str, Attribute]
-
-	def __new__(
-		metaclass,
-		name: str,
-		bases: tuple[type, ...],
-		namespace: dict[str, Any],
-	):
-		if bases and "attributes" in namespace:
-			raise ModelError(
-				f"{name}.attributes is model metadata; declare named attributes instead"
-			)
-
-		model_bases = [base for base in bases if isinstance(base, ModelMeta)]
-		if len(model_bases) > 1:
-			raise ModelError(f"{name} cannot inherit from multiple model classes")
-
-		model_type = super().__new__(metaclass, name, bases, namespace)
-		attributes = dict(model_bases[0].attributes) if model_bases else {}
-		declared = declare_attributes(model_type)
-		for attribute_name, value in namespace.items():
-			if isinstance(value, Declaration) and attribute_name not in declared:
-				raise ModelError(f"'{name}.{attribute_name}' has no annotation")
-			if attribute_name in attributes and attribute_name not in declared:
-				raise ModelError(
-					f"'{name}.{attribute_name}' replaces an inherited attribute "
-					"without an annotation"
-				)
-		for attribute_name, declared_attribute in declared.items():
-			if attribute_name in attributes and not attributes[attribute_name].init:
-				raise ModelError(f"'{name}.{attribute_name}' is a reserved attribute")
-			declared_attribute.__set_name__(model_type, attribute_name)
-			setattr(model_type, attribute_name, declared_attribute)
-			attributes[attribute_name] = declared_attribute
-
-		model_type.attributes = attributes
-		return model_type
-
-
-def declare_attributes(model_type: type) -> dict[str, Attribute]:
-	try:
-		annotations = get_annotations(model_type, eval_str=True)
-	except NameError as error:
-		raise ModelError(
-			f"{model_type.__name__} has an unresolved annotation: {error}"
-		) from error
-
-	declared = {}
-	for name, annotation in annotations.items():
-		if annotation is ClassVar or get_origin(annotation) is ClassVar:
-			continue
-
-		try:
-			declared[name] = declare(annotation, vars(model_type).get(name, MISSING))
-		except TypeError as error:
-			raise ModelError(f"{model_type.__name__}.{name}: {error}") from error
-	return declared
+class ResolvedAttributes:
+	def __get__(self, instance: object, owner: type[Model]) -> dict[str, Attribute]:
+		for declared_attribute in owner._attributes.values():
+			declared_attribute.declaration.resolve()
+		return owner._attributes
 
 
 @dataclass_transform(
 	kw_only_default=True,
 	eq_default=False,
-	field_specifiers=(attribute,),
+	field_specifiers=(generated,),
 )
-class Model(metaclass=ModelMeta):
+class Model:
 	table: ClassVar[str] = ""
-	attributes: ClassVar[dict[str, Attribute]]
+	_attributes: ClassVar[dict[str, Attribute]] = {}
+	attributes = ResolvedAttributes()
 
-	id: UUID = attribute(init=False)
-	created_at: datetime | None = attribute(init=False)
+	id: UUID = generated()
+	created_at: datetime = generated()
+
+	def __init_subclass__(cls, **keywords: Any):
+		super().__init_subclass__(**keywords)
+		annotations = get_annotations(cls, format=Format.FORWARDREF)
+		for name in METADATA:
+			if name in vars(cls) or name in annotations:
+				raise ModelError(f"{cls.__name__}.{name} is model metadata")
+
+		model_bases = [base for base in cls.__bases__ if issubclass(base, Model)]
+		if len(model_bases) > 1:
+			raise ModelError(
+				f"{cls.__name__} cannot inherit from multiple model classes"
+			)
+		declare_attributes(cls, dict(model_bases[0]._attributes))
 
 	def __init__(self, **attributes: Any):
 		self.values = type(self).initialize(attributes)
 		self.values["id"] = uuid4()
-		self.values["created_at"] = None
 		self._changes = Changes()
-		self._status = Status.NEW
+		self._lifecycle = Lifecycle.NEW
 
 	@classmethod
 	def hydrate(cls, values: dict[str, Any]) -> Model:
 		model = cls.__new__(cls)
-		model.values = dict(values)
+		model.values = {name: values[name] for name in cls.attributes}
 		model._changes = Changes()
-		model._status = Status.PERSISTED
+		model._lifecycle = Lifecycle.SAVED
 		return model
 
 	@classmethod
@@ -130,24 +93,60 @@ class Model(metaclass=ModelMeta):
 
 	@classmethod
 	def initialize(cls, raw_attributes: dict[str, Any]) -> dict[str, Any]:
-		for name in raw_attributes:
-			attribute = cls.attributes.get(name)
-			if attribute is None or not attribute.init:
-				raise ModelError(f"extra attribute '{name}'")
+		initialized = {
+			name: definition
+			for name, definition in cls.attributes.items()
+			if definition.init
+		}
+		check_init_keywords(
+			cls,
+			"attributes",
+			raw_attributes,
+			initialized,
+			[name for name, definition in initialized.items() if definition.required],
+		)
 
 		values = {}
-		for name, attribute in cls.attributes.items():
-			if not attribute.init:
-				continue
-			if name in raw_attributes:
-				value = raw_attributes[name]
-			elif not attribute.required:
-				value = attribute.default
-			else:
-				raise ModelError(f"missing attribute '{name}'")
-			attribute.check(value, cls)
+		for name, definition in initialized.items():
+			value = raw_attributes.get(name, definition.default)
+			definition.check(value, cls)
 			values[name] = value
 		return values
 
+	@property
+	def lifecycle(self) -> Lifecycle:
+		return self._lifecycle
+
 	def __repr__(self) -> str:
 		return f"{type(self).__name__}({self.id!r})"
+
+
+def declare_attributes(model_type: type[Model], attributes: dict[str, Attribute]):
+	name = model_type.__name__
+	own_attributes = {}
+	for declaration in declarations(model_type, declare, ModelError):
+		default = declaration.default
+		declared_attribute = default if isinstance(default, Attribute) else Attribute()
+		declared_attribute.bind(declaration)
+		own_attributes[declaration.name] = declared_attribute
+
+	for attribute_name, value in vars(model_type).items():
+		if isinstance(value, Attribute) and attribute_name not in own_attributes:
+			raise ModelError(f"'{name}.{attribute_name}' has no annotation")
+		if attribute_name in attributes and attribute_name not in own_attributes:
+			raise ModelError(
+				f"'{name}.{attribute_name}' replaces an inherited attribute "
+				"without an annotation"
+			)
+
+	for attribute_name, declared_attribute in own_attributes.items():
+		if attribute_name in attributes and not attributes[attribute_name].init:
+			raise ModelError(f"'{name}.{attribute_name}' is a reserved attribute")
+		setattr(model_type, attribute_name, declared_attribute)
+		attributes[attribute_name] = declared_attribute
+	model_type._attributes = attributes
+
+
+METADATA = {"attributes", "lifecycle"}
+
+declare_attributes(Model, {})
