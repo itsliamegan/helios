@@ -49,7 +49,7 @@ class Store:
 
 	def save(self, model: Model):
 		model_type = self.registry.get(type(model))
-		if model.lifecycle is Lifecycle.NEW:
+		if model._lifecycle is Lifecycle.NEW:
 			self.insert(model_type, model)
 			return
 		self.update(model_type, model)

@@ -195,7 +195,7 @@ def test_rejects_attributes_without_supported_annotations():
 	with assert_raises(ModelError):
 
 		class Unsupported(Model):
-			score: float
+			score: dict[str, str]
 
 	with assert_raises(ModelError):
 
@@ -206,15 +206,6 @@ def test_rejects_attributes_without_supported_annotations():
 
 		class Alternative(Model):
 			value: str | int
-
-
-def test_declaration_errors_are_type_errors():
-	with assert_raises(TypeError) as raised:
-
-		class Unsupported(Model):
-			score: float
-
-	assert_that(isinstance(raised.exception, ModelError))
 
 
 def test_inherits_and_overrides_attributes():

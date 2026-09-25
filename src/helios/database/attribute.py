@@ -39,12 +39,16 @@ class Attribute:
 		return self.default is MISSING
 
 	@property
+	def encoding(self) -> Encoding:
+		return self.declaration.resolve()
+
+	@property
 	def codec(self) -> Codec[object]:
-		return self.declaration.resolve().codec
+		return self.encoding.codec
 
 	@property
 	def nullable(self) -> bool:
-		return self.declaration.resolve().nullable
+		return self.encoding.nullable
 
 	def __get__(self, instance: Model | None, owner: type) -> object:
 		if instance is None:

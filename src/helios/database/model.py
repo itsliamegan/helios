@@ -38,9 +38,9 @@ class Changes:
 
 class ResolvedAttributes:
 	def __get__(self, instance: object, owner: type[Model]) -> dict[str, Attribute]:
-		for declared_attribute in owner.declared_attributes.values():
+		for declared_attribute in owner._attributes.values():
 			declared_attribute.declaration.resolve()
-		return owner.declared_attributes
+		return owner._attributes
 
 
 @dataclass_transform(
@@ -50,7 +50,7 @@ class ResolvedAttributes:
 )
 class Model:
 	table: ClassVar[str] = ""
-	declared_attributes: ClassVar[dict[str, Attribute]] = {}
+	_attributes: ClassVar[dict[str, Attribute]] = {}
 	attributes = ResolvedAttributes()
 
 	id: UUID = generated()
@@ -68,7 +68,7 @@ class Model:
 			raise ModelError(
 				f"{cls.__name__} cannot inherit from multiple model classes"
 			)
-		declare_attributes(cls, dict(model_bases[0].declared_attributes))
+		declare_attributes(cls, dict(model_bases[0]._attributes))
 
 	def __init__(self, **attributes: Any):
 		self.values = type(self).initialize(attributes)
@@ -144,7 +144,7 @@ def declare_attributes(model_type: type[Model], attributes: dict[str, Attribute]
 			raise ModelError(f"'{name}.{attribute_name}' is a reserved attribute")
 		setattr(model_type, attribute_name, declared_attribute)
 		attributes[attribute_name] = declared_attribute
-	model_type.declared_attributes = attributes
+	model_type._attributes = attributes
 
 
 METADATA = {"attributes", "lifecycle"}
