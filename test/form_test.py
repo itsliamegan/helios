@@ -3,7 +3,17 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import Errors, Filters, Form, FormError, RuleError, Rules, Untrimmed
+from helios.form import (
+	Errors,
+	Filter,
+	Filters,
+	Form,
+	FormError,
+	Rule,
+	RuleError,
+	Rules,
+	Untrimmed,
+)
 from helios.form.filter import Compact, Unspace, Upcase
 from helios.form.rule import Distinct, Length
 from helios.http import Input, URL
@@ -259,7 +269,7 @@ def test_rejects_field_names_form_uses():
 	)
 
 
-class WebURL:
+class WebURL(Rule[str]):
 	name = "web_url"
 
 	def check(self, value: str):
@@ -455,26 +465,41 @@ def test_rejects_item_keys_for_fields_that_are_not_lists():
 	)
 
 
-class Recorded:
-	name = "recorded"
-
-	def __init__(self):
-		self.values = []
+class RecordedFilter(Filter[object]):
+	def __init__(self, values: list[object]):
+		self.values = values
 
 	def apply(self, value: object) -> object:
 		self.values.append(value)
 		return value
+
+
+class RecordedRule(Rule[object]):
+	name = "recorded"
+
+	def __init__(self, values: list[object]):
+		self.values = values
 
 	def check(self, value: object):
 		self.values.append(value)
 
 
 def test_skips_filters_and_rules_for_missing_optional_fields():
-	recorded = Recorded()
+	recorded = []
 
 	class TagsForm(Form):
-		filters = Filters({"tags.*": [recorded], "tags": [recorded]})
-		rules = Rules({"tags.*": [recorded], "tags": [recorded]})
+		filters = Filters(
+			{
+				"tags.*": [RecordedFilter(recorded)],
+				"tags": [RecordedFilter(recorded)],
+			}
+		)
+		rules = Rules(
+			{
+				"tags.*": [RecordedRule(recorded)],
+				"tags": [RecordedRule(recorded)],
+			}
+		)
 
 		tags: list[str] = ["default"]
 
@@ -482,25 +507,25 @@ def test_skips_filters_and_rules_for_missing_optional_fields():
 
 	assert_that(not errors)
 	assert_eq(form.tags, ["default"])
-	assert_eq(recorded.values, [])
+	assert_eq(recorded, [])
 
 
 def test_skips_filters_and_rules_after_a_parse_error():
-	recorded = Recorded()
+	recorded = []
 
 	class BoardsForm(Form):
-		filters = Filters({"board_ids": [recorded]})
-		rules = Rules({"board_ids": [recorded]})
+		filters = Filters({"board_ids": [RecordedFilter(recorded)]})
+		rules = Rules({"board_ids": [RecordedRule(recorded)]})
 
 		board_ids: list[UUID] = []
 
 	_, errors = BoardsForm.validate(Input({"board_ids": ["not-a-uuid"]}))
 
 	assert_that("board_ids" in errors)
-	assert_eq(recorded.values, [])
+	assert_eq(recorded, [])
 
 
-class Failing:
+class Failing(Filter[str]):
 	def apply(self, value: str) -> str:
 		raise RuleError("must not be filtered")
 

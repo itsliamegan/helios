@@ -1,6 +1,7 @@
+from abc import ABC, abstractmethod
 from collections.abc import Hashable, Iterable, Sized
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, ClassVar
 
 from luna.inflect import count
 
@@ -14,15 +15,15 @@ class RuleError(ValueError):
 		self.key = key
 
 
-class Rule[T](Protocol):
-	@property
-	def name(self) -> str: ...
+class Rule[T](ABC):
+	name: ClassVar[str]
 
+	@abstractmethod
 	def check(self, value: T): ...
 
 
 @dataclass(init=False)
-class Length:
+class Length(Rule[Sized]):
 	name = "length"
 	exactly: int | None
 	minimum: int | None
@@ -74,7 +75,7 @@ class Length:
 
 
 @dataclass(init=False)
-class Only:
+class Only(Rule[Iterable[Any]]):
 	name = "only"
 	allowed: frozenset[Hashable]
 
@@ -90,7 +91,7 @@ class Only:
 
 
 @dataclass
-class Distinct:
+class Distinct(Rule[list[Any]]):
 	name = "distinct"
 
 	def check(self, value: list[Any]):

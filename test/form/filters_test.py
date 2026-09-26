@@ -1,11 +1,11 @@
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.form import Filters, FormError, parser
+from helios.form import Filter, Filters, FormError, parser
 from helios.form.field import Field
 from helios.form.filter import Compact, Upcase
 
 
-class Suffix:
+class Suffix(Filter[str]):
 	def __init__(self, text: str):
 		self.text = text
 

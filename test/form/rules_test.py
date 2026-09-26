@@ -1,22 +1,28 @@
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import FormError, RuleError, Rules, parser
+from helios.form import FormError, Rule, RuleError, Rules, parser
 from helios.form.field import Field
 from helios.form.key import Key
 from helios.form.rule import Length
 
 
-class Refuses:
-	def __init__(self, name: str, refused: str):
-		self.name = name
-		self.refused = refused
+class Reserved(Rule[str]):
+	name = "reserved"
 
 	def check(self, value: str):
-		if value == self.refused:
-			raise RuleError(f"must not be {self.refused}")
+		if value == "admin":
+			raise RuleError("must not be a reserved name")
 
 
-class Recorded:
+class Taken(Rule[str]):
+	name = "taken"
+
+	def check(self, value: str):
+		if value == "admin":
+			raise RuleError("must not be taken")
+
+
+class Recorded(Rule[object]):
 	name = "recorded"
 
 	def __init__(self):
@@ -35,17 +41,17 @@ def test_passes_values_that_meet_every_rule():
 
 def test_keys_failures_by_field_and_rule_name():
 	field = Field("handle", parser.Str())
-	rules = Rules({"handle": [Refuses("reserved", "admin")]})
+	rules = Rules({"handle": [Reserved()]})
 
 	error = rule_error_of(rules, field, "admin")
 
 	assert_eq(error.key, Key("handle", rest="reserved"))
-	assert_eq(error.message, "must not be admin")
+	assert_eq(error.message, "must not be a reserved name")
 
 
 def test_runs_rules_in_declared_order():
 	field = Field("handle", parser.Str())
-	rules = Rules({"handle": [Refuses("reserved", "admin"), Refuses("taken", "admin")]})
+	rules = Rules({"handle": [Reserved(), Taken()]})
 
 	error = rule_error_of(rules, field, "admin")
 
@@ -55,7 +61,7 @@ def test_runs_rules_in_declared_order():
 def test_stops_at_the_first_failing_rule():
 	recorded = Recorded()
 	field = Field("handle", parser.Str())
-	rules = Rules({"handle": [Refuses("reserved", "admin"), recorded]})
+	rules = Rules({"handle": [Reserved(), recorded]})
 
 	rule_error_of(rules, field, "admin")
 
@@ -85,7 +91,7 @@ def test_keys_field_rule_failures_on_lists_as_field_failures():
 def test_stops_at_the_first_failing_item():
 	recorded = Recorded()
 	field = Field("tags", parser.List(parser.Str()), [])
-	rules = Rules({"tags.*": [recorded, Refuses("reserved", "admin")]})
+	rules = Rules({"tags.*": [recorded, Reserved()]})
 
 	rule_error_of(rules, field, ["design", "admin", "art"])
 

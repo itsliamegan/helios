@@ -1,5 +1,6 @@
+from abc import ABC, abstractmethod
 import re
-from typing import Any, NewType, Protocol, get_args, get_origin
+from typing import Any, NewType, get_args, get_origin
 import uuid
 
 from helios import http
@@ -16,11 +17,12 @@ class ParseError(ValueError):
 		self.item = item
 
 
-class Parser[T](Protocol):
+class Parser[T](ABC):
+	@abstractmethod
 	def parse(self, value: RawValue) -> T: ...
 
 
-class Scalar:
+class Scalar[T](Parser[T]):
 	def single(self, value: RawValue) -> str:
 		if isinstance(value, list):
 			raise ParseError("must be a single value")
@@ -28,12 +30,12 @@ class Scalar:
 			return value
 
 
-class Str(Scalar):
+class Str(Scalar[str]):
 	def parse(self, value: RawValue) -> str:
 		return self.single(value)
 
 
-class Int(Scalar):
+class Int(Scalar[int]):
 	def parse(self, value: RawValue) -> int:
 		raw = self.single(value).strip()
 		if re.fullmatch(r"-?[0-9]+", raw) is None:
@@ -42,7 +44,7 @@ class Int(Scalar):
 			return int(raw)
 
 
-class UUID(Scalar):
+class UUID(Scalar[uuid.UUID]):
 	def parse(self, value: RawValue) -> uuid.UUID:
 		raw = self.single(value).strip()
 		try:
@@ -51,7 +53,7 @@ class UUID(Scalar):
 			raise ParseError("must be a valid UUID") from err
 
 
-class URL(Scalar):
+class URL(Scalar[http.URL]):
 	def parse(self, value: RawValue) -> http.URL:
 		raw = self.single(value).strip()
 		try:
@@ -60,7 +62,7 @@ class URL(Scalar):
 			raise ParseError("must be a valid URL") from err
 
 
-class Bool:
+class Bool(Parser[bool]):
 	def parse(self, value: RawValue) -> bool:
 		if isinstance(value, str) and value.strip() == "on":
 			return True
@@ -68,7 +70,7 @@ class Bool:
 			raise ParseError('must be "on" or omitted')
 
 
-class List[T]:
+class List[T](Parser[list[T]]):
 	def __init__(self, parser: Parser[T]):
 		self.parser = parser
 

@@ -1,31 +1,32 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Protocol
 
 
-class Filter[T](Protocol):
+class Filter[T](ABC):
+	@abstractmethod
 	def apply(self, value: T) -> T: ...
 
 
 @dataclass
-class Trim:
+class Trim(Filter[str]):
 	def apply(self, value: str) -> str:
 		return value.strip()
 
 
 @dataclass
-class Upcase:
+class Upcase(Filter[str]):
 	def apply(self, value: str) -> str:
 		return value.upper()
 
 
 @dataclass
-class Unspace:
+class Unspace(Filter[str]):
 	def apply(self, value: str) -> str:
 		return "".join(value.split())
 
 
 @dataclass
-class Compact:
+class Compact(Filter[list[str]]):
 	def apply(self, value: list[str]) -> list[str]:
 		return [item for item in value if not blank(item)]
 
