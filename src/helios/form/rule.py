@@ -1,4 +1,5 @@
 from collections.abc import Hashable, Iterable, Sized
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 
@@ -15,8 +16,12 @@ class Rule[T](Protocol):
 	def check(self, value: T): ...
 
 
+@dataclass(init=False)
 class Length:
 	name = "length"
+	exactly: int | None
+	minimum: int | None
+	maximum: int | None
 
 	def __init__(
 		self,
@@ -63,8 +68,10 @@ class Length:
 				return f"between {minimum} and {maximum} {unit}s"
 
 
+@dataclass(init=False)
 class Only:
 	name = "only"
+	allowed: frozenset[Hashable]
 
 	def __init__(self, allowed: Iterable[Hashable]):
 		self.allowed = frozenset(allowed)
@@ -77,6 +84,7 @@ class Only:
 				raise RuleError("must only contain allowed items")
 
 
+@dataclass
 class Distinct:
 	name = "distinct"
 

@@ -27,3 +27,8 @@ def test_compact_drops_blank_items_and_keeps_order():
 
 def test_compact_keeps_padding_on_items_it_keeps():
 	assert_eq(Compact().apply([" design ", "\t"]), [" design "])
+
+
+def test_compares_and_shows_filters_by_value():
+	assert_eq(Trim(), Trim())
+	assert_eq(repr(Upcase()), "Upcase()")

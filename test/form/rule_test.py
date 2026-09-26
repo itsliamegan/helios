@@ -13,6 +13,16 @@ def test_names_built_in_rules():
 	)
 
 
+def test_compares_and_shows_rules_by_their_arguments():
+	assert_eq(Length(maximum=3), Length(maximum=3))
+	assert_eq(Only("BA"), Only("AB"))
+	assert_eq(Distinct(), Distinct())
+	assert_eq(
+		repr(Length(minimum=1, maximum=3)),
+		"Length(exactly=None, minimum=1, maximum=3)",
+	)
+
+
 def test_length_accepts_values_within_its_limits():
 	Length(exactly=4).check("ABCD")
 	Length(minimum=3).check("abc")
