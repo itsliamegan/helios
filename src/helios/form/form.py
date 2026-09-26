@@ -30,7 +30,7 @@ class Form:
 		check_single_base(cls, Form, FormError)
 		cls.fields = {}
 		for declaration in declarations(cls, declare, FormError):
-			if declaration.name in RESERVED:
+			if declaration.name == "values" or declaration.name in vars(Form):
 				raise FormError(
 					f"Form {cls.__name__} has a field named '{declaration.name}', "
 					"which Form uses"
@@ -100,6 +100,3 @@ class Form:
 			if name in self.values
 		)
 		return f"{type(self).__name__}({values})"
-
-
-RESERVED = {"values", *vars(Form)}

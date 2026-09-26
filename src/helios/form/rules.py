@@ -11,6 +11,7 @@ class Rules(Steps[Rule[Any]]):
 		if field.is_list:
 			for item in value:
 				run(self.item.get(field.name, []), field.name, True, item)
+
 		run(self.field.get(field.name, []), field.name, False, value)
 
 
