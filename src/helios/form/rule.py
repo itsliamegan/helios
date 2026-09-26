@@ -12,7 +12,7 @@ class Rule[T](Protocol):
 	@property
 	def name(self) -> str: ...
 
-	def check(self, value: T) -> None: ...
+	def check(self, value: T): ...
 
 
 class Length:
@@ -36,7 +36,7 @@ class Length:
 		self.minimum = minimum
 		self.maximum = maximum
 
-	def check(self, value: Sized) -> None:
+	def check(self, value: Sized):
 		if not self.fits(len(value)):
 			if isinstance(value, str):
 				raise RuleError(f"must be {self.limit("character")}")
@@ -69,7 +69,7 @@ class Only:
 	def __init__(self, allowed: Iterable[Hashable]):
 		self.allowed = frozenset(allowed)
 
-	def check(self, value: Iterable[Any]) -> None:
+	def check(self, value: Iterable[Any]):
 		if any(element not in self.allowed for element in value):
 			if isinstance(value, str):
 				raise RuleError("must only contain allowed characters")
@@ -80,7 +80,7 @@ class Only:
 class Distinct:
 	name = "distinct"
 
-	def check(self, value: list[Any]) -> None:
+	def check(self, value: list[Any]):
 		if len(set(value)) != len(value):
 			raise RuleError("must not repeat a value")
 

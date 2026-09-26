@@ -1,6 +1,6 @@
 from luna.test.assertion import assert_eq
 
-from helios.form import Compact, Trim, Unspace, Upcase
+from helios.form.filter import Compact, Trim, Unspace, Upcase
 
 
 def test_trim_removes_surrounding_whitespace():

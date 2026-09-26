@@ -2,7 +2,8 @@ from uuid import uuid4
 
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.form import Distinct, Length, Only, RuleError
+from helios.form import RuleError
+from helios.form.rule import Distinct, Length, Only
 
 
 def test_names_built_in_rules():

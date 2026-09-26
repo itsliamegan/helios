@@ -2,8 +2,10 @@ from uuid import uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import Compact, Length, Only, RuleError, Unspace, Upcase, parser
+from helios.form import RuleError, parser
 from helios.form.field import Failure, Field
+from helios.form.filter import Compact, Unspace, Upcase
+from helios.form.rule import Length, Only
 from helios.http import Input
 
 

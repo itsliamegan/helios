@@ -89,10 +89,10 @@ class Field:
 			return True
 
 		value = input[self.name]
-		if isinstance(value, list):
-			return not value
+		if self.is_list:
+			return value == []
 		else:
-			return not self.is_list and blank(value)
+			return isinstance(value, str) and blank(value)
 
 	def parse(self, value: str | list[str]) -> object:
 		try:

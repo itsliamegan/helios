@@ -3,18 +3,9 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import (
-	Compact,
-	Distinct,
-	Errors,
-	Form,
-	FormError,
-	Length,
-	RuleError,
-	Unspace,
-	Untrimmed,
-	Upcase,
-)
+from helios.form import Errors, Form, FormError, RuleError, Untrimmed
+from helios.form.filter import Compact, Unspace, Upcase
+from helios.form.rule import Distinct, Length
 from helios.http import Input, URL
 
 

@@ -26,4 +26,4 @@ class Compact:
 
 
 def blank(value: str) -> bool:
-	return not value.strip()
+	return value.strip() == ""
