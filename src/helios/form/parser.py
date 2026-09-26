@@ -1,104 +1,94 @@
+from abc import ABC, abstractmethod
 import re
 from typing import Any, NewType, get_args, get_origin
 import uuid
 
 from helios import http
 
-from .rule import Rule, RuleError
-
-Verbatim = NewType("Verbatim", str)
+Untrimmed = NewType("Untrimmed", str)
 
 type RawValue = str | list[str]
 
-type Parser[T] = Rule[RawValue, T]
+
+class ParseError(ValueError):
+	def __init__(self, message: str, item: bool = False):
+		super().__init__(message)
+		self.message = message
+		self.item = item
 
 
-class Scalar:
-	name = "string"
-	message = "must be a single value"
+class Parser[T](ABC):
+	@abstractmethod
+	def parse(self, value: RawValue) -> T: ...
 
+
+class Scalar[T](Parser[T]):
 	def single(self, value: RawValue) -> str:
 		if isinstance(value, list):
-			raise RuleError("must be a single value")
+			raise ParseError("must be a single value")
 		else:
 			return value
 
 
-class Str(Scalar):
-	def check(self, value: RawValue) -> str:
+class Str(Scalar[str]):
+	def parse(self, value: RawValue) -> str:
 		return self.single(value)
 
 
-class Int(Scalar):
-	name = "integer"
-	message = "must be a whole number"
-
-	def check(self, value: RawValue) -> int:
-		raw = self.single(value)
+class Int(Scalar[int]):
+	def parse(self, value: RawValue) -> int:
+		raw = self.single(value).strip()
 		if re.fullmatch(r"-?[0-9]+", raw) is None:
-			raise RuleError()
+			raise ParseError("must be a whole number")
 		else:
 			return int(raw)
 
 
-class UUID(Scalar):
-	name = "uuid"
-	message = "must be a valid UUID"
-
-	def check(self, value: RawValue) -> uuid.UUID:
-		raw = self.single(value)
+class UUID(Scalar[uuid.UUID]):
+	def parse(self, value: RawValue) -> uuid.UUID:
+		raw = self.single(value).strip()
 		try:
 			return uuid.UUID(raw)
 		except ValueError as err:
-			raise RuleError() from err
+			raise ParseError("must be a valid UUID") from err
 
 
-class URL(Scalar):
-	name = "url"
-	message = "must be a valid URL"
-
-	def check(self, value: RawValue) -> http.URL:
-		raw = self.single(value)
+class URL(Scalar[http.URL]):
+	def parse(self, value: RawValue) -> http.URL:
+		raw = self.single(value).strip()
 		try:
 			return http.URL(raw)
 		except ValueError as err:
-			raise RuleError() from err
+			raise ParseError("must be a valid URL") from err
 
 
-class Bool:
-	name = "boolean"
-	message = 'must be "on" or omitted'
-
-	def check(self, value: RawValue) -> bool:
-		if value == "on":
+class Bool(Parser[bool]):
+	def parse(self, value: RawValue) -> bool:
+		if isinstance(value, str) and value.strip() == "on":
 			return True
 		else:
-			raise RuleError()
+			raise ParseError('must be "on" or omitted')
 
 
-class List[T]:
+class List[T](Parser[list[T]]):
 	def __init__(self, parser: Parser[T]):
 		self.parser = parser
 
-	@property
-	def name(self) -> str:
-		return self.parser.name
-
-	@property
-	def message(self) -> str:
-		return self.parser.message
-
-	def check(self, value: RawValue) -> list[T]:
+	def parse(self, value: RawValue) -> list[T]:
 		if isinstance(value, str):
 			values = [value]
 		else:
 			values = value
-		return [self.parser.check(item) for item in values]
+
+		try:
+			return [self.parser.parse(item) for item in values]
+		except ParseError as error:
+			raise ParseError(error.message, item=True) from error
 
 
 SCALARS: dict[Any, Parser[Any]] = {
 	str: Str(),
-	Verbatim: Str(),
+	Untrimmed: Str(),
 	bool: Bool(),
 	int: Int(),
 	uuid.UUID: UUID(),
@@ -118,12 +108,12 @@ def for_type(annotation: object) -> Parser[Any] | None:
 		return List(item_parser)
 
 
-def is_verbatim(annotation: Any) -> bool:
+def is_trimmed(annotation: Any) -> bool:
 	if get_origin(annotation) is list:
 		(item,) = get_args(annotation)
-		return item is Verbatim
+		return item is str
 	else:
-		return annotation is Verbatim
+		return annotation is str
 
 
 def scalar(annotation: object) -> Parser[Any] | None:

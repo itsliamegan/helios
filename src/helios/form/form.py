@@ -1,20 +1,28 @@
 from typing import Any, ClassVar, Self, dataclass_transform
 
-from luna.inflect import sentence
+from luna.inflect import sentence, words
 
 from helios.declarative import check_init_keywords, check_single_base, declarations
 from helios.http import Input
 
 from .error import FormError
 from .errors import Errors
-from .field import Failure, Field, declare
-from .rule import Rule
+from .field import Field, declare
+from .filters import Filters
+from .key import Key
+from .parser import ParseError
+from .rule import RuleError
+from .rules import Rules
+
+INVALID = "invalid"
+REQUIRED = "required"
 
 
 @dataclass_transform(kw_only_default=True, eq_default=False)
 class Form:
 	fields: ClassVar[dict[str, Field]] = {}
-	rules: ClassVar[dict[str, list[Rule[Any, Any]]]] = {}
+	filters: ClassVar[Filters] = Filters()
+	rules: ClassVar[Rules] = Rules()
 	messages: ClassVar[dict[str, str]] = {}
 
 	def __init_subclass__(cls, **keywords: Any):
@@ -22,21 +30,17 @@ class Form:
 		check_single_base(cls, Form, FormError)
 		cls.fields = {}
 		for declaration in declarations(cls, declare, FormError):
-			if declaration.name in RESERVED:
+			if declaration.name == "values" or declaration.name in vars(Form):
 				raise FormError(
 					f"Form {cls.__name__} has a field named '{declaration.name}', "
 					"which Form uses"
 				)
 			field = declaration.resolve()
-			field.extra_rules = cls.rules.get(declaration.name, [])
 			cls.fields[declaration.name] = field
 			setattr(cls, declaration.name, field)
 
-		for name in cls.rules:
-			if name not in cls.fields:
-				raise FormError(
-					f"Form {cls.__name__} has rules for '{name}', which is not a field"
-				)
+		cls.filters.verify(cls)
+		cls.rules.verify(cls)
 
 	def __init__(self, **values: Any):
 		form = type(self)
@@ -58,19 +62,36 @@ class Form:
 		form.values = {}
 		errors = Errors()
 		for name, field in cls.fields.items():
+			if field.missing(input):
+				if field.required:
+					key = Key(name, rest=REQUIRED)
+					errors.add(name, cls.message(key, "must be provided"))
+				else:
+					form.values[name] = field.initial
+				continue
+
 			try:
-				form.values[name] = field.validate(input)
-			except Failure as failure:
-				errors.add(name, cls.message(name, failure))
+				value = cls.filters.apply(field, field.parse(input))
+				cls.rules.check(field, value)
+			except ParseError as error:
+				key = Key(name, rest=INVALID)
+				errors.add(name, cls.message(key, error.message, error.item))
+			except RuleError as error:
+				if error.key is None:
+					raise
+				errors.add(name, cls.message(error.key, error.message, error.key.item))
+			else:
+				form.values[name] = value
 		return form, errors
 
 	@classmethod
-	def message(cls, name: str, failure: Failure) -> str:
-		key = f"{name}.{failure.rule}"
-		if key in cls.messages:
-			return cls.messages[key]
+	def message(cls, key: Key, message: str, item: bool = False) -> str:
+		if str(key) in cls.messages:
+			return cls.messages[str(key)]
+		elif item:
+			return f"An item in {" ".join(words(key.name))} {message}."
 		else:
-			return f"{sentence(name)} {failure.message}."
+			return f"{sentence(key.name)} {message}."
 
 	def __repr__(self) -> str:
 		values = ", ".join(
@@ -79,6 +100,3 @@ class Form:
 			if name in self.values
 		)
 		return f"{type(self).__name__}({values})"
-
-
-RESERVED = {"values", *vars(Form)}
