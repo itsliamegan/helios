@@ -64,7 +64,7 @@ class Form:
 		for name, field in cls.fields.items():
 			if field.missing(input):
 				if field.required:
-					key = Key(name, False, REQUIRED)
+					key = Key(name, rest=REQUIRED)
 					errors.add(name, cls.message(key, "must be provided"))
 				else:
 					form.values[name] = field.initial
@@ -74,7 +74,7 @@ class Form:
 				value = cls.filters.apply(field, field.parse(input))
 				cls.rules.check(field, value)
 			except ParseError as error:
-				key = Key(name, False, INVALID)
+				key = Key(name, rest=INVALID)
 				errors.add(name, cls.message(key, error.message, error.item))
 			except RuleError as error:
 				if error.key is None:

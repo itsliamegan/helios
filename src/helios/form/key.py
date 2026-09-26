@@ -3,7 +3,7 @@ from dataclasses import dataclass
 ITEM = "*"
 
 
-@dataclass(frozen=True)
+@dataclass
 class Key:
 	name: str
 	item: bool = False
@@ -14,9 +14,9 @@ class Key:
 		name, _, remainder = text.partition(".")
 		marker, _, rest = remainder.partition(".")
 		if marker == ITEM:
-			return cls(name, True, rest)
+			return cls(name, item=True, rest=rest)
 		else:
-			return cls(name, False, remainder)
+			return cls(name, rest=remainder)
 
 	def __str__(self) -> str:
 		parts = [self.name]

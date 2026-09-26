@@ -19,4 +19,5 @@ def run(rules: list[Rule[Any]], name: str, item: bool, value: Any):
 		try:
 			rule.check(value)
 		except RuleError as error:
-			raise RuleError(error.message, Key(name, item, rule.name)) from error
+			key = Key(name, item=item, rest=rule.name)
+			raise RuleError(error.message, key) from error

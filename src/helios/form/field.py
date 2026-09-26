@@ -17,24 +17,12 @@ if TYPE_CHECKING:
 	from .form import Form
 
 
-@dataclass(init=False)
+@dataclass
 class Field:
 	name: str
 	parser: Parser[Any]
-	default: object
-	trimmed: bool
-
-	def __init__(
-		self,
-		name: str,
-		parser: Parser[Any],
-		default: object = MISSING,
-		trimmed: bool = False,
-	):
-		self.name = name
-		self.parser = parser
-		self.default = default
-		self.trimmed = trimmed
+	default: object = MISSING
+	trimmed: bool = False
 
 	@property
 	def required(self) -> bool:

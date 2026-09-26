@@ -39,7 +39,7 @@ def test_keys_failures_by_field_and_rule_name():
 
 	error = rule_error_of(rules, field, "admin")
 
-	assert_eq(error.key, Key("handle", False, "reserved"))
+	assert_eq(error.key, Key("handle", rest="reserved"))
 	assert_eq(error.message, "must not be admin")
 
 
@@ -49,7 +49,7 @@ def test_runs_rules_in_declared_order():
 
 	error = rule_error_of(rules, field, "admin")
 
-	assert_eq(error.key, Key("handle", False, "reserved"))
+	assert_eq(error.key, Key("handle", rest="reserved"))
 
 
 def test_stops_at_the_first_failing_rule():
@@ -68,7 +68,7 @@ def test_runs_item_rules_before_field_rules():
 
 	error = rule_error_of(rules, field, ["a", "long"])
 
-	assert_eq(error.key, Key("tags", True, "length"))
+	assert_eq(error.key, Key("tags", item=True, rest="length"))
 	assert_eq(error.message, "must be at most 3 characters")
 
 
@@ -78,7 +78,7 @@ def test_keys_field_rule_failures_on_lists_as_field_failures():
 
 	error = rule_error_of(rules, field, ["a", "b"])
 
-	assert_eq(error.key, Key("tags", False, "length"))
+	assert_eq(error.key, Key("tags", rest="length"))
 	assert_that(not error.key.item)
 
 
