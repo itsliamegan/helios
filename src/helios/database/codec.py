@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from datetime import UTC, datetime
 from typing import Any, Protocol, runtime_checkable
 import uuid
@@ -9,10 +10,13 @@ type Scalar = int | float | str | bytes
 
 @runtime_checkable
 class Codec[T](Protocol):
+	@abstractmethod
 	def check(self, value: object): ...
 
+	@abstractmethod
 	def encode(self, value: T) -> Scalar: ...
 
+	@abstractmethod
 	def decode(self, value: Scalar) -> T: ...
 
 
@@ -23,7 +27,15 @@ def encode[T](codec: Codec[T], value: T) -> Scalar:
 	return encoded
 
 
-class Str:
+class Text[T](Codec[T]):
+	def text(self, value: Scalar) -> str:
+		if isinstance(value, str):
+			return value
+		else:
+			raise TypeError(f"expected a string, got {type(value).__name__}")
+
+
+class Str(Text[str]):
 	def check(self, value: object):
 		if not isinstance(value, str):
 			raise TypeError(f"expected a string, got {type(value).__name__}")
@@ -33,12 +45,10 @@ class Str:
 		return value
 
 	def decode(self, value: Scalar) -> str:
-		if not isinstance(value, str):
-			raise TypeError(f"expected a string, got {type(value).__name__}")
-		return value
+		return self.text(value)
 
 
-class Bool:
+class Bool(Codec[bool]):
 	def check(self, value: object):
 		if not isinstance(value, bool):
 			raise TypeError(f"expected a boolean, got {type(value).__name__}")
@@ -53,7 +63,7 @@ class Bool:
 		return bool(value)
 
 
-class Int:
+class Int(Codec[int]):
 	def check(self, value: object):
 		if not isinstance(value, int) or isinstance(value, bool):
 			raise TypeError(f"expected an integer, got {type(value).__name__}")
@@ -68,7 +78,7 @@ class Int:
 		return value
 
 
-class UUID:
+class UUID(Text[uuid.UUID]):
 	def check(self, value: object):
 		if not isinstance(value, uuid.UUID):
 			raise TypeError(f"expected a UUID, got {type(value).__name__}")
@@ -78,15 +88,14 @@ class UUID:
 		return str(value)
 
 	def decode(self, value: Scalar) -> uuid.UUID:
-		if not isinstance(value, str):
-			raise TypeError(f"expected a UUID string, got {type(value).__name__}")
-		decoded = uuid.UUID(value)
-		if str(decoded) != value:
+		text = self.text(value)
+		decoded = uuid.UUID(text)
+		if str(decoded) != text:
 			raise ValueError("expected a canonical UUID string")
 		return decoded
 
 
-class Date:
+class Date(Text[datetime]):
 	FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 	def check(self, value: object):
@@ -102,15 +111,14 @@ class Date:
 		return value.astimezone(UTC).strftime(self.FORMAT)
 
 	def decode(self, value: Scalar) -> datetime:
-		if not isinstance(value, str):
-			raise TypeError(f"expected a datetime string, got {type(value).__name__}")
-		decoded = datetime.strptime(value, self.FORMAT).replace(tzinfo=UTC)
-		if decoded.strftime(self.FORMAT) != value:
+		text = self.text(value)
+		decoded = datetime.strptime(text, self.FORMAT).replace(tzinfo=UTC)
+		if decoded.strftime(self.FORMAT) != text:
 			raise ValueError("expected a canonical UTC datetime string")
 		return decoded
 
 
-class URL:
+class URL(Text[http.URL]):
 	def check(self, value: object):
 		if not isinstance(value, http.URL):
 			raise TypeError(f"expected a URL, got {type(value).__name__}")
@@ -120,9 +128,7 @@ class URL:
 		return str(value)
 
 	def decode(self, value: Scalar) -> http.URL:
-		if not isinstance(value, str):
-			raise TypeError(f"expected a URL string, got {type(value).__name__}")
-		return http.URL(value)
+		return http.URL(self.text(value))
 
 
 CODECS: dict[object, Codec[Any]] = {

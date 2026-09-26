@@ -55,7 +55,7 @@ class Pattern:
 
 		def replace(match: re.Match[str]) -> str:
 			name = match.group(1)
-			value = str(self.converters[name].convert(str(params[name])))
+			value = self.converters[name].format(params[name])
 			encoded = quote(value, safe="")
 			if re.fullmatch(PARAM_VALUE_REGEX, encoded) is None:
 				raise ValueError(f"invalid route parameter: {name}")
