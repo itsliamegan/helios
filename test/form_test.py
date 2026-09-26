@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import Errors, Form, FormError, RuleError, Untrimmed
+from helios.form import Errors, Filters, Form, FormError, RuleError, Rules, Untrimmed
 from helios.form.filter import Compact, Unspace, Upcase
 from helios.form.rule import Distinct, Length
 from helios.http import Input, URL
@@ -269,7 +269,7 @@ class WebURL:
 
 def test_runs_rules_on_parsed_values():
 	class LinkForm(Form):
-		rules = {"url": [WebURL()], "board_ids": [Distinct()]}
+		rules = Rules({"url": [WebURL()], "board_ids": [Distinct()]})
 
 		url: str
 		board_ids: list[UUID] = []
@@ -301,7 +301,7 @@ def test_runs_rules_on_parsed_values():
 
 def test_overrides_messages_by_field_and_rule():
 	class LinkForm(Form):
-		rules = {"url": [WebURL()]}
+		rules = Rules({"url": [WebURL()]})
 		messages = {
 			"title.required": "Give the pin a title.",
 			"url.web_url": "Use a web address.",
@@ -330,7 +330,7 @@ def test_rejects_rules_for_undeclared_fields():
 	with assert_raises(FormError) as raised:
 
 		class LinkForm(Form):
-			rules = {"link": [WebURL()]}
+			rules = Rules({"link": [WebURL()]})
 
 			url: str
 
@@ -342,8 +342,8 @@ def test_rejects_rules_for_undeclared_fields():
 
 def test_applies_filters_before_rules():
 	class SignInForm(Form):
-		filters = {"recovery_code": [Unspace(), Upcase()]}
-		rules = {"recovery_code": [Length(exactly=8)]}
+		filters = Filters({"recovery_code": [Unspace(), Upcase()]})
+		rules = Rules({"recovery_code": [Length(exactly=8)]})
 
 		recovery_code: str
 
@@ -355,8 +355,8 @@ def test_applies_filters_before_rules():
 
 def test_applies_item_filters_and_rules():
 	class TagsForm(Form):
-		filters = {"tags.*": [Upcase()], "tags": [Compact()]}
-		rules = {"tags.*": [Length(maximum=5)], "tags": [Distinct()]}
+		filters = Filters({"tags.*": [Upcase()], "tags": [Compact()]})
+		rules = Rules({"tags.*": [Length(maximum=5)], "tags": [Distinct()]})
 
 		tags: list[str] = []
 
@@ -375,7 +375,12 @@ def test_applies_item_filters_and_rules():
 
 def test_overrides_item_messages_by_items_key():
 	class TagsForm(Form):
-		rules = {"tag_names.*": [Length(maximum=5)], "tag_names": [Length(maximum=1)]}
+		rules = Rules(
+			{
+				"tag_names.*": [Length(maximum=5)],
+				"tag_names": [Length(maximum=1)],
+			}
+		)
 		messages = {
 			"tag_names.*.length": "Tags must be at most 5 characters.",
 			"tag_names.length": "Choose one tag.",
@@ -411,7 +416,7 @@ def test_rejects_filters_for_undeclared_fields():
 	with assert_raises(FormError) as raised:
 
 		class SignInForm(Form):
-			filters = {"code": [Upcase()]}
+			filters = Filters({"code": [Upcase()]})
 
 			recovery_code: str
 
@@ -425,13 +430,13 @@ def test_rejects_item_keys_for_undeclared_fields():
 	with assert_raises(FormError) as raised:
 
 		class TagsForm(Form):
-			rules = {"labels.*": [Length(maximum=5)]}
+			rules = Rules({"labels.*": [Length(maximum=5)]})
 
 			tags: list[str] = []
 
 	assert_eq(
 		str(raised.exception),
-		"Form TagsForm has rules for 'labels.*', which is not a field",
+		"Form TagsForm has rules for 'labels', which is not a field",
 	)
 
 
@@ -439,7 +444,7 @@ def test_rejects_item_keys_for_fields_that_are_not_lists():
 	with assert_raises(FormError) as raised:
 
 		class SignInForm(Form):
-			filters = {"recovery_code.*": [Upcase()]}
+			filters = Filters({"recovery_code.*": [Upcase()]})
 
 			recovery_code: str
 
@@ -450,27 +455,64 @@ def test_rejects_item_keys_for_fields_that_are_not_lists():
 	)
 
 
-def test_rejects_anything_after_the_items_marker():
-	with assert_raises(FormError) as raised:
+class Recorded:
+	name = "recorded"
 
-		class TagsForm(Form):
-			rules = {"tags.*.name": [Length(maximum=5)]}
+	def __init__(self):
+		self.values = []
 
-			tags: list[str] = []
+	def apply(self, value: object) -> object:
+		self.values.append(value)
+		return value
 
-	assert_eq(
-		str(raised.exception),
-		"Form TagsForm has rules for 'tags.*.name', which is neither 'tags' nor 'tags.*'",
-	)
+	def check(self, value: object):
+		self.values.append(value)
 
 
-def test_rejects_keys_with_a_suffix_other_than_the_items_marker():
-	with assert_raises(FormError):
+def test_skips_filters_and_rules_for_missing_optional_fields():
+	recorded = Recorded()
 
-		class TagsForm(Form):
-			rules = {"tags.first": [Length(maximum=5)]}
+	class TagsForm(Form):
+		filters = Filters({"tags.*": [recorded], "tags": [recorded]})
+		rules = Rules({"tags.*": [recorded], "tags": [recorded]})
 
-			tags: list[str] = []
+		tags: list[str] = ["default"]
+
+	form, errors = TagsForm.validate(Input())
+
+	assert_that(not errors)
+	assert_eq(form.tags, ["default"])
+	assert_eq(recorded.values, [])
+
+
+def test_skips_filters_and_rules_after_a_parse_error():
+	recorded = Recorded()
+
+	class BoardsForm(Form):
+		filters = Filters({"board_ids": [recorded]})
+		rules = Rules({"board_ids": [recorded]})
+
+		board_ids: list[UUID] = []
+
+	_, errors = BoardsForm.validate(Input({"board_ids": ["not-a-uuid"]}))
+
+	assert_that("board_ids" in errors)
+	assert_eq(recorded.values, [])
+
+
+class Failing:
+	def apply(self, value: str) -> str:
+		raise RuleError("must not be filtered")
+
+
+def test_propagates_rule_errors_raised_outside_rules():
+	class NoteForm(Form):
+		filters = Filters({"body": [Failing()]})
+
+		body: str
+
+	with assert_raises(RuleError):
+		NoteForm.validate(Input({"body": "Hello"}))
 
 
 def test_controllers_add_their_own_errors():

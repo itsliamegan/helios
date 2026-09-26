@@ -4,11 +4,14 @@ from typing import Any, Protocol
 
 from luna.inflect import count
 
+from .key import Key
+
 
 class RuleError(ValueError):
-	def __init__(self, message: str):
+	def __init__(self, message: str, key: Key | None = None):
 		super().__init__(message)
 		self.message = message
+		self.key = key
 
 
 class Rule[T](Protocol):

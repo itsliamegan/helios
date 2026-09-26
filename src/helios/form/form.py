@@ -7,18 +7,22 @@ from helios.http import Input
 
 from .error import FormError
 from .errors import Errors
-from .field import Failure, Field, INVALID, declare
-from .filter import Filter
-from .rule import Rule
+from .field import Field, declare
+from .filters import Filters
+from .key import Key
+from .parser import ParseError
+from .rule import RuleError
+from .rules import Rules
 
-ITEMS = "*"
+INVALID = "invalid"
+REQUIRED = "required"
 
 
 @dataclass_transform(kw_only_default=True, eq_default=False)
 class Form:
 	fields: ClassVar[dict[str, Field]] = {}
-	filters: ClassVar[dict[str, list[Filter[Any]]]] = {}
-	rules: ClassVar[dict[str, list[Rule[Any]]]] = {}
+	filters: ClassVar[Filters] = Filters()
+	rules: ClassVar[Rules] = Rules()
 	messages: ClassVar[dict[str, str]] = {}
 
 	def __init_subclass__(cls, **keywords: Any):
@@ -35,19 +39,8 @@ class Form:
 			cls.fields[declaration.name] = field
 			setattr(cls, declaration.name, field)
 
-		for key, filters in cls.filters.items():
-			field, items = target(cls, "filters", key)
-			if items:
-				field.item_filters = filters
-			else:
-				field.filters = filters
-
-		for key, rules in cls.rules.items():
-			field, items = target(cls, "rules", key)
-			if items:
-				field.item_rules = rules
-			else:
-				field.rules = rules
+		cls.filters.verify(cls)
+		cls.rules.verify(cls)
 
 	def __init__(self, **values: Any):
 		form = type(self)
@@ -69,25 +62,36 @@ class Form:
 		form.values = {}
 		errors = Errors()
 		for name, field in cls.fields.items():
+			if field.missing(input):
+				if field.required:
+					key = Key(name, False, REQUIRED)
+					errors.add(name, cls.message(key, "must be provided"))
+				else:
+					form.values[name] = field.initial
+				continue
+
 			try:
-				form.values[name] = field.validate(input)
-			except Failure as failure:
-				errors.add(name, cls.message(name, failure))
+				value = cls.filters.apply(field, field.parse(input))
+				cls.rules.check(field, value)
+			except ParseError as error:
+				key = Key(name, False, INVALID)
+				errors.add(name, cls.message(key, error.message, error.item))
+			except RuleError as error:
+				if error.key is None:
+					raise
+				errors.add(name, cls.message(error.key, error.message, error.key.item))
+			else:
+				form.values[name] = value
 		return form, errors
 
 	@classmethod
-	def message(cls, name: str, failure: Failure) -> str:
-		if failure.item and failure.key != INVALID:
-			key = f"{name}.{ITEMS}.{failure.key}"
+	def message(cls, key: Key, message: str, item: bool = False) -> str:
+		if str(key) in cls.messages:
+			return cls.messages[str(key)]
+		elif item:
+			return f"An item in {" ".join(words(key.name))} {message}."
 		else:
-			key = f"{name}.{failure.key}"
-
-		if key in cls.messages:
-			return cls.messages[key]
-		elif failure.item:
-			return f"An item in {" ".join(words(name))} {failure.message}."
-		else:
-			return f"{sentence(name)} {failure.message}."
+			return f"{sentence(key.name)} {message}."
 
 	def __repr__(self) -> str:
 		values = ", ".join(
@@ -99,23 +103,3 @@ class Form:
 
 
 RESERVED = {"values", *vars(Form)}
-
-
-def target(form: type[Form], kind: str, key: str) -> tuple[Field, bool]:
-	name, separator, rest = key.partition(".")
-	if name not in form.fields:
-		raise FormError(
-			f"Form {form.__name__} has {kind} for '{key}', which is not a field"
-		)
-	if separator and rest != ITEMS:
-		raise FormError(
-			f"Form {form.__name__} has {kind} for '{key}', "
-			f"which is neither '{name}' nor '{name}.{ITEMS}'"
-		)
-
-	field = form.fields[name]
-	if separator and not field.is_list:
-		raise FormError(
-			f"Form {form.__name__} has {kind} for '{key}', but '{name}' is not a list"
-		)
-	return field, bool(separator)

@@ -106,12 +106,12 @@ def for_type(annotation: object) -> Parser[Any] | None:
 		return List(item_parser)
 
 
-def is_untrimmed(annotation: Any) -> bool:
+def is_trimmed(annotation: Any) -> bool:
 	if get_origin(annotation) is list:
 		(item,) = get_args(annotation)
-		return item is Untrimmed
+		return item is str
 	else:
-		return annotation is Untrimmed
+		return annotation is str
 
 
 def scalar(annotation: object) -> Parser[Any] | None:
