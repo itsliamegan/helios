@@ -12,23 +12,22 @@ class DependencyError(Exception):
 	pass
 
 
-class Binding:
-	pass
-
-
 @dataclass
-class Instance(Binding):
+class Instance:
 	value: Any
 
 
 @dataclass
-class Singleton(Binding):
+class Singleton:
 	factory: Callable[[Container], Any]
 
 
 @dataclass
-class Scoped(Binding):
+class Scoped:
 	factory: Callable[[Context], Any]
+
+
+type Binding = Instance | Singleton | Scoped
 
 
 class Container:
@@ -65,11 +64,10 @@ class Container:
 		if isinstance(binding, Instance):
 			return cast(T, binding.value)
 
-		singleton = cast(Singleton, binding)
 		with self.lock:
 			if key in self.singletons:
 				return cast(T, self.singletons[key])
-			factory = cast(Callable[[Container], T], singleton.factory)
+			factory = cast(Callable[[Container], T], binding.factory)
 			value = factory(self)
 			if value is None:
 				raise DependencyError(f"factory for {key.__qualname__} returned None")

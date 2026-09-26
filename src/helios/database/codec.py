@@ -11,16 +11,16 @@ type Scalar = int | float | str | bytes
 class Codec[T](Protocol):
 	def check(self, value: object): ...
 
-	def encode(self, value: Any) -> Scalar:
-		if isinstance(value, bool) or not isinstance(value, int | float | str | bytes):
-			raise TypeError(f"expected a SQLite scalar, got {type(value).__name__}")
-		return value
+	def encode(self, value: T) -> Scalar: ...
 
 	def decode(self, value: Scalar) -> T: ...
 
 
 def encode[T](codec: Codec[T], value: T) -> Scalar:
-	return Codec.encode(codec, codec.encode(value))
+	encoded = codec.encode(value)
+	if isinstance(encoded, bool) or not isinstance(encoded, int | float | str | bytes):
+		raise TypeError(f"expected a SQLite scalar, got {type(encoded).__name__}")
+	return encoded
 
 
 class Str:
@@ -30,7 +30,7 @@ class Str:
 
 	def encode(self, value: str) -> Scalar:
 		self.check(value)
-		return Codec.encode(self, value)
+		return value
 
 	def decode(self, value: Scalar) -> str:
 		if not isinstance(value, str):
@@ -45,7 +45,7 @@ class Bool:
 
 	def encode(self, value: bool) -> Scalar:
 		self.check(value)
-		return Codec.encode(self, 1 if value else 0)
+		return 1 if value else 0
 
 	def decode(self, value: Scalar) -> bool:
 		if not isinstance(value, int) or isinstance(value, bool) or value not in (0, 1):
@@ -60,7 +60,7 @@ class Int:
 
 	def encode(self, value: int) -> Scalar:
 		self.check(value)
-		return Codec.encode(self, value)
+		return value
 
 	def decode(self, value: Scalar) -> int:
 		if not isinstance(value, int) or isinstance(value, bool):
@@ -75,7 +75,7 @@ class UUID:
 
 	def encode(self, value: uuid.UUID) -> Scalar:
 		self.check(value)
-		return Codec.encode(self, str(value))
+		return str(value)
 
 	def decode(self, value: Scalar) -> uuid.UUID:
 		if not isinstance(value, str):
@@ -99,7 +99,7 @@ class Date:
 
 	def encode(self, value: datetime) -> Scalar:
 		self.check(value)
-		return Codec.encode(self, value.astimezone(UTC).strftime(self.FORMAT))
+		return value.astimezone(UTC).strftime(self.FORMAT)
 
 	def decode(self, value: Scalar) -> datetime:
 		if not isinstance(value, str):
@@ -117,7 +117,7 @@ class URL:
 
 	def encode(self, value: http.URL) -> Scalar:
 		self.check(value)
-		return Codec.encode(self, str(value))
+		return str(value)
 
 	def decode(self, value: Scalar) -> http.URL:
 		if not isinstance(value, str):

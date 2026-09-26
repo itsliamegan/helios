@@ -1,7 +1,7 @@
-from .source import Source
+from .source import Driver, Source
 
 
-class Driver:
+class Driver(Driver):
 	def __init__(self, templates: dict[str, str]):
 		self.templates = templates
 

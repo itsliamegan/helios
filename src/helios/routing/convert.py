@@ -1,18 +1,20 @@
-from typing import Any, Protocol
+from abc import ABC, abstractmethod
+from typing import Any
 import uuid
 
 
-class Converter(Protocol):
-	def __call__(self, value: str) -> Any: ...
+class Converter(ABC):
+	@abstractmethod
+	def convert(self, value: str) -> Any: ...
 
 
-class Str:
-	def __call__(self, value: str) -> str:
+class Str(Converter):
+	def convert(self, value: str) -> str:
 		return value
 
 
-class UUID:
-	def __call__(self, value: str) -> uuid.UUID:
+class UUID(Converter):
+	def convert(self, value: str) -> uuid.UUID:
 		return uuid.UUID(value)
 
 
