@@ -26,13 +26,13 @@ def reject(declaration: Declaration[object]) -> object:
 
 
 def test_reads_annotations_with_defaults():
-	class Pin:
+	class Post:
 		limit: ClassVar[int] = 10
 
 		title: str
 		note: str = ""
 
-	found = declarations(Pin, annotation_of, ExampleError)
+	found = declarations(Post, annotation_of, ExampleError)
 
 	assert_eq([declaration.name for declaration in found], ["title", "note"])
 	assert_that(found[0].default is MISSING)
@@ -41,55 +41,55 @@ def test_reads_annotations_with_defaults():
 
 
 def test_settles_resolved_annotations_when_declared():
-	class Pin:
+	class Post:
 		title: str
 
 	with assert_raises(ExampleError) as raised:
-		declarations(Pin, reject, ExampleError)
+		declarations(Post, reject, ExampleError)
 
-	assert_eq(str(raised.exception), "Pin.title: not allowed")
+	assert_eq(str(raised.exception), "Post.title: not allowed")
 
 
 def test_rejects_string_annotations():
-	class Pin:
+	class Post:
 		title: "str"  # noqa: UP037
 
 	with assert_raises(ExampleError) as raised:
-		declarations(Pin, annotation_of, ExampleError)
+		declarations(Post, annotation_of, ExampleError)
 
 	assert_eq(
 		str(raised.exception),
-		"Pin.title: string annotations are not supported: 'str'",
+		"Post.title: string annotations are not supported: 'str'",
 	)
 
 
 def test_resolves_pending_annotations_on_first_use():
-	class Pin:
-		board: Board
+	class Post:
+		author: Author
 
-	(declaration,) = declarations(Pin, annotation_of, ExampleError)
+	(declaration,) = declarations(Post, annotation_of, ExampleError)
 	pending = declaration.pending
 
-	class Board:
+	class Author:
 		pass
 
 	resolved = declaration.resolve()
 
 	assert_that(pending)
 	assert_that(not declaration.pending)
-	assert_that(resolved is Board)
+	assert_that(resolved is Author)
 
 
 def test_rejects_annotations_that_never_resolve():
-	class Pin:
-		board: Board  # noqa: F821
+	class Post:
+		author: Author  # noqa: F821
 
-	(declaration,) = declarations(Pin, annotation_of, ExampleError)
+	(declaration,) = declarations(Post, annotation_of, ExampleError)
 
 	with assert_raises(ExampleError) as raised:
 		declaration.resolve()
 
-	assert_eq(str(raised.exception), "Pin.board: unresolved annotation: Board")
+	assert_eq(str(raised.exception), "Post.author: unresolved annotation: Author")
 
 
 def test_splits_nullable_annotations():

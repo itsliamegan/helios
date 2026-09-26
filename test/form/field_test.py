@@ -37,10 +37,10 @@ def test_lists_are_missing_only_when_nothing_was_sent():
 
 
 def test_parses_the_sent_value():
-	board_id = uuid4()
-	field = Field("board_ids", parser.List(parser.UUID()), [])
+	tag_id = uuid4()
+	field = Field("tag_ids", parser.List(parser.UUID()), [])
 
-	assert_eq(field.parse(Input({"board_ids": [str(board_id)]})), [board_id])
+	assert_eq(field.parse(Input({"tag_ids": [str(tag_id)]})), [tag_id])
 
 
 def test_raises_parse_errors():

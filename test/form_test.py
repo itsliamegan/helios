@@ -19,23 +19,23 @@ from helios.form.rule import Distinct, Length
 from helios.http import Input, URL
 
 
-class PinForm(Form):
+class PostForm(Form):
 	title: str
 	note: Untrimmed = Untrimmed("")
-	board_ids: list[UUID] = []
+	tag_ids: list[UUID] = []
 	return_to: str | None = None
 
 
 def test_validates_annotated_fields():
-	read_later_id = uuid4()
-	inbox_id = uuid4()
-	form, errors = PinForm.validate(
+	python_id = uuid4()
+	news_id = uuid4()
+	form, errors = PostForm.validate(
 		Input(
 			{
 				"title": "Intro",
 				"note": "Read later",
-				"board_ids": [str(read_later_id), str(inbox_id)],
-				"return_to": "/boards",
+				"tag_ids": [str(python_id), str(news_id)],
+				"return_to": "/posts",
 			}
 		)
 	)
@@ -43,50 +43,50 @@ def test_validates_annotated_fields():
 	assert_eq(errors, Errors())
 	assert_eq(form.title, "Intro")
 	assert_eq(form.note, "Read later")
-	assert_eq(form.board_ids, [read_later_id, inbox_id])
-	assert_eq(form.return_to, "/boards")
+	assert_eq(form.tag_ids, [python_id, news_id])
+	assert_eq(form.return_to, "/posts")
 
 
 def test_fills_missing_optional_fields_with_defaults():
-	form, errors = PinForm.validate(Input({"title": "Intro"}))
+	form, errors = PostForm.validate(Input({"title": "Intro"}))
 
 	assert_that(not errors)
 	assert_eq(form.note, "")
-	assert_eq(form.board_ids, [])
+	assert_eq(form.tag_ids, [])
 	assert_that(form.return_to is None)
 
 
 def test_copies_mutable_defaults():
-	first, _ = PinForm.validate(Input({"title": "Intro"}))
-	second, _ = PinForm.validate(Input({"title": "Intro"}))
+	first, _ = PostForm.validate(Input({"title": "Intro"}))
+	second, _ = PostForm.validate(Input({"title": "Intro"}))
 
-	first.board_ids.append(uuid4())
+	first.tag_ids.append(uuid4())
 
-	assert_eq(second.board_ids, [])
-	assert_eq(PinForm(title="Intro").board_ids, [])
+	assert_eq(second.tag_ids, [])
+	assert_eq(PostForm(title="Intro").tag_ids, [])
 
 
 def test_requires_fields_without_defaults():
-	form, errors = PinForm.validate(Input())
+	form, errors = PostForm.validate(Input())
 
 	assert_eq(errors.messages["title"], ["Title must be provided."])
 	with assert_raises(AttributeError) as raised:
 		_ = form.title
-	assert_eq(str(raised.exception), "PinForm.title has not been initialized")
+	assert_eq(str(raised.exception), "PostForm.title has not been initialized")
 
 
 def test_trims_strings():
-	form, errors = PinForm.validate(
-		Input({"title": "  Intro  ", "return_to": "  /boards "})
+	form, errors = PostForm.validate(
+		Input({"title": "  Intro  ", "return_to": "  /posts "})
 	)
 
 	assert_that(not errors)
 	assert_eq(form.title, "Intro")
-	assert_eq(form.return_to, "/boards")
+	assert_eq(form.return_to, "/posts")
 
 
 def test_treats_blank_strings_as_missing():
-	form, errors = PinForm.validate(Input({"title": "   ", "return_to": ""}))
+	form, errors = PostForm.validate(Input({"title": "   ", "return_to": ""}))
 
 	assert_eq(errors.messages["title"], ["Title must be provided."])
 	assert_that(form.return_to is None)
@@ -103,20 +103,20 @@ def test_trims_list_items_and_keeps_blank_ones():
 
 
 def test_trims_padded_list_items_before_parsing():
-	board_id = uuid4()
-	form, errors = PinForm.validate(
-		Input({"title": "Intro", "board_ids": [f" {board_id} "]})
+	tag_id = uuid4()
+	form, errors = PostForm.validate(
+		Input({"title": "Intro", "tag_ids": [f" {tag_id} "]})
 	)
 
 	assert_that(not errors)
-	assert_eq(form.board_ids, [board_id])
+	assert_eq(form.tag_ids, [tag_id])
 
 
 def test_keeps_untrimmed_fields_exactly_as_sent():
 	class PasswordForm(Form):
 		password: Untrimmed
 
-	indented, _ = PinForm.validate(Input({"title": "Intro", "note": "  - item\n"}))
+	indented, _ = PostForm.validate(Input({"title": "Intro", "note": "  - item\n"}))
 	padded, padded_errors = PasswordForm.validate(Input({"password": " secret "}))
 
 	assert_eq(indented.note, "  - item\n")
@@ -136,26 +136,26 @@ def test_treats_blank_untrimmed_fields_as_missing():
 
 
 def test_records_parse_errors_with_readable_field_names():
-	form, errors = PinForm.validate(Input({"title": "Intro", "return_to": ["/", "/"]}))
+	form, errors = PostForm.validate(Input({"title": "Intro", "return_to": ["/", "/"]}))
 
 	assert_eq(form.title, "Intro")
 	assert_eq(errors.messages, {"return_to": ["Return to must be a single value."]})
 
 
 def test_words_list_item_parse_errors_as_items():
-	board_id = uuid4()
-	_, errors = PinForm.validate(
-		Input({"title": "Intro", "board_ids": [str(board_id), "not-a-uuid"]})
+	tag_id = uuid4()
+	_, errors = PostForm.validate(
+		Input({"title": "Intro", "tag_ids": [str(tag_id), "not-a-uuid"]})
 	)
 
 	assert_eq(
 		errors.messages,
-		{"board_ids": ["An item in board ids must be a valid UUID."]},
+		{"tag_ids": ["An item in tag ids must be a valid UUID."]},
 	)
 
 
 def test_rejects_repeated_scalar_values():
-	_, errors = PinForm.validate(Input({"title": ["Intro", "Outro"]}))
+	_, errors = PostForm.validate(Input({"title": ["Intro", "Outro"]}))
 
 	assert_eq(errors.messages["title"], ["Title must be a single value."])
 
@@ -196,29 +196,29 @@ def test_parses_checkboxes_and_other_scalar_types():
 
 
 def test_constructs_with_fields():
-	board_id = uuid4()
-	form = PinForm(title="Intro", board_ids=[board_id])
+	tag_id = uuid4()
+	form = PostForm(title="Intro", tag_ids=[tag_id])
 
 	assert_eq(form.title, "Intro")
 	assert_eq(form.note, "")
-	assert_eq(form.board_ids, [board_id])
+	assert_eq(form.tag_ids, [tag_id])
 	assert_that(form.return_to is None)
 
 
 def test_construction_rejects_missing_and_extra_fields():
 	with assert_raises(TypeError) as missing:
-		PinForm()  # ty: ignore[missing-argument]
+		PostForm()  # ty: ignore[missing-argument]
 	with assert_raises(TypeError) as extra:
-		PinForm(title="Intro", body="Hello")  # ty: ignore[unknown-argument]
+		PostForm(title="Intro", body="Hello")  # ty: ignore[unknown-argument]
 
-	assert_eq(str(missing.exception), "PinForm is missing fields: title")
-	assert_eq(str(extra.exception), "PinForm got unexpected fields: body")
+	assert_eq(str(missing.exception), "PostForm is missing fields: title")
+	assert_eq(str(extra.exception), "PostForm got unexpected fields: body")
 
 
 def test_rejects_subclassing_a_form():
 	with assert_raises(FormError):
 
-		class ArchivablePinForm(PinForm):
+		class ArchivablePostForm(PostForm):
 			archived: bool = False
 
 
@@ -254,7 +254,7 @@ def test_rejects_undefined_annotations():
 	with assert_raises(FormError):
 
 		class BadForm(Form):
-			board: Board  # noqa: F821
+			author: Author  # noqa: F821
 
 
 def test_rejects_field_names_form_uses():
@@ -279,23 +279,23 @@ class WebURL(Rule[str]):
 
 def test_runs_rules_on_parsed_values():
 	class LinkForm(Form):
-		rules = Rules({"url": [WebURL()], "board_ids": [Distinct()]})
+		rules = Rules({"url": [WebURL()], "tag_ids": [Distinct()]})
 
 		url: str
-		board_ids: list[UUID] = []
+		tag_ids: list[UUID] = []
 
-	read_later_id = uuid4()
-	inbox_id = uuid4()
+	python_id = uuid4()
+	news_id = uuid4()
 	form, errors = LinkForm.validate(
 		Input(
 			{
 				"url": "https://example.com",
-				"board_ids": [str(read_later_id), str(inbox_id)],
+				"tag_ids": [str(python_id), str(news_id)],
 			}
 		)
 	)
 	_, invalid_errors = LinkForm.validate(
-		Input({"url": "example.com", "board_ids": [str(inbox_id), str(inbox_id)]})
+		Input({"url": "example.com", "tag_ids": [str(news_id), str(news_id)]})
 	)
 
 	assert_that(not errors)
@@ -304,7 +304,7 @@ def test_runs_rules_on_parsed_values():
 		invalid_errors.messages,
 		{
 			"url": ["Url must start with http:// or https://."],
-			"board_ids": ["Board ids must not repeat a value."],
+			"tag_ids": ["Tag ids must not repeat a value."],
 		},
 	)
 
@@ -313,25 +313,25 @@ def test_overrides_messages_by_field_and_rule():
 	class LinkForm(Form):
 		rules = Rules({"url": [WebURL()]})
 		messages = {
-			"title.required": "Give the pin a title.",
+			"title.required": "Give the post a title.",
 			"url.web_url": "Use a web address.",
-			"board_ids.invalid": "Choose boards from the list.",
+			"tag_ids.invalid": "Choose tags from the list.",
 		}
 
 		title: str
 		url: str
-		board_ids: list[UUID] = []
+		tag_ids: list[UUID] = []
 
 	_, errors = LinkForm.validate(
-		Input({"url": "example.com", "board_ids": "not-a-uuid"})
+		Input({"url": "example.com", "tag_ids": "not-a-uuid"})
 	)
 
 	assert_eq(
 		errors.messages,
 		{
-			"title": ["Give the pin a title."],
+			"title": ["Give the post a title."],
 			"url": ["Use a web address."],
-			"board_ids": ["Choose boards from the list."],
+			"tag_ids": ["Choose tags from the list."],
 		},
 	)
 
@@ -409,17 +409,17 @@ def test_overrides_item_messages_by_items_key():
 
 
 def test_overrides_item_parse_messages_by_invalid_key():
-	class BoardsForm(Form):
+	class TagsForm(Form):
 		messages = {
-			"board_ids.*.invalid": "Unused.",
-			"board_ids.invalid": "Choose boards from the list.",
+			"tag_ids.*.invalid": "Unused.",
+			"tag_ids.invalid": "Choose tags from the list.",
 		}
 
-		board_ids: list[UUID] = []
+		tag_ids: list[UUID] = []
 
-	_, errors = BoardsForm.validate(Input({"board_ids": ["not-a-uuid"]}))
+	_, errors = TagsForm.validate(Input({"tag_ids": ["not-a-uuid"]}))
 
-	assert_eq(errors.messages, {"board_ids": ["Choose boards from the list."]})
+	assert_eq(errors.messages, {"tag_ids": ["Choose tags from the list."]})
 
 
 def test_rejects_filters_for_undeclared_fields():
@@ -513,15 +513,15 @@ def test_skips_filters_and_rules_for_missing_optional_fields():
 def test_skips_filters_and_rules_after_a_parse_error():
 	recorded = []
 
-	class BoardsForm(Form):
-		filters = Filters({"board_ids": [RecordedFilter(recorded)]})
-		rules = Rules({"board_ids": [RecordedRule(recorded)]})
+	class TagsForm(Form):
+		filters = Filters({"tag_ids": [RecordedFilter(recorded)]})
+		rules = Rules({"tag_ids": [RecordedRule(recorded)]})
 
-		board_ids: list[UUID] = []
+		tag_ids: list[UUID] = []
 
-	_, errors = BoardsForm.validate(Input({"board_ids": ["not-a-uuid"]}))
+	_, errors = TagsForm.validate(Input({"tag_ids": ["not-a-uuid"]}))
 
-	assert_that("board_ids" in errors)
+	assert_that("tag_ids" in errors)
 	assert_eq(recorded, [])
 
 
@@ -541,7 +541,7 @@ def test_propagates_rule_errors_raised_outside_rules():
 
 
 def test_controllers_add_their_own_errors():
-	form, errors = PinForm.validate(Input({"title": "Intro"}))
+	form, errors = PostForm.validate(Input({"title": "Intro"}))
 
 	if form.title == "Intro":
 		errors.add("title", "That title is taken.")

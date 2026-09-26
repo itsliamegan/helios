@@ -22,7 +22,7 @@ def test_fills_content_with_the_body():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{% render Card(title="Pins") %}<b>{{ name }}</b>{% endrender %}',
+				"index": '{% render Card(title="Posts") %}<b>{{ name }}</b>{% endrender %}',
 				"card": "<h2>{{ title }}</h2>{{ content }}",
 			}
 		),
@@ -31,7 +31,7 @@ def test_fills_content_with_the_body():
 
 	html = engine.render("index", {"name": "<i>"})
 
-	assert_eq(html, "<h2>Pins</h2><b>&lt;i&gt;</b>")
+	assert_eq(html, "<h2>Posts</h2><b>&lt;i&gt;</b>")
 
 
 def test_renders_the_body_in_the_caller_scope():
@@ -39,8 +39,8 @@ def test_renders_the_body_in_the_caller_scope():
 		memory.Driver(
 			{
 				"index": (
-					"{% for pin in pins %}"
-					"{% render Card(title=pin) %}{{ pin }} of {{ board }}{% endrender %}"
+					"{% for comment in comments %}"
+					"{% render Card(title=comment) %}{{ comment }} on {{ post }}{% endrender %}"
 					"{% endfor %}"
 				),
 				"card": "[{{ content }}]",
@@ -49,16 +49,16 @@ def test_renders_the_body_in_the_caller_scope():
 		components=[Card],
 	)
 
-	html = engine.render("index", {"pins": ["a", "b"], "board": "Travel"})
+	html = engine.render("index", {"comments": ["a", "b"], "post": "Travel"})
 
-	assert_eq(html, "[a of Travel][b of Travel]")
+	assert_eq(html, "[a on Travel][b on Travel]")
 
 
 def test_uses_the_default_for_a_blank_body():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{% render Card(title="Pins") %}\n\t \n{% endrender %}',
+				"index": '{% render Card(title="Posts") %}\n\t \n{% endrender %}',
 				"card": "{{ content }}",
 			}
 		),

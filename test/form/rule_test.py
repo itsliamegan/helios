@@ -94,12 +94,12 @@ def test_only_compares_whole_items_of_a_list():
 
 
 def test_distinct_rejects_repeated_items():
-	board_id = uuid4()
+	tag_id = uuid4()
 	rule = Distinct()
 
-	rule.check([board_id, uuid4()])
+	rule.check([tag_id, uuid4()])
 	rule.check([])
-	assert_rule_error(rule, [board_id, board_id], "must not repeat a value")
+	assert_rule_error(rule, [tag_id, tag_id], "must not repeat a value")
 
 
 def assert_rule_error(rule, value, message):

@@ -109,12 +109,12 @@ def test_escapes_assigns():
 def test_escapes_assigns_in_loaded_templates():
 	with TemporaryDirectory() as dir:
 		views_dir = Path(dir)
-		views_dir.joinpath("boards").mkdir()
-		views_dir.joinpath("boards", "index.html").write_text("{{ title }}")
+		views_dir.joinpath("posts").mkdir()
+		views_dir.joinpath("posts", "index.html").write_text("{{ title }}")
 
 		engine = Engine(file.Driver(views_dir))
 
-		assert_eq(engine.render("boards.index", {"title": "<b>"}), "&lt;b&gt;")
+		assert_eq(engine.render("posts.index", {"title": "<b>"}), "&lt;b&gt;")
 
 
 def test_rejects_undefined_variables():
@@ -125,10 +125,10 @@ def test_rejects_undefined_variables():
 
 
 def test_rejects_undefined_attributes():
-	engine = Engine(memory.Driver({"index": "<h1>{{ board.titel }}</h1>"}))
+	engine = Engine(memory.Driver({"index": "<h1>{{ post.titel }}</h1>"}))
 
 	with assert_raises(UndefinedError):
-		engine.render("index", {"board": {"title": "Index"}})
+		engine.render("index", {"post": {"title": "Index"}})
 
 
 def test_rejects_undefined_variables_in_conditions():

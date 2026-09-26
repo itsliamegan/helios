@@ -28,8 +28,8 @@ class Link(Component):
 	attributes: Attributes = Attributes()
 
 
-class Board(Component):
-	template = "board"
+class Post(Component):
+	template = "post"
 
 	name: str
 	owner: str
@@ -91,7 +91,7 @@ def test_rejects_subclassing_a_component():
 
 def test_accepts_global_and_declared_attributes_from_python():
 	attributes = Attributes(
-		class_="pin-link",
+		class_="post-link",
 		id="link",
 		hidden=True,
 		data_turbo_frame="modal",
@@ -159,18 +159,18 @@ def test_hides_caller_assigns():
 	)
 
 	with assert_raises(UndefinedError):
-		engine.render("index", {"name": "Travel", "title": "Boards"})
+		engine.render("index", {"name": "Travel", "title": "Posts"})
 
 
 def test_renders_component_properties():
 	engine = Engine(
 		memory.Driver(
 			{
-				"index": '{{ Board(name="Travel", owner="ada", user="ada") }}',
-				"board": "{{ name }}{% if component.owned %} (yours){% endif %}",
+				"index": '{{ Post(name="Travel", owner="ada", user="ada") }}',
+				"post": "{{ name }}{% if component.owned %} (yours){% endif %}",
 			}
 		),
-		components=[Board],
+		components=[Post],
 	)
 
 	html = engine.render("index")
@@ -262,7 +262,7 @@ def test_passes_attributes_through_from_templates():
 		memory.Driver(
 			{
 				"index": (
-					'{{ Link(url="/pins/1", new_tab=True, class="pin-link", '
+					'{{ Link(url="/posts/1", new_tab=True, class="post-link", '
 					'data_turbo_frame="modal", rel="nofollow") }}'
 				),
 				"link": link_template,
@@ -275,7 +275,7 @@ def test_passes_attributes_through_from_templates():
 
 	assert_eq(
 		html,
-		'<a href="/pins/1" class="external-link pin-link" target="_blank" '
+		'<a href="/posts/1" class="external-link post-link" target="_blank" '
 		'rel="nofollow" data-turbo-frame="modal"></a>',
 	)
 
@@ -322,7 +322,7 @@ def test_rejects_attributes_bag_with_loose_attributes():
 	)
 
 	with assert_raises(TypeError):
-		engine.render("index", {"bag": Attributes(class_="pin-link")})
+		engine.render("index", {"bag": Attributes(class_="post-link")})
 
 
 def test_rejects_components_with_the_same_name():
@@ -397,23 +397,23 @@ def test_accepts_props_typed_with_later_classes():
 	class Card(Component):
 		template = "card"
 
-		pin: Pin
+		author: Author
 
-	class Pin:
+	class Author:
 		pass
 
-	pin = Pin()
+	author = Author()
 
-	card = Card(pin=pin)
+	card = Card(author=author)
 
-	assert_that(card.pin is pin)
+	assert_that(card.author is author)
 
 
 def test_rejects_undefined_annotations_on_construction():
 	class Card(Component):
 		template = "card"
 
-		pin: Pin  # noqa: F821
+		author: Author  # noqa: F821
 
 	with assert_raises(ComponentError):
-		Card(pin=None)
+		Card(author=None)

@@ -225,16 +225,16 @@ def test_client_sends_query_and_headers():
 
 def test_client_sends_scalar_and_repeated_form_values():
 	def create(req, ctx):
-		board_ids = req.input["board_id"]
-		return Response.text(f"{req.input["title"]}|{",".join(board_ids)}")
+		tag_ids = req.input["tag_id"]
+		return Response.text(f"{req.input["title"]}|{",".join(tag_ids)}")
 
-	client = make_client([Route(Method.POST, Pattern("/pins"), create)])
+	client = make_client([Route(Method.POST, Pattern("/posts"), create)])
 	form = {
 		"title": "Reading",
-		"board_id": ["first", "second"],
+		"tag_id": ["first", "second"],
 	}
 
-	res = client.post("/pins", form=form)
+	res = client.post("/posts", form=form)
 
 	assert_eq(res.text, "Reading|first,second")
 

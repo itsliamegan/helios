@@ -32,12 +32,12 @@ def test_parses_integers():
 
 def test_parses_uuid():
 	value_parser = parser.UUID()
-	board_id = uuid4()
+	tag_id = uuid4()
 
-	assert_eq(value_parser.parse(str(board_id)), board_id)
-	assert_eq(value_parser.parse(f" {board_id}\n"), board_id)
+	assert_eq(value_parser.parse(str(tag_id)), tag_id)
+	assert_eq(value_parser.parse(f" {tag_id}\n"), tag_id)
 	assert_parse_error(value_parser, "not-a-uuid", "must be a valid UUID")
-	assert_parse_error(value_parser, [str(board_id)], "must be a single value")
+	assert_parse_error(value_parser, [str(tag_id)], "must be a single value")
 
 
 def test_parses_url():
@@ -67,13 +67,13 @@ def test_parses_checked_boolean_strictly():
 
 def test_parses_list_from_scalar_and_list():
 	value_parser = parser.List(parser.UUID())
-	first_board_id = uuid4()
-	second_board_id = uuid4()
+	first_tag_id = uuid4()
+	second_tag_id = uuid4()
 
-	assert_eq(value_parser.parse(str(first_board_id)), [first_board_id])
+	assert_eq(value_parser.parse(str(first_tag_id)), [first_tag_id])
 	assert_eq(
-		value_parser.parse([str(first_board_id), str(second_board_id)]),
-		[first_board_id, second_board_id],
+		value_parser.parse([str(first_tag_id), str(second_tag_id)]),
+		[first_tag_id, second_tag_id],
 	)
 
 

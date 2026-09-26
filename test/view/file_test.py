@@ -21,20 +21,20 @@ def test_directory_renders_application_helpers():
 def test_renders_nested_directory_templates():
 	with TemporaryDirectory() as dir:
 		views_dir = Path(dir)
-		views_dir.joinpath("boards").mkdir()
-		views_dir.joinpath("boards", "index.html").write_text("<h1>Boards</h1>")
+		views_dir.joinpath("posts").mkdir()
+		views_dir.joinpath("posts", "index.html").write_text("<h1>Posts</h1>")
 
 		engine = Engine(file.Driver(views_dir))
 
-		assert_eq(engine.render("boards.index"), "<h1>Boards</h1>")
+		assert_eq(engine.render("posts.index"), "<h1>Posts</h1>")
 
 
 def test_directory_rejects_syntax_errors_on_creation():
 	with TemporaryDirectory() as dir:
 		views_dir = Path(dir)
-		views_dir.joinpath("boards").mkdir()
-		views_dir.joinpath("boards", "show.html").write_text("<h1>Show</h1>")
-		broken_file = views_dir.joinpath("boards", "index.html")
+		views_dir.joinpath("posts").mkdir()
+		views_dir.joinpath("posts", "show.html").write_text("<h1>Show</h1>")
+		broken_file = views_dir.joinpath("posts", "index.html")
 		broken_file.write_text("<h1>{{ title }}</h1>\n{% if title %}\n")
 
 		with assert_raises(TemplateSyntaxError) as raised:

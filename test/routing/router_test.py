@@ -101,9 +101,9 @@ def test_passes_converted_params_to_handler_by_name():
 
 
 def test_uuid_converter_doesnt_match_invalid_uuid():
-	pattern = Pattern("/boards/{id:uuid}")
+	pattern = Pattern("/posts/{id:uuid}")
 
-	match = pattern.match(URL("/boards/not-a-uuid"))
+	match = pattern.match(URL("/posts/not-a-uuid"))
 
 	assert_that(match is None)
 
@@ -202,13 +202,13 @@ def test_generates_named_grouped_route():
 	router = Router(
 		[
 			Group(
-				prefix="/boards",
+				prefix="/posts",
 				routes=[
 					Route(
 						Method.GET,
 						Pattern("/{id:uuid}/edit"),
 						lambda req, ctx: Response.empty(),
-						name="boards.edit",
+						name="posts.edit",
 					)
 				],
 			)
@@ -216,9 +216,9 @@ def test_generates_named_grouped_route():
 	)
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
 
-	path = router.path("boards.edit", {"id": id})
+	path = router.path("posts.edit", {"id": id})
 
-	assert_eq(path, f"/boards/{id}/edit")
+	assert_eq(path, f"/posts/{id}/edit")
 
 
 def test_rejects_generated_params_outside_route_syntax():

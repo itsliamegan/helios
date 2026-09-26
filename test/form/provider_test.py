@@ -38,7 +38,7 @@ def test_flashes_errors_and_input():
 		Request(
 			Method.POST,
 			URL("/"),
-			input=Input({"title": "", "board_ids": ["inbox", "later"]}),
+			input=Input({"title": "", "tag_ids": ["news", "python"]}),
 		),
 	)
 
@@ -46,7 +46,7 @@ def test_flashes_errors_and_input():
 		session["_flash"],
 		{
 			"_errors": {"title": ["Title must be provided."]},
-			"_input": {"title": "", "board_ids": ["inbox", "later"]},
+			"_input": {"title": "", "tag_ids": ["news", "python"]},
 		},
 	)
 

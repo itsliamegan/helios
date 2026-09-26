@@ -15,7 +15,7 @@ def test_provider_shares_urls_with_templates():
 	with TemporaryDirectory() as dir:
 		views_dir = Path(dir)
 		views_dir.joinpath("index.html").write_text(
-			'<a href="{{ urls.route("boards.show", {"id": 7}) }}">Board</a>'
+			'<a href="{{ urls.route("posts.show", {"id": 7}) }}">Post</a>'
 		)
 
 		def index(request, context):
@@ -28,9 +28,9 @@ def test_provider_shares_urls_with_templates():
 					Route(Method.GET, Pattern("/"), index),
 					Route(
 						Method.GET,
-						Pattern("/boards/{id}"),
+						Pattern("/posts/{id}"),
 						index,
-						name="boards.show",
+						name="posts.show",
 					),
 				]
 			),
@@ -41,31 +41,31 @@ def test_provider_shares_urls_with_templates():
 		finally:
 			app.close()
 
-	assert_eq(str(response.body), '<a href="/boards/7">Board</a>')
+	assert_eq(str(response.body), '<a href="/posts/7">Post</a>')
 
 
 def test_provider_registers_components():
 	with TemporaryDirectory() as dir:
 		views_dir = Path(dir)
-		views_dir.joinpath("boards").mkdir()
-		views_dir.joinpath("boards", "chip.py").write_text(
+		views_dir.joinpath("tags").mkdir()
+		views_dir.joinpath("tags", "chip.py").write_text(
 			"from helios.view import Component\n"
 			"\n"
 			"\n"
-			"class BoardChip(Component):\n"
-			'\ttemplate = "boards.chip"\n'
+			"class TagChip(Component):\n"
+			'\ttemplate = "tags.chip"\n'
 			"\n"
 			"\tname: str\n"
 		)
-		views_dir.joinpath("boards", "chip.html").write_text(
+		views_dir.joinpath("tags", "chip.html").write_text(
 			'<span class="chip">{{ name }}</span>'
 		)
 		views_dir.joinpath("index.html").write_text(
-			"{% for name in names %}{{ BoardChip(name=name) }}{% endfor %}"
+			"{% for name in names %}{{ TagChip(name=name) }}{% endfor %}"
 		)
 		spec = importlib.util.spec_from_file_location(
 			"chip",
-			views_dir.joinpath("boards", "chip.py"),
+			views_dir.joinpath("tags", "chip.py"),
 		)
 		assert spec is not None and spec.loader is not None
 		chip = importlib.util.module_from_spec(spec)
@@ -80,7 +80,7 @@ def test_provider_registers_components():
 			[
 				helios.view.Provider(
 					helios.view.Config(views_dir),
-					components=[chip.BoardChip],
+					components=[chip.TagChip],
 				)
 			],
 		)

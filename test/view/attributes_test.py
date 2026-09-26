@@ -79,19 +79,19 @@ def test_omits_empty_class_lists():
 
 
 def test_merges_classes_after_defaults_without_duplicates():
-	attributes = Attributes(class_=["pin-link", "external-link"])
+	attributes = Attributes(class_=["post-link", "external-link"])
 
 	merged = attributes.merge(class_="external-link link")
 
-	assert_eq(str(merged), 'class="external-link link pin-link"')
+	assert_eq(str(merged), 'class="external-link link post-link"')
 
 
 def test_merges_default_class_lists():
-	attributes = Attributes(class_="pin-link")
+	attributes = Attributes(class_="post-link")
 
 	merged = attributes.merge(class_=["external-link", False])
 
-	assert_eq(str(merged), 'class="external-link pin-link"')
+	assert_eq(str(merged), 'class="external-link post-link"')
 
 
 def test_prefers_caller_values_over_defaults():
@@ -103,19 +103,19 @@ def test_prefers_caller_values_over_defaults():
 
 
 def test_orders_defaults_before_caller_attributes():
-	attributes = Attributes(id="link", class_="pin-link")
+	attributes = Attributes(id="link", class_="post-link")
 
 	merged = attributes.merge(class_="external-link", data_turbo=False)
 
-	assert_eq(str(merged), 'class="external-link pin-link" id="link"')
+	assert_eq(str(merged), 'class="external-link post-link" id="link"')
 
 
 def test_merge_leaves_original_unchanged():
-	attributes = Attributes(class_="pin-link")
+	attributes = Attributes(class_="post-link")
 
 	attributes.merge(class_="external-link", id="link")
 
-	assert_eq(str(attributes), 'class="pin-link"')
+	assert_eq(str(attributes), 'class="post-link"')
 
 
 def test_builds_from_html_names():

@@ -7,39 +7,37 @@ from helios.http import Input
 
 
 def test_returns_submitted_values():
-	submitted_board_id = uuid4()
-	saved_board_id = uuid4()
+	submitted_tag_id = uuid4()
+	saved_tag_id = uuid4()
 	submission = Submission(
-		Input({"title": "Intro", "board_ids": [str(submitted_board_id)]})
+		Input({"title": "Intro", "tag_ids": [str(submitted_tag_id)]})
 	)
 
 	assert_eq(submission.value("title", "Old title"), "Intro")
-	assert_eq(
-		submission.value("board_ids", [saved_board_id]), [str(submitted_board_id)]
-	)
+	assert_eq(submission.value("tag_ids", [saved_tag_id]), [str(submitted_tag_id)])
 
 
 def test_treats_fields_missing_from_submitted_input_as_empty():
-	saved_board_id = uuid4()
+	saved_tag_id = uuid4()
 	submission = Submission(Input({"title": "Intro"}))
 
 	assert_eq(submission.value("note", "Old note"), "")
 	assert_eq(submission.value("open_in_new_tab", True), "")
-	assert_eq(submission.value("board_ids", [saved_board_id]), [])
+	assert_eq(submission.value("tag_ids", [saved_tag_id]), [])
 
 
 def test_shapes_submitted_values_by_default():
-	board_id = uuid4()
-	submission = Submission(Input({"board_ids": str(board_id)}))
+	tag_id = uuid4()
+	submission = Submission(Input({"tag_ids": str(tag_id)}))
 
-	assert_eq(submission.value("board_ids", []), [str(board_id)])
-	assert_eq(submission.value("board_ids"), str(board_id))
+	assert_eq(submission.value("tag_ids", []), [str(tag_id)])
+	assert_eq(submission.value("tag_ids"), str(tag_id))
 
 
 def test_encodes_defaults_without_submitted_input():
-	board_id = uuid4()
-	first_board_id = uuid4()
-	second_board_id = uuid4()
+	tag_id = uuid4()
+	first_tag_id = uuid4()
+	second_tag_id = uuid4()
 	submission = Submission()
 
 	assert_eq(submission.value("title"), "")
@@ -48,10 +46,10 @@ def test_encodes_defaults_without_submitted_input():
 	assert_eq(submission.value("open_in_new_tab", True), "on")
 	assert_eq(submission.value("open_in_new_tab", False), "")
 	assert_eq(submission.value("position", 3), "3")
-	assert_eq(submission.value("board_id", board_id), str(board_id))
+	assert_eq(submission.value("tag_id", tag_id), str(tag_id))
 	assert_eq(
-		submission.value("board_ids", (first_board_id, second_board_id)),
-		[str(first_board_id), str(second_board_id)],
+		submission.value("tag_ids", (first_tag_id, second_tag_id)),
+		[str(first_tag_id), str(second_tag_id)],
 	)
 	assert_eq(submission.value("flags", [True, False, None]), ["on", "", ""])
 

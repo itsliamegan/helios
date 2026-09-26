@@ -64,15 +64,15 @@ def test_creates_file_response():
 def test_gets_request_referrer():
 	request = Request(
 		Method.GET,
-		URL("/boards/123456/edit"),
-		Headers({"Referer": "/boards/"}),
+		URL("/posts/123456/edit"),
+		Headers({"Referer": "/posts/"}),
 	)
 
-	assert_eq(request.referrer, "/boards/")
+	assert_eq(request.referrer, "/posts/")
 
 
 def test_doesnt_get_empty_referrer():
-	request = Request(Method.GET, URL("/boards/example/edit"))
+	request = Request(Method.GET, URL("/posts/example/edit"))
 
 	assert_that(request.referrer is None)
 
