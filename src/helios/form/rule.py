@@ -2,6 +2,8 @@ from collections.abc import Hashable, Iterable, Sized
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from luna.inflect import count
+
 
 class RuleError(ValueError):
 	def __init__(self, message: str):
@@ -91,10 +93,3 @@ class Distinct:
 	def check(self, value: list[Any]):
 		if len(set(value)) != len(value):
 			raise RuleError("must not repeat a value")
-
-
-def count(number: int, unit: str) -> str:
-	if number == 1:
-		return f"1 {unit}"
-	else:
-		return f"{number} {unit}s"
