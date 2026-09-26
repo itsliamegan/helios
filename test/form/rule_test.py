@@ -144,7 +144,7 @@ def test_skips_rules_after_a_parse_error():
 
 	failure = failure_of(field, Input({"board_ids": ["not-a-uuid"]}))
 
-	assert_eq(failure.rule, "uuid")
+	assert_eq(failure.rule, "invalid")
 	assert_eq(failure.message, "must be a valid UUID")
 	assert_eq(recorded.values, [])
 

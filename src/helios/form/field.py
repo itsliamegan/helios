@@ -10,7 +10,7 @@ from helios.declarative import (
 )
 from helios.http import Input
 
-from .parser import Parser, RawValue, for_type, is_verbatim
+from .parser import ParseError, Parser, RawValue, for_type, is_untrimmed
 from .rule import Required, Rule, RuleError
 
 if TYPE_CHECKING:
@@ -29,7 +29,7 @@ class Field:
 	name: str
 	parser: Parser[Any]
 	default: object
-	verbatim: bool
+	untrimmed: bool
 	extra_rules: list[Rule[Any, Any]]
 
 	@property
@@ -40,29 +40,30 @@ class Field:
 	def initial(self) -> object:
 		return copy(self.default)
 
-	@property
-	def rules(self) -> list[Rule[Any, Any]]:
-		if self.required:
-			return [Required(), self.parser, *self.extra_rules]
-		else:
-			return [self.parser, *self.extra_rules]
-
 	def raw(self, input: Input) -> RawValue | None:
 		if self.name not in input:
 			return None
 
 		value = input[self.name]
-		if self.verbatim:
+		if self.untrimmed:
 			return value
 		else:
 			return trim(value)
 
 	def validate(self, input: Input) -> object:
 		value = self.raw(input)
-		if value is None and not self.required:
-			return self.initial
+		if value is None:
+			if self.required:
+				raise Failure(Required.name, Required.message)
+			else:
+				return self.initial
 
-		for rule in self.rules:
+		try:
+			value = self.parser.parse(value)
+		except ParseError as error:
+			raise Failure("invalid", error.message) from error
+
+		for rule in self.extra_rules:
 			try:
 				value = rule.check(value)
 			except RuleError as error:
@@ -96,7 +97,7 @@ def declare(declaration: Declaration[Field]) -> Field:
 		declaration.name,
 		parser,
 		declaration.default,
-		is_verbatim(annotation),
+		is_untrimmed(annotation),
 		[],
 	)
 

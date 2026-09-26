@@ -3,13 +3,13 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import Errors, Form, FormError, RuleError, Verbatim
+from helios.form import Errors, Form, FormError, RuleError, Untrimmed
 from helios.http import Input, URL
 
 
 class PinForm(Form):
 	title: str
-	note: Verbatim = Verbatim("")
+	note: Untrimmed = Untrimmed("")
 	board_ids: list[UUID] = []
 	return_to: str | None = None
 
@@ -90,9 +90,9 @@ def test_trims_list_items_and_drops_blank_ones():
 	assert_eq(form.board_ids, [board_id])
 
 
-def test_keeps_verbatim_fields_exactly_as_sent():
+def test_keeps_untrimmed_fields_exactly_as_sent():
 	class PasswordForm(Form):
-		password: Verbatim
+		password: Untrimmed
 
 	indented, _ = PinForm.validate(Input({"title": "Intro", "note": "  - item\n"}))
 	blank, blank_errors = PasswordForm.validate(Input({"password": ""}))
@@ -289,7 +289,7 @@ def test_overrides_messages_by_field_and_rule():
 		messages = {
 			"title.required": "Give the pin a title.",
 			"url.web_url": "Use a web address.",
-			"board_ids.uuid": "Choose boards from the list.",
+			"board_ids.invalid": "Choose boards from the list.",
 		}
 
 		title: str
