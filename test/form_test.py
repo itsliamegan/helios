@@ -80,10 +80,20 @@ def test_treats_blank_strings_as_missing():
 	assert_that(form.return_to is None)
 
 
-def test_trims_list_items_and_drops_blank_ones():
+def test_trims_list_items_and_keeps_blank_ones():
+	class TagsForm(Form):
+		tags: list[str] = []
+
+	form, errors = TagsForm.validate(Input({"tags": [" design ", " ", ""]}))
+
+	assert_that(not errors)
+	assert_eq(form.tags, ["design", "", ""])
+
+
+def test_trims_padded_list_items_before_parsing():
 	board_id = uuid4()
 	form, errors = PinForm.validate(
-		Input({"title": "Intro", "board_ids": [f" {board_id} ", " ", ""]})
+		Input({"title": "Intro", "board_ids": [f" {board_id} "]})
 	)
 
 	assert_that(not errors)
@@ -95,12 +105,21 @@ def test_keeps_untrimmed_fields_exactly_as_sent():
 		password: Untrimmed
 
 	indented, _ = PinForm.validate(Input({"title": "Intro", "note": "  - item\n"}))
-	blank, blank_errors = PasswordForm.validate(Input({"password": ""}))
-	_, missing_errors = PasswordForm.validate(Input())
+	padded, padded_errors = PasswordForm.validate(Input({"password": " secret "}))
 
 	assert_eq(indented.note, "  - item\n")
-	assert_that(not blank_errors)
-	assert_eq(blank.password, "")
+	assert_that(not padded_errors)
+	assert_eq(padded.password, " secret ")
+
+
+def test_treats_blank_untrimmed_fields_as_missing():
+	class PasswordForm(Form):
+		password: Untrimmed
+
+	_, blank_errors = PasswordForm.validate(Input({"password": "   "}))
+	_, missing_errors = PasswordForm.validate(Input())
+
+	assert_eq(blank_errors.messages["password"], ["Password must be provided."])
 	assert_eq(missing_errors.messages["password"], ["Password must be provided."])
 
 

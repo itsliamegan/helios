@@ -28,7 +28,7 @@ class Form:
 					"which Form uses"
 				)
 			field = declaration.resolve()
-			field.extra_rules = cls.rules.get(declaration.name, [])
+			field.rules = cls.rules.get(declaration.name, [])
 			cls.fields[declaration.name] = field
 			setattr(cls, declaration.name, field)
 
@@ -66,7 +66,7 @@ class Form:
 
 	@classmethod
 	def message(cls, name: str, failure: Failure) -> str:
-		key = f"{name}.{failure.rule}"
+		key = f"{name}.{failure.key}"
 		if key in cls.messages:
 			return cls.messages[key]
 		else:
