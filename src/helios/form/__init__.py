@@ -4,16 +4,19 @@ from .filter import Compact, Filter, Trim, Unspace, Upcase
 from .form import Form
 from .parser import Untrimmed
 from .provider import Provider
-from .rule import Rule, RuleError
+from .rule import Distinct, Length, Only, Rule, RuleError
 from .submission import Submission
 from .submissions import Submissions
 
 __all__ = [
 	"Compact",
+	"Distinct",
 	"Errors",
 	"Filter",
 	"Form",
 	"FormError",
+	"Length",
+	"Only",
 	"Provider",
 	"Rule",
 	"RuleError",

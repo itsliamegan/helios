@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import Errors, Form, FormError, RuleError, Untrimmed
+from helios.form import Distinct, Errors, Form, FormError, RuleError, Untrimmed
 from helios.http import Input, URL
 
 
@@ -231,24 +231,10 @@ def test_rejects_field_names_form_uses():
 
 class WebURL:
 	name = "web_url"
-	message = "must start with http:// or https://"
 
-	def check(self, value: str) -> str:
+	def check(self, value: str):
 		if not value.startswith(("http://", "https://")):
-			raise RuleError()
-		else:
-			return value
-
-
-class Distinct:
-	name = "distinct"
-	message = "must not repeat a value"
-
-	def check(self, values: list[UUID]) -> list[UUID]:
-		if len(set(values)) != len(values):
-			raise RuleError()
-		else:
-			return values
+			raise RuleError("must start with http:// or https://")
 
 
 def test_runs_rules_on_parsed_values():

@@ -11,7 +11,7 @@ from helios.declarative import (
 from helios.http import Input
 
 from .parser import ParseError, Parser, RawValue, for_type, is_untrimmed
-from .rule import Required, Rule, RuleError
+from .rule import Rule, RuleError
 
 if TYPE_CHECKING:
 	from .form import Form
@@ -30,7 +30,7 @@ class Field:
 	parser: Parser[Any]
 	default: object
 	untrimmed: bool
-	extra_rules: list[Rule[Any, Any]]
+	extra_rules: list[Rule[Any]]
 
 	@property
 	def required(self) -> bool:
@@ -54,7 +54,7 @@ class Field:
 		value = self.raw(input)
 		if value is None:
 			if self.required:
-				raise Failure(Required.name, Required.message)
+				raise Failure("required", "must be provided")
 			else:
 				return self.initial
 
@@ -65,9 +65,9 @@ class Field:
 
 		for rule in self.extra_rules:
 			try:
-				value = rule.check(value)
+				rule.check(value)
 			except RuleError as error:
-				raise Failure(rule.name, error.message or rule.message) from error
+				raise Failure(rule.name, error.message) from error
 		return value
 
 	def __get__(self, form: Form | None, owner: type) -> Any:

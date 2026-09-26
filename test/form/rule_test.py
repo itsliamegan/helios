@@ -1,86 +1,132 @@
+from uuid import uuid4
+
 from luna.test.assertion import assert_eq, assert_raises
 
 from helios.declarative import MISSING
-from helios.form import RuleError, parser
+from helios.form import Distinct, Length, Only, RuleError, parser
 from helios.form.form import Failure, Field
-from helios.form.rule import Required
 from helios.http import Input
 
 
-class Lowercase:
-	name = "lowercase"
-	message = "must be lowercase"
+def test_names_built_in_rules():
+	assert_eq(
+		[Length(exactly=1).name, Only("ab").name, Distinct().name],
+		["length", "only", "distinct"],
+	)
 
-	def check(self, value: str) -> str:
-		return value.lower()
+
+def test_length_accepts_values_within_its_limits():
+	Length(exactly=4).check("ABCD")
+	Length(minimum=3).check("abc")
+	Length(maximum=3).check("abc")
+	Length(minimum=1, maximum=3).check(["design", "reading"])
+	Length(maximum=0).check([])
+
+
+def test_length_rejects_strings_by_character_count():
+	assert_rule_error(Length(exactly=10), "short", "must be 10 characters")
+	assert_rule_error(Length(minimum=3), "ab", "must be at least 3 characters")
+	assert_rule_error(Length(maximum=200), "a" * 201, "must be at most 200 characters")
+	assert_rule_error(
+		Length(minimum=3, maximum=20),
+		"ab",
+		"must be between 3 and 20 characters",
+	)
+	assert_rule_error(
+		Length(minimum=3, maximum=20),
+		"a" * 21,
+		"must be between 3 and 20 characters",
+	)
+
+
+def test_length_rejects_lists_by_item_count():
+	assert_rule_error(Length(exactly=10), ["a"], "must have 10 items")
+	assert_rule_error(Length(minimum=3), ["a", "b"], "must have at least 3 items")
+	assert_rule_error(Length(maximum=2), ["a", "b", "c"], "must have at most 2 items")
+	assert_rule_error(
+		Length(minimum=3, maximum=20),
+		[],
+		"must have between 3 and 20 items",
+	)
+
+
+def test_length_uses_a_singular_unit_for_a_limit_of_one():
+	assert_rule_error(Length(exactly=1), "ab", "must be 1 character")
+	assert_rule_error(Length(minimum=1), "", "must be at least 1 character")
+	assert_rule_error(Length(maximum=1), ["a", "b"], "must have at most 1 item")
+
+
+def test_length_requires_a_limit():
+	with assert_raises(TypeError):
+		Length()
+
+
+def test_length_rejects_exactly_with_a_bound():
+	with assert_raises(TypeError):
+		Length(exactly=3, minimum=1)
+	with assert_raises(TypeError):
+		Length(exactly=3, maximum=5)
+
+
+def test_length_rejects_a_minimum_above_its_maximum():
+	with assert_raises(TypeError):
+		Length(minimum=5, maximum=3)
+
+
+def test_only_checks_the_characters_of_a_string():
+	rule = Only("ABCDEF")
+
+	rule.check("FACADE")
+	rule.check("")
+	assert_rule_error(rule, "FACADE1", "must only contain allowed characters")
+	assert_rule_error(rule, "AB CD", "must only contain allowed characters")
+
+
+def test_only_checks_the_items_of_a_list():
+	rule = Only(["design", "reading"])
+
+	rule.check(["reading", "design", "reading"])
+	assert_rule_error(rule, ["design", "art"], "must only contain allowed items")
+
+
+def test_only_compares_whole_items_of_a_list():
+	rule = Only("ABC")
+
+	assert_rule_error(rule, ["AB"], "must only contain allowed items")
+
+
+def test_distinct_rejects_repeated_items():
+	board_id = uuid4()
+	rule = Distinct()
+
+	rule.check([board_id, uuid4()])
+	rule.check([])
+	assert_rule_error(rule, [board_id, board_id], "must not repeat a value")
+
+
+def assert_rule_error(rule, value, message):
+	with assert_raises(RuleError) as raised:
+		rule.check(value)
+
+	assert_eq(raised.exception.message, message)
 
 
 class WebURL:
 	name = "web_url"
-	message = "must start with http:// or https://"
 
-	def check(self, value: str) -> str:
+	def check(self, value: str):
 		if not value.startswith(("http://", "https://")):
-			raise RuleError()
-		else:
-			return value
-
-
-class MaxLength:
-	name = "max_length"
-
-	def __init__(self, limit: int):
-		self.limit = limit
-
-	@property
-	def message(self) -> str:
-		return f"must be at most {self.limit} characters"
-
-	def check(self, value: str) -> str:
-		if len(value) > self.limit:
-			raise RuleError()
-		else:
-			return value
-
-
-class Available:
-	name = "available"
-	message = "must be available"
-
-	def check(self, value: str) -> str:
-		raise RuleError("must not be a reserved name")
+			raise RuleError("must start with http:// or https://")
 
 
 class Recorded:
 	name = "recorded"
-	message = "never fails"
 
 	def __init__(self):
 		self.values = []
 
-	def check(self, value: str) -> str:
+	def check(self, value: str):
 		self.values.append(value)
-		return value
-
-
-def test_required_passes_present_values():
-	assert_eq(Required().check("Intro"), "Intro")
-
-
-def test_required_rejects_missing_values():
-	with assert_raises(RuleError) as raised:
-		Required().check(None)
-
-	assert_eq(raised.exception.message, None)
-	assert_eq((Required.name, Required.message), ("required", "must be provided"))
-
-
-def test_runs_rules_in_order_on_parsed_values():
-	field = text_field("url", [Lowercase(), WebURL()])
-
-	assert_eq(
-		field.validate(Input({"url": " HTTPS://Example.com "})), "https://example.com"
-	)
 
 
 def test_reports_the_failing_rule_and_its_message():
@@ -90,24 +136,6 @@ def test_reports_the_failing_rule_and_its_message():
 
 	assert_eq(failure.rule, "web_url")
 	assert_eq(failure.message, "must start with http:// or https://")
-
-
-def test_rules_with_parameters_supply_their_messages():
-	field = text_field("title", [MaxLength(3)])
-
-	failure = failure_of(field, Input({"title": "Hello"}))
-
-	assert_eq(failure.rule, "max_length")
-	assert_eq(failure.message, "must be at most 3 characters")
-
-
-def test_rule_errors_can_replace_the_default_message():
-	field = text_field("handle", [Available()])
-
-	failure = failure_of(field, Input({"handle": "admin"}))
-
-	assert_eq(failure.rule, "available")
-	assert_eq(failure.message, "must not be a reserved name")
 
 
 def test_stops_at_the_first_failing_rule():

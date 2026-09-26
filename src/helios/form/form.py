@@ -14,7 +14,7 @@ from .rule import Rule
 @dataclass_transform(kw_only_default=True, eq_default=False)
 class Form:
 	fields: ClassVar[dict[str, Field]] = {}
-	rules: ClassVar[dict[str, list[Rule[Any, Any]]]] = {}
+	rules: ClassVar[dict[str, list[Rule[Any]]]] = {}
 	messages: ClassVar[dict[str, str]] = {}
 
 	def __init_subclass__(cls, **keywords: Any):
