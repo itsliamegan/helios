@@ -1,19 +1,23 @@
 from typing import Any, ClassVar, Self, dataclass_transform
 
-from luna.inflect import sentence
+from luna.inflect import sentence, words
 
 from helios.declarative import check_init_keywords, check_single_base, declarations
 from helios.http import Input
 
 from .error import FormError
 from .errors import Errors
-from .field import Failure, Field, declare
+from .field import Failure, Field, INVALID, declare
+from .filter import Filter
 from .rule import Rule
+
+ITEMS = "*"
 
 
 @dataclass_transform(kw_only_default=True, eq_default=False)
 class Form:
 	fields: ClassVar[dict[str, Field]] = {}
+	filters: ClassVar[dict[str, list[Filter[Any]]]] = {}
 	rules: ClassVar[dict[str, list[Rule[Any]]]] = {}
 	messages: ClassVar[dict[str, str]] = {}
 
@@ -28,15 +32,22 @@ class Form:
 					"which Form uses"
 				)
 			field = declaration.resolve()
-			field.rules = cls.rules.get(declaration.name, [])
 			cls.fields[declaration.name] = field
 			setattr(cls, declaration.name, field)
 
-		for name in cls.rules:
-			if name not in cls.fields:
-				raise FormError(
-					f"Form {cls.__name__} has rules for '{name}', which is not a field"
-				)
+		for key, filters in cls.filters.items():
+			field, items = target(cls, "filters", key)
+			if items:
+				field.item_filters = filters
+			else:
+				field.filters = filters
+
+		for key, rules in cls.rules.items():
+			field, items = target(cls, "rules", key)
+			if items:
+				field.item_rules = rules
+			else:
+				field.rules = rules
 
 	def __init__(self, **values: Any):
 		form = type(self)
@@ -66,9 +77,15 @@ class Form:
 
 	@classmethod
 	def message(cls, name: str, failure: Failure) -> str:
-		key = f"{name}.{failure.key}"
+		if failure.item and failure.key != INVALID:
+			key = f"{name}.{ITEMS}.{failure.key}"
+		else:
+			key = f"{name}.{failure.key}"
+
 		if key in cls.messages:
 			return cls.messages[key]
+		elif failure.item:
+			return f"An item in {" ".join(words(name))} {failure.message}."
 		else:
 			return f"{sentence(name)} {failure.message}."
 
@@ -82,3 +99,23 @@ class Form:
 
 
 RESERVED = {"values", *vars(Form)}
+
+
+def target(form: type[Form], kind: str, key: str) -> tuple[Field, bool]:
+	name, separator, rest = key.partition(".")
+	if name not in form.fields:
+		raise FormError(
+			f"Form {form.__name__} has {kind} for '{key}', which is not a field"
+		)
+	if separator and rest != ITEMS:
+		raise FormError(
+			f"Form {form.__name__} has {kind} for '{key}', "
+			f"which is neither '{name}' nor '{name}.{ITEMS}'"
+		)
+
+	field = form.fields[name]
+	if separator and not field.is_list:
+		raise FormError(
+			f"Form {form.__name__} has {kind} for '{key}', but '{name}' is not a list"
+		)
+	return field, bool(separator)

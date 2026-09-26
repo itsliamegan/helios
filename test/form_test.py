@@ -3,7 +3,18 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.form import Distinct, Errors, Form, FormError, RuleError, Untrimmed
+from helios.form import (
+	Compact,
+	Distinct,
+	Errors,
+	Form,
+	FormError,
+	Length,
+	RuleError,
+	Unspace,
+	Untrimmed,
+	Upcase,
+)
 from helios.http import Input, URL
 
 
@@ -124,13 +135,22 @@ def test_treats_blank_untrimmed_fields_as_missing():
 
 
 def test_records_parse_errors_with_readable_field_names():
+	form, errors = PinForm.validate(Input({"title": "Intro", "return_to": ["/", "/"]}))
+
+	assert_eq(form.title, "Intro")
+	assert_eq(errors.messages, {"return_to": ["Return to must be a single value."]})
+
+
+def test_words_list_item_parse_errors_as_items():
 	board_id = uuid4()
-	form, errors = PinForm.validate(
+	_, errors = PinForm.validate(
 		Input({"title": "Intro", "board_ids": [str(board_id), "not-a-uuid"]})
 	)
 
-	assert_eq(form.title, "Intro")
-	assert_eq(errors.messages, {"board_ids": ["Board ids must be a valid UUID."]})
+	assert_eq(
+		errors.messages,
+		{"board_ids": ["An item in board ids must be a valid UUID."]},
+	)
 
 
 def test_rejects_repeated_scalar_values():
@@ -327,6 +347,139 @@ def test_rejects_rules_for_undeclared_fields():
 		str(raised.exception),
 		"Form LinkForm has rules for 'link', which is not a field",
 	)
+
+
+def test_applies_filters_before_rules():
+	class SignInForm(Form):
+		filters = {"recovery_code": [Unspace(), Upcase()]}
+		rules = {"recovery_code": [Length(exactly=8)]}
+
+		recovery_code: str
+
+	form, errors = SignInForm.validate(Input({"recovery_code": " abcd efgh "}))
+
+	assert_that(not errors)
+	assert_eq(form.recovery_code, "ABCDEFGH")
+
+
+def test_applies_item_filters_and_rules():
+	class TagsForm(Form):
+		filters = {"tags.*": [Upcase()], "tags": [Compact()]}
+		rules = {"tags.*": [Length(maximum=5)], "tags": [Distinct()]}
+
+		tags: list[str] = []
+
+	form, errors = TagsForm.validate(Input({"tags": [" art ", "", "news"]}))
+	_, item_errors = TagsForm.validate(Input({"tags": ["art", "reading"]}))
+	_, list_errors = TagsForm.validate(Input({"tags": ["art", "ART"]}))
+
+	assert_that(not errors)
+	assert_eq(form.tags, ["ART", "NEWS"])
+	assert_eq(
+		item_errors.messages,
+		{"tags": ["An item in tags must be at most 5 characters."]},
+	)
+	assert_eq(list_errors.messages, {"tags": ["Tags must not repeat a value."]})
+
+
+def test_overrides_item_messages_by_items_key():
+	class TagsForm(Form):
+		rules = {"tag_names.*": [Length(maximum=5)], "tag_names": [Length(maximum=1)]}
+		messages = {
+			"tag_names.*.length": "Tags must be at most 5 characters.",
+			"tag_names.length": "Choose one tag.",
+		}
+
+		tag_names: list[str] = []
+
+	_, item_errors = TagsForm.validate(Input({"tag_names": ["reading"]}))
+	_, list_errors = TagsForm.validate(Input({"tag_names": ["art", "news"]}))
+
+	assert_eq(
+		item_errors.messages,
+		{"tag_names": ["Tags must be at most 5 characters."]},
+	)
+	assert_eq(list_errors.messages, {"tag_names": ["Choose one tag."]})
+
+
+def test_overrides_item_parse_messages_by_invalid_key():
+	class BoardsForm(Form):
+		messages = {
+			"board_ids.*.invalid": "Unused.",
+			"board_ids.invalid": "Choose boards from the list.",
+		}
+
+		board_ids: list[UUID] = []
+
+	_, errors = BoardsForm.validate(Input({"board_ids": ["not-a-uuid"]}))
+
+	assert_eq(errors.messages, {"board_ids": ["Choose boards from the list."]})
+
+
+def test_rejects_filters_for_undeclared_fields():
+	with assert_raises(FormError) as raised:
+
+		class SignInForm(Form):
+			filters = {"code": [Upcase()]}
+
+			recovery_code: str
+
+	assert_eq(
+		str(raised.exception),
+		"Form SignInForm has filters for 'code', which is not a field",
+	)
+
+
+def test_rejects_item_keys_for_undeclared_fields():
+	with assert_raises(FormError) as raised:
+
+		class TagsForm(Form):
+			rules = {"labels.*": [Length(maximum=5)]}
+
+			tags: list[str] = []
+
+	assert_eq(
+		str(raised.exception),
+		"Form TagsForm has rules for 'labels.*', which is not a field",
+	)
+
+
+def test_rejects_item_keys_for_fields_that_are_not_lists():
+	with assert_raises(FormError) as raised:
+
+		class SignInForm(Form):
+			filters = {"recovery_code.*": [Upcase()]}
+
+			recovery_code: str
+
+	assert_eq(
+		str(raised.exception),
+		"Form SignInForm has filters for 'recovery_code.*', "
+		"but 'recovery_code' is not a list",
+	)
+
+
+def test_rejects_anything_after_the_items_marker():
+	with assert_raises(FormError) as raised:
+
+		class TagsForm(Form):
+			rules = {"tags.*.name": [Length(maximum=5)]}
+
+			tags: list[str] = []
+
+	assert_eq(
+		str(raised.exception),
+		"Form TagsForm has rules for 'tags.*.name', which is neither 'tags' nor 'tags.*'",
+	)
+
+
+def test_rejects_keys_with_a_suffix_other_than_the_items_marker():
+	with assert_raises(FormError):
+
+		class TagsForm(Form):
+			rules = {"tags.first": [Length(maximum=5)]}
+
+			tags: list[str] = []
 
 
 def test_controllers_add_their_own_errors():
