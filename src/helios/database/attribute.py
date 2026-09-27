@@ -3,7 +3,7 @@ from typing import Any, TYPE_CHECKING
 
 from helios.declarative import Declaration, DeclarationError, MISSING, split_nullable
 
-from .codec import Codec, Stored, encode, for_type
+from .codec import Codec, Stored, encode
 from .error import ModelError
 
 if TYPE_CHECKING:
@@ -93,7 +93,7 @@ def generated(init: bool = False) -> Any:
 
 def declare(declaration: Declaration[Encoding]) -> Encoding:
 	annotation, nullable = split_nullable(declaration.name, declaration.annotation)
-	codec = for_type(annotation)
+	codec = Codec.for_type(annotation)
 	if codec is None:
 		raise DeclarationError(
 			declaration.name,

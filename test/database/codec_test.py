@@ -59,7 +59,7 @@ def test_normalizes_datetimes_to_canonical_utc_text():
 
 
 def test_supports_custom_codec():
-	class Uppercase:
+	class Uppercase(codec.Codec[str]):
 		def check(self, value: object):
 			if not isinstance(value, str):
 				raise TypeError("expected a string")
@@ -78,11 +78,36 @@ def test_supports_custom_codec():
 
 	assert_eq(encoded, "EXAMPLE")
 	assert_eq(uppercase.decode(encoded), "example")
-	assert_that(isinstance(uppercase, codec.Codec))
+
+
+def test_finds_codecs_for_types():
+	class Slug:
+		def __init__(self, text: str):
+			self.text = text
+
+		class Codec(codec.Codec):
+			def check(self, value: object):
+				if not isinstance(value, Slug):
+					raise TypeError("expected a Slug")
+
+			def encode(self, value: Slug) -> codec.Stored:
+				self.check(value)
+				return value.text
+
+			def decode(self, value: codec.Stored) -> Slug:
+				return Slug(str(value))
+
+	found = codec.Codec.for_type(Slug)
+
+	assert_that(isinstance(codec.Codec.for_type(str), codec.Str))
+	assert_that(isinstance(found, Slug.Codec))
+	assert_eq(codec.encode(found, Slug("today")), "today")
+	assert_eq(codec.Codec.for_type(list[str]), None)
+	assert_eq(codec.Codec.for_type(object), None)
 
 
 def test_rejects_non_scalar_custom_encoding():
-	class Invalid:
+	class Invalid(codec.Codec[str]):
 		def check(self, value: object):
 			pass
 

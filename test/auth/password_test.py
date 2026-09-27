@@ -20,7 +20,7 @@ def test_creates_and_matches_password():
 
 def test_redacts_password_representation():
 	password = Password.from_plaintext("secret")
-	encoded = Password.encode(password)
+	encoded = Password.Codec().encode(password)
 
 	assert_that(encoded not in repr(password))
 	assert_that("secret" not in repr(password))
@@ -72,7 +72,7 @@ def test_round_trips_password_attrs():
 
 def test_rejects_malformed_encoded_password():
 	with assert_raises(TypeError):
-		Password.decode(42)
+		Password.Codec().decode(42)
 
 
 def test_generates_and_checks_digest():

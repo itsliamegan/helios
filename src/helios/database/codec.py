@@ -1,6 +1,6 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from datetime import UTC, datetime
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 import uuid
 
 from helios import http
@@ -8,8 +8,20 @@ from helios import http
 type Stored = int | float | str | bytes
 
 
-@runtime_checkable
-class Codec[T](Protocol):
+class Codec[T](ABC):
+	@classmethod
+	def for_type(cls, annotation: object) -> Codec[Any] | None:
+		try:
+			found = CODECS.get(annotation)
+		except TypeError:
+			found = None
+
+		if found is None and isinstance(annotation, type):
+			declared = vars(annotation).get("Codec")
+			if isinstance(declared, type) and issubclass(declared, Codec):
+				return declared()
+		return found
+
 	@abstractmethod
 	def check(self, value: object): ...
 
@@ -141,15 +153,3 @@ CODECS: dict[object, Codec[Any]] = {
 	datetime: Date(),
 	http.URL: URL(),
 }
-
-
-def for_type(annotation: object) -> Codec[Any] | None:
-	try:
-		found = CODECS.get(annotation)
-	except TypeError:
-		found = None
-
-	if found is None and isinstance(annotation, Codec):
-		return annotation
-	else:
-		return found

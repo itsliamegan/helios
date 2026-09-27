@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.database import Model, ModelError, generated
+from helios.database import Codec, Model, ModelError, Stored, generated
 
 
 def test_constructs_model_with_table_defaults_and_nulls():
@@ -102,18 +102,16 @@ def test_resolves_codecs_nested_in_the_model():
 			def __init__(self, text: str):
 				self.text = text
 
-			@classmethod
-			def check(cls, value: object):
-				if not isinstance(value, cls):
-					raise TypeError("expected a Slug")
+			class Codec(Codec):
+				def check(self, value: object):
+					if not isinstance(value, Post.Slug):
+						raise TypeError("expected a Slug")
 
-			@classmethod
-			def encode(cls, value: Post.Slug) -> str:
-				return value.text
+				def encode(self, value: Post.Slug) -> Stored:
+					return value.text
 
-			@classmethod
-			def decode(cls, value: object) -> Post.Slug:
-				return cls(str(value))
+				def decode(self, value: Stored) -> Post.Slug:
+					return Post.Slug(str(value))
 
 		slug: Slug
 
@@ -130,18 +128,16 @@ def test_resolves_codecs_that_refer_to_the_model():
 			def __init__(self, text: str):
 				self.text = text
 
-			@classmethod
-			def check(cls, value: object):
-				if not isinstance(value, cls):
-					raise TypeError("expected a Slug")
+			class Codec(Codec):
+				def check(self, value: object):
+					if not isinstance(value, Post.Slug):
+						raise TypeError("expected a Slug")
 
-			@classmethod
-			def encode(cls, value: Post.Slug) -> str:
-				return value.text
+				def encode(self, value: Post.Slug) -> Stored:
+					return value.text
 
-			@classmethod
-			def decode(cls, value: object) -> Post.Slug:
-				return cls(str(value))
+				def decode(self, value: Stored) -> Post.Slug:
+					return Post.Slug(str(value))
 
 		slug: Post.Slug | None = None
 
@@ -160,18 +156,16 @@ def test_resolves_codecs_declared_after_the_model():
 		def __init__(self, text: str):
 			self.text = text
 
-		@classmethod
-		def check(cls, value: object):
-			if not isinstance(value, cls):
-				raise TypeError("expected a Slug")
+		class Codec(Codec):
+			def check(self, value: object):
+				if not isinstance(value, Slug):
+					raise TypeError("expected a Slug")
 
-		@classmethod
-		def encode(cls, value: Slug) -> str:
-			return value.text
+			def encode(self, value: Slug) -> Stored:
+				return value.text
 
-		@classmethod
-		def decode(cls, value: object) -> Slug:
-			return cls(str(value))
+			def decode(self, value: Stored) -> Slug:
+				return Slug(str(value))
 
 	post = Post(slug=Slug("intro"))
 
