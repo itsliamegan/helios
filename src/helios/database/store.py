@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from .codec import Scalar
+from .codec import Stored
 from .error import DatabaseError, ModelError, NotFoundError
 from .model import Lifecycle, Model
 from .query import Filter, Membership, Query
@@ -184,7 +184,7 @@ class Store:
 		self,
 		model_type: type[T],
 		column_names: tuple[str, ...],
-		row: tuple[Scalar | None, ...],
+		row: tuple[Stored | None, ...],
 	) -> T:
 		expected = tuple(model_type.attributes)
 		if (

@@ -18,6 +18,18 @@ class ParseError(ValueError):
 
 
 class Parser[T](ABC):
+	@classmethod
+	def for_type(cls, annotation: object) -> Parser[Any] | None:
+		if get_origin(annotation) is not list:
+			return scalar(annotation)
+
+		(item,) = get_args(annotation)
+		item_parser = scalar(item)
+		if item_parser is None:
+			return None
+		else:
+			return List(item_parser)
+
 	@abstractmethod
 	def parse(self, value: RawValue) -> T: ...
 
@@ -94,18 +106,6 @@ SCALARS: dict[Any, Parser[Any]] = {
 	uuid.UUID: UUID(),
 	http.URL: URL(),
 }
-
-
-def for_type(annotation: object) -> Parser[Any] | None:
-	if get_origin(annotation) is not list:
-		return scalar(annotation)
-
-	(item,) = get_args(annotation)
-	item_parser = scalar(item)
-	if item_parser is None:
-		return None
-	else:
-		return List(item_parser)
 
 
 def is_trimmed(annotation: Any) -> bool:

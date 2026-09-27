@@ -68,7 +68,7 @@ def test_supports_custom_codec():
 			self.check(value)
 			return value.upper()
 
-		def decode(self, value: codec.Scalar):
+		def decode(self, value: codec.Stored):
 			if not isinstance(value, str):
 				raise TypeError("expected a string")
 			return value.lower()
@@ -89,7 +89,7 @@ def test_rejects_non_scalar_custom_encoding():
 		def encode(self, value: str):
 			return [value]
 
-		def decode(self, value: codec.Scalar):
+		def decode(self, value: codec.Stored):
 			return value
 
 	class InvalidDictionary(Invalid):

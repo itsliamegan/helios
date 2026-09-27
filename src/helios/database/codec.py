@@ -5,7 +5,7 @@ import uuid
 
 from helios import http
 
-type Scalar = int | float | str | bytes
+type Stored = int | float | str | bytes
 
 
 @runtime_checkable
@@ -14,21 +14,23 @@ class Codec[T](Protocol):
 	def check(self, value: object): ...
 
 	@abstractmethod
-	def encode(self, value: T) -> Scalar: ...
+	def encode(self, value: T) -> Stored: ...
 
 	@abstractmethod
-	def decode(self, value: Scalar) -> T: ...
+	def decode(self, value: Stored) -> T: ...
 
 
-def encode[T](codec: Codec[T], value: T) -> Scalar:
+def encode[T](codec: Codec[T], value: T) -> Stored:
 	encoded = codec.encode(value)
 	if isinstance(encoded, bool) or not isinstance(encoded, int | float | str | bytes):
-		raise TypeError(f"expected a SQLite scalar, got {type(encoded).__name__}")
+		raise TypeError(
+			f"expected a value SQLite can store, got {type(encoded).__name__}"
+		)
 	return encoded
 
 
 class Text[T](Codec[T]):
-	def text(self, value: Scalar) -> str:
+	def text(self, value: Stored) -> str:
 		if isinstance(value, str):
 			return value
 		else:
@@ -40,11 +42,11 @@ class Str(Text[str]):
 		if not isinstance(value, str):
 			raise TypeError(f"expected a string, got {type(value).__name__}")
 
-	def encode(self, value: str) -> Scalar:
+	def encode(self, value: str) -> Stored:
 		self.check(value)
 		return value
 
-	def decode(self, value: Scalar) -> str:
+	def decode(self, value: Stored) -> str:
 		return self.text(value)
 
 
@@ -53,11 +55,11 @@ class Bool(Codec[bool]):
 		if not isinstance(value, bool):
 			raise TypeError(f"expected a boolean, got {type(value).__name__}")
 
-	def encode(self, value: bool) -> Scalar:
+	def encode(self, value: bool) -> Stored:
 		self.check(value)
 		return 1 if value else 0
 
-	def decode(self, value: Scalar) -> bool:
+	def decode(self, value: Stored) -> bool:
 		if not isinstance(value, int) or isinstance(value, bool) or value not in (0, 1):
 			raise TypeError("expected the integer 0 or 1")
 		return bool(value)
@@ -68,11 +70,11 @@ class Int(Codec[int]):
 		if not isinstance(value, int) or isinstance(value, bool):
 			raise TypeError(f"expected an integer, got {type(value).__name__}")
 
-	def encode(self, value: int) -> Scalar:
+	def encode(self, value: int) -> Stored:
 		self.check(value)
 		return value
 
-	def decode(self, value: Scalar) -> int:
+	def decode(self, value: Stored) -> int:
 		if not isinstance(value, int) or isinstance(value, bool):
 			raise TypeError(f"expected an integer, got {type(value).__name__}")
 		return value
@@ -83,11 +85,11 @@ class UUID(Text[uuid.UUID]):
 		if not isinstance(value, uuid.UUID):
 			raise TypeError(f"expected a UUID, got {type(value).__name__}")
 
-	def encode(self, value: uuid.UUID) -> Scalar:
+	def encode(self, value: uuid.UUID) -> Stored:
 		self.check(value)
 		return str(value)
 
-	def decode(self, value: Scalar) -> uuid.UUID:
+	def decode(self, value: Stored) -> uuid.UUID:
 		text = self.text(value)
 		decoded = uuid.UUID(text)
 		if str(decoded) != text:
@@ -106,11 +108,11 @@ class Date(Text[datetime]):
 		):
 			raise TypeError(f"expected an aware datetime, got {type(value).__name__}")
 
-	def encode(self, value: datetime) -> Scalar:
+	def encode(self, value: datetime) -> Stored:
 		self.check(value)
 		return value.astimezone(UTC).strftime(self.FORMAT)
 
-	def decode(self, value: Scalar) -> datetime:
+	def decode(self, value: Stored) -> datetime:
 		text = self.text(value)
 		decoded = datetime.strptime(text, self.FORMAT).replace(tzinfo=UTC)
 		if decoded.strftime(self.FORMAT) != text:
@@ -123,11 +125,11 @@ class URL(Text[http.URL]):
 		if not isinstance(value, http.URL):
 			raise TypeError(f"expected a URL, got {type(value).__name__}")
 
-	def encode(self, value: http.URL) -> Scalar:
+	def encode(self, value: http.URL) -> Stored:
 		self.check(value)
 		return str(value)
 
-	def decode(self, value: Scalar) -> http.URL:
+	def decode(self, value: Stored) -> http.URL:
 		return http.URL(self.text(value))
 
 
@@ -141,13 +143,13 @@ CODECS: dict[object, Codec[Any]] = {
 }
 
 
-def for_type(value_type: object) -> Codec[Any] | None:
+def for_type(annotation: object) -> Codec[Any] | None:
 	try:
-		found = CODECS.get(value_type)
+		found = CODECS.get(annotation)
 	except TypeError:
 		found = None
 
-	if found is None and isinstance(value_type, Codec):
-		return value_type
+	if found is None and isinstance(annotation, Codec):
+		return annotation
 	else:
 		return found

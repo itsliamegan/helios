@@ -11,7 +11,7 @@ from helios.declarative import (
 from helios.http import Input
 
 from .filter import blank
-from .parser import List, Parser, for_type, is_trimmed
+from .parser import List, Parser, is_trimmed
 
 if TYPE_CHECKING:
 	from .form import Form
@@ -66,7 +66,7 @@ class Field:
 
 def declare(declaration: Declaration[Field]) -> Field:
 	annotation, _ = split_nullable(declaration.name, declaration.annotation)
-	parser = for_type(annotation)
+	parser = Parser.for_type(annotation)
 	if parser is None:
 		raise DeclarationError(
 			declaration.name,
