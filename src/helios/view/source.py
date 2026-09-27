@@ -1,5 +1,5 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Protocol
 
 
 @dataclass
@@ -9,9 +9,12 @@ class Source:
 	version: int
 
 
-class Driver(Protocol):
+class Driver(ABC):
+	@abstractmethod
 	def names(self) -> list[str]: ...
 
+	@abstractmethod
 	def source(self, name: str) -> Source | None: ...
 
+	@abstractmethod
 	def is_current(self, name: str, source: Source) -> bool: ...

@@ -9,12 +9,14 @@ from luna.test.assertion import assert_eq, assert_raises, assert_that
 
 from helios import http
 from helios.database import (
+	Codec,
 	Config,
 	DatabaseError,
 	Lifecycle,
 	Model,
 	ModelError,
 	NotFoundError,
+	Scalar,
 	Store,
 )
 from helios.database.sqlite import connect
@@ -24,21 +26,19 @@ class Token:
 	def __init__(self, value: str):
 		self.value = value
 
-	@classmethod
-	def check(cls, value: object):
-		if not isinstance(value, cls):
-			raise TypeError("expected a Token")
+	class Codec(Codec):
+		def check(self, value: object):
+			if not isinstance(value, Token):
+				raise TypeError("expected a Token")
 
-	@classmethod
-	def encode(cls, value: Token):
-		cls.check(value)
-		return value.value
+		def encode(self, value: Token) -> Scalar:
+			self.check(value)
+			return value.value
 
-	@classmethod
-	def decode(cls, value: float | str | bytes):
-		if not isinstance(value, str):
-			raise TypeError("expected token text")
-		return cls(value)
+		def decode(self, value: Scalar) -> Token:
+			if not isinstance(value, str):
+				raise TypeError("expected token text")
+			return Token(value)
 
 
 class Record(Model):
@@ -380,18 +380,16 @@ def test_round_trips_models_with_codecs_declared_later():
 		def __init__(self, text: str):
 			self.text = text
 
-		@classmethod
-		def check(cls, value: object):
-			if not isinstance(value, cls):
-				raise TypeError("expected a Label")
+		class Codec(Codec):
+			def check(self, value: object):
+				if not isinstance(value, Label):
+					raise TypeError("expected a Label")
 
-		@classmethod
-		def encode(cls, value: Label) -> str:
-			return value.text
+			def encode(self, value: Label) -> Scalar:
+				return value.text
 
-		@classmethod
-		def decode(cls, value: object) -> Label:
-			return cls(str(value))
+			def decode(self, value: Scalar) -> Label:
+				return Label(str(value))
 
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")

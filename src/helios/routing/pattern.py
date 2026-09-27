@@ -4,7 +4,7 @@ from urllib.parse import quote
 
 from helios.http import URL
 
-from . import convert
+from .convert import Converter
 
 PARAM_REGEX = re.compile(r"{(\w+)(?::(\w+))?}")
 PARAM_VALUE_REGEX = r"[\w-]+"
@@ -12,14 +12,15 @@ PARAM_VALUE_REGEX = r"[\w-]+"
 
 class Pattern:
 	def __init__(self, raw: str):
-		self.converters: dict[str, convert.Converter] = {}
+		self.converters: dict[str, Converter[Any]] = {}
 		lit = raw
 		for param in PARAM_REGEX.finditer(raw):
 			name, converter_name = param.groups()
 			converter_name = converter_name or "str"
-			if converter_name not in convert.CONVERTERS:
+			converter = Converter.for_name(converter_name)
+			if converter is None:
 				raise ValueError(f"Unknown pattern converter: {converter_name}")
-			self.converters[name] = convert.CONVERTERS[converter_name]
+			self.converters[name] = converter
 			lit = lit.replace(param.group(), f"(?P<{name}>{PARAM_VALUE_REGEX})")
 
 		if lit.endswith("/"):
@@ -55,7 +56,7 @@ class Pattern:
 
 		def replace(match: re.Match[str]) -> str:
 			name = match.group(1)
-			value = str(self.converters[name](str(params[name])))
+			value = self.converters[name].format(params[name])
 			encoded = quote(value, safe="")
 			if re.fullmatch(PARAM_VALUE_REGEX, encoded) is None:
 				raise ValueError(f"invalid route parameter: {name}")
@@ -66,7 +67,8 @@ class Pattern:
 	def convert(self, raw_params: dict[str, str]) -> dict[str, Any] | None:
 		try:
 			return {
-				name: self.converters[name](value) for name, value in raw_params.items()
+				name: self.converters[name].convert(value)
+				for name, value in raw_params.items()
 			}
 		except ValueError:
 			return None

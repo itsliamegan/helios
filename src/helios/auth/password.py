@@ -4,6 +4,8 @@ from typing import Self
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from helios.database import Codec, Scalar
+
 
 class Password:
 	def __init__(self, digest: Digest):
@@ -16,22 +18,20 @@ class Password:
 	def matches(self, candidate: str) -> bool:
 		return self.digest.matches(candidate)
 
-	@classmethod
-	def check(cls, value: object):
-		if not isinstance(value, cls):
-			raise TypeError(f"expected a Password, got {type(value).__name__}")
-
-	@classmethod
-	def encode(cls, value: Password) -> str:
-		cls.check(value)
-		return value.digest.encode()
-
-	@classmethod
-	def decode(cls, encoded: object) -> Self:
-		return cls(Digest.decode(encoded))
-
 	def __repr__(self) -> str:
 		return "Password(<redacted>)"
+
+	class Codec(Codec):
+		def check(self, value: object):
+			if not isinstance(value, Password):
+				raise TypeError(f"expected a Password, got {type(value).__name__}")
+
+		def encode(self, value: Password) -> Scalar:
+			self.check(value)
+			return value.digest.encode()
+
+		def decode(self, value: Scalar) -> Password:
+			return Password(Digest.decode(value))
 
 
 class Digest:
