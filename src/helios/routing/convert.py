@@ -4,6 +4,10 @@ import uuid
 
 
 class Converter(ABC):
+	@classmethod
+	def for_name(cls, name: str) -> Converter | None:
+		return CONVERTERS.get(name)
+
 	@abstractmethod
 	def convert(self, value: str) -> Any: ...
 

@@ -17,9 +17,10 @@ class Pattern:
 		for param in PARAM_REGEX.finditer(raw):
 			name, converter_name = param.groups()
 			converter_name = converter_name or "str"
-			if converter_name not in convert.CONVERTERS:
+			converter = convert.Converter.for_name(converter_name)
+			if converter is None:
 				raise ValueError(f"Unknown pattern converter: {converter_name}")
-			self.converters[name] = convert.CONVERTERS[converter_name]
+			self.converters[name] = converter
 			lit = lit.replace(param.group(), f"(?P<{name}>{PARAM_VALUE_REGEX})")
 
 		if lit.endswith("/"):
