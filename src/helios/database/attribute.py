@@ -3,7 +3,7 @@ from typing import Any, TYPE_CHECKING
 
 from helios.declarative import Declaration, DeclarationError, MISSING, split_nullable
 
-from .codec import Codec, Stored, encode
+from .codec import Codec, Scalar, encode
 from .error import ModelError
 
 if TYPE_CHECKING:
@@ -70,13 +70,13 @@ class Attribute:
 		except (TypeError, ValueError) as error:
 			raise ModelError(f"{model_type.__name__}.{self.name}: {error}") from error
 
-	def encode(self, value: object, model_type: type) -> Stored | None:
+	def encode(self, value: object, model_type: type) -> Scalar | None:
 		self.check(value, model_type)
 		if value is None:
 			return None
 		return encode(self.codec, value)
 
-	def decode(self, raw: Stored | None, model_type: type) -> object:
+	def decode(self, raw: Scalar | None, model_type: type) -> object:
 		value = None if raw is None else self.codec.decode(raw)
 		self.check(value, model_type)
 		return value

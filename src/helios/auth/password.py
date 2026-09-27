@@ -4,7 +4,7 @@ from typing import Self
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from helios.database import Codec, Stored
+from helios.database import Codec, Scalar
 
 
 class Password:
@@ -26,11 +26,11 @@ class Password:
 			if not isinstance(value, Password):
 				raise TypeError(f"expected a Password, got {type(value).__name__}")
 
-		def encode(self, value: Password) -> Stored:
+		def encode(self, value: Password) -> Scalar:
 			self.check(value)
 			return value.digest.encode()
 
-		def decode(self, value: Stored) -> Password:
+		def decode(self, value: Scalar) -> Password:
 			return Password(Digest.decode(value))
 
 

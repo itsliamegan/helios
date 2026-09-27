@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.database import Codec, Model, ModelError, Stored, generated
+from helios.database import Codec, Model, ModelError, Scalar, generated
 
 
 def test_constructs_model_with_table_defaults_and_nulls():
@@ -107,10 +107,10 @@ def test_resolves_codecs_nested_in_the_model():
 					if not isinstance(value, Post.Slug):
 						raise TypeError("expected a Slug")
 
-				def encode(self, value: Post.Slug) -> Stored:
+				def encode(self, value: Post.Slug) -> Scalar:
 					return value.text
 
-				def decode(self, value: Stored) -> Post.Slug:
+				def decode(self, value: Scalar) -> Post.Slug:
 					return Post.Slug(str(value))
 
 		slug: Slug
@@ -133,10 +133,10 @@ def test_resolves_codecs_that_refer_to_the_model():
 					if not isinstance(value, Post.Slug):
 						raise TypeError("expected a Slug")
 
-				def encode(self, value: Post.Slug) -> Stored:
+				def encode(self, value: Post.Slug) -> Scalar:
 					return value.text
 
-				def decode(self, value: Stored) -> Post.Slug:
+				def decode(self, value: Scalar) -> Post.Slug:
 					return Post.Slug(str(value))
 
 		slug: Post.Slug | None = None
@@ -161,10 +161,10 @@ def test_resolves_codecs_declared_after_the_model():
 				if not isinstance(value, Slug):
 					raise TypeError("expected a Slug")
 
-			def encode(self, value: Slug) -> Stored:
+			def encode(self, value: Slug) -> Scalar:
 				return value.text
 
-			def decode(self, value: Stored) -> Slug:
+			def decode(self, value: Scalar) -> Slug:
 				return Slug(str(value))
 
 	post = Post(slug=Slug("intro"))

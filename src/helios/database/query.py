@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Literal, TYPE_CHECKING
 
-from .codec import Stored
+from .codec import Scalar
 from .model import Model
 
 if TYPE_CHECKING:
@@ -17,13 +17,13 @@ type Direction = Literal["asc", "desc"]
 @dataclass
 class Filter:
 	name: str
-	value: Stored | None
+	value: Scalar | None
 
 
 @dataclass
 class Membership:
 	name: str
-	values: tuple[Stored, ...]
+	values: tuple[Scalar, ...]
 	includes_null: bool
 
 

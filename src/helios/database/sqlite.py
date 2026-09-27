@@ -2,7 +2,7 @@ from collections.abc import Iterable
 import sqlite3
 from typing import Any, Self
 
-from .codec import Stored
+from .codec import Scalar
 from .config import Config
 from .error import DatabaseBusy, DatabaseError
 
@@ -33,13 +33,13 @@ class Cursor:
 			return ()
 		return tuple(column[0] for column in description)
 
-	def fetch_one(self) -> tuple[Stored | None, ...] | None:
+	def fetch_one(self) -> tuple[Scalar | None, ...] | None:
 		try:
 			return self.cursor.fetchone()
 		except sqlite3.Error as error:
 			raise translate(error, "fetch") from error
 
-	def fetch_all(self) -> list[tuple[Stored | None, ...]]:
+	def fetch_all(self) -> list[tuple[Scalar | None, ...]]:
 		try:
 			return self.cursor.fetchall()
 		except sqlite3.Error as error:

@@ -1,5 +1,5 @@
 from .attribute import generated
-from .codec import Codec, Stored
+from .codec import Codec, Scalar
 from .config import Config
 from .error import DatabaseBusy, DatabaseError, ModelError, NotFoundError
 from .model import Lifecycle, Model
@@ -18,7 +18,7 @@ __all__ = [
 	"NotFoundError",
 	"Provider",
 	"Query",
+	"Scalar",
 	"Store",
-	"Stored",
 	"generated",
 ]

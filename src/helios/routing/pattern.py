@@ -4,7 +4,7 @@ from urllib.parse import quote
 
 from helios.http import URL
 
-from . import convert
+from .convert import Converter
 
 PARAM_REGEX = re.compile(r"{(\w+)(?::(\w+))?}")
 PARAM_VALUE_REGEX = r"[\w-]+"
@@ -12,12 +12,12 @@ PARAM_VALUE_REGEX = r"[\w-]+"
 
 class Pattern:
 	def __init__(self, raw: str):
-		self.converters: dict[str, convert.Converter] = {}
+		self.converters: dict[str, Converter[Any]] = {}
 		lit = raw
 		for param in PARAM_REGEX.finditer(raw):
 			name, converter_name = param.groups()
 			converter_name = converter_name or "str"
-			converter = convert.Converter.for_name(converter_name)
+			converter = Converter.for_name(converter_name)
 			if converter is None:
 				raise ValueError(f"Unknown pattern converter: {converter_name}")
 			self.converters[name] = converter

@@ -16,8 +16,8 @@ from helios.database import (
 	Model,
 	ModelError,
 	NotFoundError,
+	Scalar,
 	Store,
-	Stored,
 )
 from helios.database.sqlite import connect
 
@@ -31,11 +31,11 @@ class Token:
 			if not isinstance(value, Token):
 				raise TypeError("expected a Token")
 
-		def encode(self, value: Token) -> Stored:
+		def encode(self, value: Token) -> Scalar:
 			self.check(value)
 			return value.value
 
-		def decode(self, value: Stored) -> Token:
+		def decode(self, value: Scalar) -> Token:
 			if not isinstance(value, str):
 				raise TypeError("expected token text")
 			return Token(value)
@@ -385,10 +385,10 @@ def test_round_trips_models_with_codecs_declared_later():
 				if not isinstance(value, Label):
 					raise TypeError("expected a Label")
 
-			def encode(self, value: Label) -> Stored:
+			def encode(self, value: Label) -> Scalar:
 				return value.text
 
-			def decode(self, value: Stored) -> Label:
+			def decode(self, value: Scalar) -> Label:
 				return Label(str(value))
 
 	with TemporaryDirectory() as directory:
