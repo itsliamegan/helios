@@ -2,7 +2,7 @@ from jinja2 import TemplateSyntaxError
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
 
-from helios.view import Component, Engine, memory
+from helios.view import Component, Engine, View, memory
 
 
 class Card(Component):
@@ -29,7 +29,7 @@ def test_fills_content_with_the_body():
 		components=[Card],
 	)
 
-	html = engine.render("index", {"name": "<i>"})
+	html = engine.render(View("index"), {"name": "<i>"})
 
 	assert_eq(html, "<h2>Posts</h2><b>&lt;i&gt;</b>")
 
@@ -49,7 +49,7 @@ def test_renders_the_body_in_the_caller_scope():
 		components=[Card],
 	)
 
-	html = engine.render("index", {"comments": ["a", "b"], "post": "Travel"})
+	html = engine.render(View("index"), {"comments": ["a", "b"], "post": "Travel"})
 
 	assert_eq(html, "[a on Travel][b on Travel]")
 
@@ -65,7 +65,7 @@ def test_uses_the_default_for_a_blank_body():
 		components=[Card],
 	)
 
-	html = engine.render("index")
+	html = engine.render(View("index"))
 
 	assert_eq(html, "<p>Empty</p>")
 
@@ -82,7 +82,7 @@ def test_rejects_a_blank_body_for_required_content():
 	)
 
 	with assert_raises(TypeError):
-		engine.render("index")
+		engine.render(View("index"))
 
 
 def test_nests_render_inside_render():
@@ -101,7 +101,7 @@ def test_nests_render_inside_render():
 		components=[Card, Panel],
 	)
 
-	html = engine.render("index")
+	html = engine.render(View("index"))
 
 	assert_eq(html, "<section><h2>Inner</h2><i>body</i></section>")
 

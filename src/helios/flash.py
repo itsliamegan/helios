@@ -73,7 +73,7 @@ class Provider(Provider):
 		return Flashes()
 
 	def compose(self, view: View, context: Context):
-		view.assign("flash", context.get(Flashes))
+		view.share("flash", context.get(Flashes))
 
 	def middleware(self, request: Request, context: Context, next: Next) -> Response:
 		response = next(request, context)

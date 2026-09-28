@@ -15,11 +15,17 @@ from helios.http import Method, Request, Response, URL
 from helios.routing import Pattern, Route, Router
 from helios.session.store import Session
 import helios.view
-from helios.view import Views
+from helios.view import Component, Views
 
 
 class User(Model):
 	table = "users"
+
+	name: str
+
+
+class Greeting(Component):
+	template = "greeting"
 
 	name: str
 
@@ -176,3 +182,42 @@ def test_shares_signed_out_authenticator_with_views():
 			connection.close()
 
 	assert_eq(html, "Guest")
+
+
+def test_shares_authenticator_with_components():
+	with TemporaryDirectory() as directory:
+		connection, store = create_store(Path(directory, "app.sqlite"))
+		try:
+			user = store.create(User, name="Alice")
+			session = Session(uuid4())
+			session["_user_id"] = str(user.id)
+			views_dir = Path(directory, "views")
+			views_dir.mkdir()
+			views_dir.joinpath("index.html").write_text('{{ Greeting(name="Hello") }}')
+			views_dir.joinpath("greeting.html").write_text(
+				"{{ name }}, {{ auth.user.name }}"
+			)
+
+			def index(request, context):
+				return context.get(Views).render("index")
+
+			app = Application(
+				Config(),
+				Router([Route(Method.GET, Pattern("/"), index)]),
+				[
+					Values(store, session),
+					helios.auth.Provider(User),
+					helios.view.Provider(
+						helios.view.Config(views_dir),
+						components=[Greeting],
+					),
+				],
+			)
+			try:
+				response = app.handle(Request(Method.GET, URL("/")))
+			finally:
+				app.close()
+		finally:
+			connection.close()
+
+	assert_eq(str(response.body), "Hello, Alice")

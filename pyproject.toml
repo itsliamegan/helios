@@ -5,6 +5,7 @@ requires-python = ">=3.14"
 dependencies = [
 	"jinja2==3.1.*",
 	"luna",
+	"markupsafe==3.0.*",
 	"python-dotenv>=1.2.2",
 	"werkzeug==3.1.*",
 ]

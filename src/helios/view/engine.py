@@ -1,17 +1,15 @@
 from collections.abc import Callable
-from typing import Any, TYPE_CHECKING, overload
+from typing import Any
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
 
 from helios.app import Context
 
-from .component import Component, rendering
+from .component import Component, Rendering, rendering
 from .extension import RenderExtension
 from .helpers import Helpers
 from .source import Driver
-
-if TYPE_CHECKING:
-	from .views import View
+from .view import View
 
 
 class Engine:
@@ -50,29 +48,12 @@ class Engine:
 	def composer(self, composer: Composer):
 		self.composers.append(composer)
 
-	@overload
-	def render(
-		self,
-		renderable: str,
-		assigns: dict[str, Any] | None = None,
-	) -> str: ...
-
-	@overload
-	def render(self, renderable: Component) -> str: ...
-
-	def render(
-		self,
-		renderable: str | Component,
-		assigns: dict[str, Any] | None = None,
-	) -> str:
-		token = rendering.set(self)
+	def render(self, view: View, assigns: dict[str, Any] | None = None) -> str:
+		token = rendering.set(Rendering(self, view.shared))
 		try:
-			if isinstance(renderable, Component):
-				return str(renderable)
-			else:
-				assigns = assigns or {}
-				template = self.jinja.get_template(renderable)
-				return template.render(**assigns)
+			assigns = assigns or {}
+			template = self.jinja.get_template(view.name)
+			return template.render({**view.shared, **assigns})
 		finally:
 			rendering.reset(token)
 

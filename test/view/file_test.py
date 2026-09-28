@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from jinja2 import TemplateNotFound, TemplateSyntaxError
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.view import Engine, Helpers, file
+from helios.view import Engine, Helpers, View, file
 
 
 def test_directory_renders_application_helpers():
@@ -15,7 +15,7 @@ def test_directory_renders_application_helpers():
 
 		engine = Engine(file.Driver(views_dir), Helpers(globals={"site": "Cork"}))
 
-		assert_eq(engine.render("index"), "Cork")
+		assert_eq(engine.render(View("index")), "Cork")
 
 
 def test_renders_nested_directory_templates():
@@ -26,7 +26,7 @@ def test_renders_nested_directory_templates():
 
 		engine = Engine(file.Driver(views_dir))
 
-		assert_eq(engine.render("posts.index"), "<h1>Posts</h1>")
+		assert_eq(engine.render(View("posts.index")), "<h1>Posts</h1>")
 
 
 def test_directory_rejects_syntax_errors_on_creation():
@@ -54,7 +54,7 @@ def test_directory_rejects_names_outside_directory():
 		engine = Engine(file.Driver(views_dir))
 
 		with assert_raises(TemplateNotFound):
-			engine.render("..secret")
+			engine.render(View("..secret"))
 
 
 def test_directory_reloads_changed_templates_when_reloading():
@@ -68,7 +68,7 @@ def test_directory_reloads_changed_templates_when_reloading():
 		template_file.write_text("After")
 		os.utime(template_file, (2_000_000, 2_000_000))
 
-		assert_eq(engine.render("index"), "After")
+		assert_eq(engine.render(View("index")), "After")
 
 
 def test_directory_rejects_deleted_templates_when_reloading():
@@ -81,7 +81,7 @@ def test_directory_rejects_deleted_templates_when_reloading():
 		template_file.unlink()
 
 		with assert_raises(TemplateNotFound):
-			engine.render("index")
+			engine.render(View("index"))
 
 
 def test_directory_keeps_compiled_templates_when_not_reloading():
@@ -95,7 +95,7 @@ def test_directory_keeps_compiled_templates_when_not_reloading():
 		template_file.write_text("After")
 		os.utime(template_file, (2_000_000, 2_000_000))
 
-		assert_eq(engine.render("index"), "Before")
+		assert_eq(engine.render(View("index")), "Before")
 
 
 def test_directory_ignores_hidden_files():
@@ -106,7 +106,7 @@ def test_directory_ignores_hidden_files():
 
 		engine = Engine(file.Driver(views_dir))
 
-		assert_eq(engine.render("index"), "<h1>Index</h1>")
+		assert_eq(engine.render(View("index")), "<h1>Index</h1>")
 
 
 def test_directory_ignores_hidden_directories():
@@ -119,4 +119,4 @@ def test_directory_ignores_hidden_directories():
 
 		engine = Engine(file.Driver(views_dir))
 
-		assert_eq(engine.render("index"), "<h1>Index</h1>")
+		assert_eq(engine.render(View("index")), "<h1>Index</h1>")
