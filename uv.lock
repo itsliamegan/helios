@@ -50,7 +50,7 @@ wheels = [
 [[package]]
 name = "luna"
 version = "0.1.0"
-source = { git = "https://github.com/itsliamegan/luna?branch=main#6b5bfc3eb169658b772f6edd4dfda9c2ea6435b0" }
+source = { git = "https://github.com/itsliamegan/luna?branch=main#8cf6588f1a8e91ab4a7cfc8d8e09ee7bdbb7dfc0" }
 
 [[package]]
 name = "markupsafe"
