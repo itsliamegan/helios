@@ -5,6 +5,7 @@ from .file import File, Files
 from .header import Headers
 from .input import Input
 from .method import Method, UnsupportedMethodError
+from .query import Query
 from .request import Request
 from .response import Response
 from .status import Status
@@ -21,6 +22,7 @@ __all__ = [
 	"Headers",
 	"Input",
 	"Method",
+	"Query",
 	"Request",
 	"Response",
 	"SameSite",

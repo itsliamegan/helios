@@ -2,7 +2,7 @@ from uuid import UUID
 
 from luna.test.assertion import assert_eq, assert_that
 
-from helios.http import Method, Response, URL
+from helios.http import Method, Query, Response, URL
 from helios.routing import (
 	Pattern,
 	Route,
@@ -30,6 +30,24 @@ def test_generates_absolute_route_with_query_explicitly():
 		str(url),
 		"https://cork.example:8443/redemptions/new?token=secret+value",
 	)
+
+
+def test_generates_route_with_query_object():
+	router = Router(
+		[
+			Route(
+				Method.GET,
+				Pattern("/posts/"),
+				lambda req, ctx: Response.empty(),
+				name="posts.index",
+			)
+		]
+	)
+	urls = URLs(router, URL("https://cork.example"))
+
+	url = urls.route("posts.index", query=Query({"tag": ["news", "politics"]}))
+
+	assert_eq(str(url), "/posts/?tag=news&tag=politics")
 
 
 def test_generates_relative_route_by_default():

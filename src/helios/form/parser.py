@@ -7,8 +7,6 @@ from helios import http
 
 Untrimmed = NewType("Untrimmed", str)
 
-type RawValue = str | list[str]
-
 
 class ParseError(ValueError):
 	def __init__(self, message: str, item: bool = False):
@@ -31,25 +29,25 @@ class Parser[T](ABC):
 			return List(item_parser)
 
 	@abstractmethod
-	def parse(self, value: RawValue) -> T: ...
+	def parse(self, values: list[str]) -> T: ...
 
 
 class Scalar[T](Parser[T]):
-	def single(self, value: RawValue) -> str:
-		if isinstance(value, list):
+	def single(self, values: list[str]) -> str:
+		if len(values) != 1:
 			raise ParseError("must be a single value")
 		else:
-			return value
+			return values[0]
 
 
 class Str(Scalar[str]):
-	def parse(self, value: RawValue) -> str:
-		return self.single(value)
+	def parse(self, values: list[str]) -> str:
+		return self.single(values)
 
 
 class Int(Scalar[int]):
-	def parse(self, value: RawValue) -> int:
-		raw = self.single(value).strip()
+	def parse(self, values: list[str]) -> int:
+		raw = self.single(values).strip()
 		if re.fullmatch(r"-?[0-9]+", raw) is None:
 			raise ParseError("must be a whole number")
 		else:
@@ -57,8 +55,8 @@ class Int(Scalar[int]):
 
 
 class UUID(Scalar[uuid.UUID]):
-	def parse(self, value: RawValue) -> uuid.UUID:
-		raw = self.single(value).strip()
+	def parse(self, values: list[str]) -> uuid.UUID:
+		raw = self.single(values).strip()
 		try:
 			return uuid.UUID(raw)
 		except ValueError as err:
@@ -66,8 +64,8 @@ class UUID(Scalar[uuid.UUID]):
 
 
 class URL(Scalar[http.URL]):
-	def parse(self, value: RawValue) -> http.URL:
-		raw = self.single(value).strip()
+	def parse(self, values: list[str]) -> http.URL:
+		raw = self.single(values).strip()
 		try:
 			return http.URL(raw)
 		except ValueError as err:
@@ -75,8 +73,8 @@ class URL(Scalar[http.URL]):
 
 
 class Bool(Parser[bool]):
-	def parse(self, value: RawValue) -> bool:
-		if isinstance(value, str) and value.strip() == "on":
+	def parse(self, values: list[str]) -> bool:
+		if len(values) == 1 and values[0].strip() == "on":
 			return True
 		else:
 			raise ParseError('must be "on" or omitted')
@@ -86,14 +84,9 @@ class List[T](Parser[list[T]]):
 	def __init__(self, parser: Parser[T]):
 		self.parser = parser
 
-	def parse(self, value: RawValue) -> list[T]:
-		if isinstance(value, str):
-			values = [value]
-		else:
-			values = value
-
+	def parse(self, values: list[str]) -> list[T]:
 		try:
-			return [self.parser.parse(item) for item in values]
+			return [self.parser.parse([item]) for item in values]
 		except ParseError as error:
 			raise ParseError(error.message, item=True) from error
 

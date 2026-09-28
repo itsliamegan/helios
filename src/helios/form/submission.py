@@ -21,14 +21,10 @@ class Submission:
 		if self.input is None:
 			return encode(default)
 
-		if name not in self.input:
-			return [] if is_collection else ""
-
-		value = self.input[name]
-		if is_collection and isinstance(value, str):
-			return [value]
+		if is_collection:
+			return self.input.all(name)
 		else:
-			return value
+			return self.input.first(name) or ""
 
 	def error(self, name: str) -> str | None:
 		return self.errors.first(name)

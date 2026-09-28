@@ -76,8 +76,8 @@ class Kernel:
 		context: Context,
 		next: Next,
 	) -> Response:
-		if "_method" in request.input:
-			raw_method = request.input["_method"]
+		raw_method = request.input.first("_method")
+		if raw_method is not None:
 			del request.input["_method"]
 			request.method = Method.parse(raw_method)
 		return next(request, context)

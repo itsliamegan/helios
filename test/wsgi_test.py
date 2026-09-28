@@ -9,7 +9,6 @@ import helios.app
 from helios.http import (
 	Buffered,
 	Cookies,
-	File,
 	Headers,
 	Method,
 	Response,
@@ -44,7 +43,15 @@ def test_adapts_url():
 	req = RequestAdapter(env).adapt()
 
 	assert_eq(req.url.path, "/search")
-	assert_eq(req.url.query, {"q": "Intro"})
+	assert_eq(req.url.query.all("q"), ["Intro"])
+
+
+def test_adapts_repeated_query_values():
+	env = EnvironBuilder(path="/search?tag=news&tag=politics").get_environ()
+
+	req = RequestAdapter(env).adapt()
+
+	assert_eq(req.url.query.all("tag"), ["news", "politics"])
 
 
 def test_adapts_blank_query_value():
@@ -52,7 +59,7 @@ def test_adapts_blank_query_value():
 
 	req = RequestAdapter(env).adapt()
 
-	assert_eq(req.url.query, {"q": ""})
+	assert_eq(req.url.query.first("q"), "")
 
 
 def test_adapts_headers():
@@ -81,7 +88,7 @@ def test_adapts_form_input():
 
 	req = RequestAdapter(env).adapt()
 
-	assert_eq(req.input["content"], "An interesting article.")
+	assert_eq(req.input.first("content"), "An interesting article.")
 
 
 def test_rejects_form_input_over_memory_limit():
@@ -110,9 +117,8 @@ def test_adapts_multipart_input_and_files():
 
 	req = RequestAdapter(env).adapt()
 
-	assert_eq(req.input["title"], "Summer")
-	photo = req.files["photo"]
-	assert isinstance(photo, File)
+	assert_eq(req.input.all("title"), ["Summer"])
+	(photo,) = req.files.all("photo")
 	assert_eq(photo.content, b"image bytes")
 	assert_eq(photo.filename, "beach.jpg")
 	assert_eq(photo.content_type, "image/jpeg")
@@ -131,9 +137,8 @@ def test_adapts_repeated_multipart_input_and_files():
 
 	req = RequestAdapter(env).adapt()
 
-	assert_eq(req.input["tag"], ["summer", "holiday"])
-	photos = req.files["photo"]
-	assert isinstance(photos, list)
+	assert_eq(req.input.all("tag"), ["summer", "holiday"])
+	photos = req.files.all("photo")
 	assert_eq([photo.content for photo in photos], [b"first", b"second"])
 	assert_eq([photo.filename for photo in photos], ["first.jpg", "second.jpg"])
 
@@ -213,7 +218,7 @@ def test_client_routes_get_and_exposes_response():
 
 def test_client_sends_query_and_headers():
 	def search(req, ctx):
-		return Response.text(f"{req.url.query["q"]}|{req.headers["X-Filter"]}")
+		return Response.text(f"{req.url.query.first("q")}|{req.headers["X-Filter"]}")
 
 	client = make_client([Route(Method.GET, Pattern("/search"), search)])
 
@@ -228,8 +233,8 @@ def test_client_sends_query_and_headers():
 
 def test_client_sends_scalar_and_repeated_form_values():
 	def create(req, ctx):
-		tag_ids = req.input["tag_id"]
-		return Response.text(f"{req.input["title"]}|{",".join(tag_ids)}")
+		tag_ids = req.input.all("tag_id")
+		return Response.text(f"{req.input.first("title")}|{",".join(tag_ids)}")
 
 	client = make_client([Route(Method.POST, Pattern("/posts"), create)])
 	form = {
@@ -244,9 +249,9 @@ def test_client_sends_scalar_and_repeated_form_values():
 
 def test_client_uploads_files():
 	def upload(req, ctx):
-		photo = req.files["photo"]
+		photo = req.files.first("photo")
 		return Response.text(
-			f"{req.input["caption"]}|{photo.filename}|{photo.content_type}|"
+			f"{req.input.first("caption")}|{photo.filename}|{photo.content_type}|"
 			f"{photo.content.decode()}"
 		)
 

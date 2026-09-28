@@ -1,8 +1,8 @@
+from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
-from helios.http import Method, URL
-from helios.http.url import Query
+from helios.http import Method, Query, URL
 
 from .router import Match, Router
 
@@ -18,10 +18,12 @@ class URLs:
 		self,
 		name: str,
 		params: dict[str, Any] | None = None,
-		query: Query | None = None,
+		query: Query | Mapping[str, str | list[str]] | None = None,
 		absolute: bool = False,
 	) -> URL:
 		path = self.router.path(name, params)
+		if isinstance(query, Mapping):
+			query = Query(query)
 		if not absolute:
 			return URL(path, query)
 		return URL(

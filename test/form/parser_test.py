@@ -10,48 +10,48 @@ from helios.http import URL
 def test_parses_strings_without_coercion():
 	value_parser = parser.Str()
 
-	assert_eq(value_parser.parse("title"), "title")
+	assert_eq(value_parser.parse(["title"]), "title")
 	assert_parse_error(value_parser, ["first", "second"], "must be a single value")
 
 
 def test_strings_keep_surrounding_whitespace():
 	value_parser = parser.Str()
 
-	assert_eq(value_parser.parse("  - item\n"), "  - item\n")
+	assert_eq(value_parser.parse(["  - item\n"]), "  - item\n")
 
 
 def test_parses_integers():
 	value_parser = parser.Int()
 
-	assert_eq(value_parser.parse("42"), 42)
-	assert_eq(value_parser.parse("-3"), -3)
-	assert_eq(value_parser.parse(" 42 "), 42)
-	assert_parse_error(value_parser, "4.5", "must be a whole number")
-	assert_parse_error(value_parser, "1_000", "must be a whole number")
+	assert_eq(value_parser.parse(["42"]), 42)
+	assert_eq(value_parser.parse(["-3"]), -3)
+	assert_eq(value_parser.parse([" 42 "]), 42)
+	assert_parse_error(value_parser, ["4.5"], "must be a whole number")
+	assert_parse_error(value_parser, ["1_000"], "must be a whole number")
 
 
 def test_parses_uuid():
 	value_parser = parser.UUID()
 	tag_id = uuid4()
 
-	assert_eq(value_parser.parse(str(tag_id)), tag_id)
-	assert_eq(value_parser.parse(f" {tag_id}\n"), tag_id)
-	assert_parse_error(value_parser, "not-a-uuid", "must be a valid UUID")
-	assert_parse_error(value_parser, [str(tag_id)], "must be a single value")
+	assert_eq(value_parser.parse([str(tag_id)]), tag_id)
+	assert_eq(value_parser.parse([f" {tag_id}\n"]), tag_id)
+	assert_parse_error(value_parser, ["not-a-uuid"], "must be a valid UUID")
+	assert_parse_error(value_parser, [], "must be a single value")
 
 
 def test_parses_url():
 	value_parser = parser.URL()
 	raw = "https://example.com:8443/search?q=today"
 
-	value = value_parser.parse(raw)
-	padded = value_parser.parse(f"  {raw} ")
+	value = value_parser.parse([raw])
+	padded = value_parser.parse([f"  {raw} "])
 	assert_that(isinstance(value, URL))
 	assert_eq(str(value), raw)
 	assert_eq(str(padded), raw)
 	assert_parse_error(
 		value_parser,
-		"https://example.com:invalid",
+		["https://example.com:invalid"],
 		"must be a valid URL",
 	)
 
@@ -59,18 +59,18 @@ def test_parses_url():
 def test_parses_checked_boolean_strictly():
 	value_parser = parser.Bool()
 
-	assert_that(value_parser.parse("on") is True)
-	assert_that(value_parser.parse(" on ") is True)
-	assert_parse_error(value_parser, "true", 'must be "on" or omitted')
-	assert_parse_error(value_parser, ["on"], 'must be "on" or omitted')
+	assert_that(value_parser.parse(["on"]) is True)
+	assert_that(value_parser.parse([" on "]) is True)
+	assert_parse_error(value_parser, ["true"], 'must be "on" or omitted')
+	assert_parse_error(value_parser, ["on", "on"], 'must be "on" or omitted')
 
 
-def test_parses_list_from_scalar_and_list():
+def test_parses_each_list_item():
 	value_parser = parser.List(parser.UUID())
 	first_tag_id = uuid4()
 	second_tag_id = uuid4()
 
-	assert_eq(value_parser.parse(str(first_tag_id)), [first_tag_id])
+	assert_eq(value_parser.parse([]), [])
 	assert_eq(
 		value_parser.parse([str(first_tag_id), str(second_tag_id)]),
 		[first_tag_id, second_tag_id],
@@ -89,7 +89,7 @@ def test_list_records_that_an_item_failed():
 
 def test_scalar_parse_errors_are_not_item_errors():
 	with assert_raises(ParseError) as raised:
-		parser.UUID().parse("not-a-uuid")
+		parser.UUID().parse(["not-a-uuid"])
 
 	assert_that(not raised.exception.item)
 

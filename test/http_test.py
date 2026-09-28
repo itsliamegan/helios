@@ -9,7 +9,9 @@ from helios.http import (
 	File,
 	Files,
 	Headers,
+	Input,
 	Method,
+	Query,
 	Request,
 	Response,
 	SameSite,
@@ -24,13 +26,13 @@ def test_encodes_url_path():
 
 
 def test_encodes_url_query():
-	url = URL("/search", {"q": "today", "tags": ["news", "politics"]})
+	url = URL("/search", Query({"q": "today", "tags": ["news", "politics"]}))
 
 	assert_eq(str(url), "/search?q=today&tags=news&tags=politics")
 
 
 def test_encodes_absolute_url():
-	url = URL("/search", {"q": "today"}, scheme="https", host="example.com")
+	url = URL("/search", Query({"q": "today"}), scheme="https", host="example.com")
 
 	assert_eq(str(url), "https://example.com/search?q=today")
 
@@ -42,6 +44,45 @@ def test_preserves_absolute_url_port():
 	assert_eq(url.host, "example.com")
 	assert_eq(url.port, 8443)
 	assert_eq(str(url), "https://example.com:8443/search")
+
+
+def test_parses_absolute_url_query():
+	url = URL("https://example.com/search?q=today&tags=news&tags=politics&page=")
+
+	assert_eq(url.query.first("q"), "today")
+	assert_eq(url.query.all("q"), ["today"])
+	assert_eq(url.query.all("tags"), ["news", "politics"])
+	assert_eq(url.query.first("page"), "")
+
+
+def test_reads_single_and_repeated_query_values():
+	query = Query({"q": "today", "tags": ["news", "politics"]})
+
+	assert_that("q" in query)
+	assert_eq(query.first("q"), "today")
+	assert_eq(query.all("q"), ["today"])
+	assert_eq(query.first("tags"), "news")
+	assert_eq(query.all("tags"), ["news", "politics"])
+
+
+def test_reads_missing_query_values_as_empty():
+	query = Query({"tags": []})
+
+	assert_that("q" not in query)
+	assert_that(query.first("q") is None)
+	assert_eq(query.all("q"), [])
+	assert_that(query.first("tags") is None)
+	assert_eq(query.all("tags"), [])
+
+
+def test_changing_read_query_values_leaves_query_unchanged():
+	tags = ["news"]
+	query = Query({"tags": tags})
+
+	tags.append("politics")
+	query.all("tags").append("sport")
+
+	assert_eq(query.all("tags"), ["news"])
 
 
 def test_encodes_text_and_binary_bodies():
@@ -229,5 +270,54 @@ def test_stores_uploaded_files():
 	files = Files({"avatar": avatar, "attachments": attachments})
 
 	assert_that("avatar" in files)
-	assert_that(files["avatar"] is avatar)
-	assert_eq(files["attachments"], attachments)
+	assert_that(files.first("avatar") is avatar)
+	assert_eq(files.all("avatar"), [avatar])
+	assert_that(files.first("attachments") is attachments[0])
+	assert_eq(files.all("attachments"), attachments)
+
+
+def test_reads_missing_files_as_empty():
+	files = Files()
+
+	assert_that("avatar" not in files)
+	assert_that(files.first("avatar") is None)
+	assert_eq(files.all("avatar"), [])
+
+
+def test_reads_single_and_repeated_input():
+	input = Input({"title": "Intro", "tags": ["art", "news"]})
+
+	assert_that("title" in input)
+	assert_eq(input.first("title"), "Intro")
+	assert_eq(input.all("title"), ["Intro"])
+	assert_eq(input.first("tags"), "art")
+	assert_eq(input.all("tags"), ["art", "news"])
+
+
+def test_reads_missing_input_as_empty():
+	input = Input({"tags": []})
+
+	assert_that("title" not in input)
+	assert_that(input.first("title") is None)
+	assert_eq(input.all("title"), [])
+	assert_that(input.first("tags") is None)
+	assert_eq(input.all("tags"), [])
+
+
+def test_changing_read_input_values_leaves_input_unchanged():
+	tags = ["art"]
+	input = Input({"tags": tags})
+
+	tags.append("news")
+	input.all("tags").append("travel")
+
+	assert_eq(input.all("tags"), ["art"])
+
+
+def test_removes_input():
+	input = Input({"_method": "delete", "title": "Intro"})
+
+	del input["_method"]
+
+	assert_that("_method" not in input)
+	assert_eq(input.first("title"), "Intro")

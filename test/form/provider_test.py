@@ -46,7 +46,7 @@ def test_flashes_errors_and_input():
 		session["_flash"],
 		{
 			"_errors": {"title": ["Title must be provided."]},
-			"_input": {"title": "", "tag_ids": ["news", "python"]},
+			"_input": {"title": [""], "tag_ids": ["news", "python"]},
 		},
 	)
 

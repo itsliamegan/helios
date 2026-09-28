@@ -160,6 +160,12 @@ def test_rejects_repeated_scalar_values():
 	assert_eq(errors.messages["title"], ["Title must be a single value."])
 
 
+def test_rejects_repeated_scalar_values_that_start_blank():
+	_, errors = PostForm.validate(Input({"title": ["", "Intro"]}))
+
+	assert_eq(errors.messages["title"], ["Title must be a single value."])
+
+
 def test_parses_checkboxes_and_other_scalar_types():
 	class SettingsForm(Form):
 		open_in_new_tab: bool = False

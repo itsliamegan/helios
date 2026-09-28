@@ -27,6 +27,13 @@ def test_blank_strings_are_missing():
 	assert_that(not field.missing(Input({"title": " Intro "})))
 
 
+def test_repeated_values_are_not_missing():
+	field = Field("title", parser.Str())
+
+	assert_that(not field.missing(Input({"title": ["", "Intro"]})))
+	assert_that(not field.missing(Input({"title": ["", ""]})))
+
+
 def test_lists_are_missing_only_when_nothing_was_sent():
 	field = Field("tags", parser.List(parser.Str()))
 

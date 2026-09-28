@@ -37,17 +37,15 @@ class Field:
 		return isinstance(self.parser, List)
 
 	def missing(self, input: Input) -> bool:
-		if self.name not in input:
-			return True
-
-		value = input[self.name]
+		values = input.all(self.name)
+		value = input.first(self.name)
 		if self.is_list:
-			return value == []
+			return len(values) == 0
 		else:
-			return isinstance(value, str) and blank(value)
+			return value is None or (len(values) == 1 and blank(value))
 
 	def parse(self, input: Input) -> Any:
-		return self.parser.parse(input[self.name])
+		return self.parser.parse(input.all(self.name))
 
 	def __get__(self, form: Form | None, owner: type) -> Any:
 		if form is None:

@@ -14,6 +14,7 @@ from helios.http import (
 	Headers,
 	Input,
 	Method,
+	Query,
 	Request,
 	Response,
 	Stream,
@@ -56,12 +57,7 @@ class RequestAdapter:
 	def url(self) -> URL:
 		raw = get_current_url(self.environment)
 		parsed = parse_url(raw)
-		query = {}
-		for name, vals in parse_query(parsed.query, keep_blank_values=True).items():
-			if isinstance(vals, list) and len(vals) == 1:
-				query[name] = vals[0]
-			else:
-				query[name] = vals
+		query = Query(parse_query(parsed.query, keep_blank_values=True))
 		return URL(parsed.path, query)
 
 	def headers(self) -> Headers:
@@ -83,13 +79,11 @@ class RequestAdapter:
 			max_form_parts=1_000,
 		)
 		_, form, uploads = parser.parse_from_environ(self.environment)
-		input_items: dict[str, str | list[str]] = {}
-		for name, values in form.lists():
-			input_items[name] = values[0] if len(values) == 1 else values
+		input_items = dict(form.lists())
 
-		file_items: dict[str, File | list[File]] = {}
+		file_items: dict[str, list[File]] = {}
 		for name, storages in uploads.lists():
-			files = [
+			file_items[name] = [
 				File(
 					storage.read(),
 					storage.filename or "",
@@ -97,6 +91,5 @@ class RequestAdapter:
 				)
 				for storage in storages
 			]
-			file_items[name] = files[0] if len(files) == 1 else files
 
 		return Input(input_items), Files(file_items)

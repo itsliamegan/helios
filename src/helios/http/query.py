@@ -2,30 +2,23 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 
-@dataclass
-class File:
-	content: bytes
-	filename: str
-	content_type: str
-
-
 @dataclass(init=False)
-class Files:
-	items: dict[str, list[File]]
+class Query:
+	items: dict[str, list[str]]
 
-	def __init__(self, items: Mapping[str, File | list[File]] | None = None):
+	def __init__(self, items: Mapping[str, str | list[str]] | None = None):
 		self.items = {}
 		for name, value in (items or {}).items():
 			self.items[name] = list(value) if isinstance(value, list) else [value]
 
-	def first(self, name: str) -> File | None:
-		files = self.items.get(name)
-		if files:
-			return files[0]
+	def first(self, name: str) -> str | None:
+		values = self.items.get(name)
+		if values:
+			return values[0]
 		else:
 			return None
 
-	def all(self, name: str) -> list[File]:
+	def all(self, name: str) -> list[str]:
 		return list(self.items.get(name, []))
 
 	def __contains__(self, name: str) -> bool:

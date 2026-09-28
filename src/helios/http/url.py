@@ -1,8 +1,7 @@
-from typing import cast
 from urllib.parse import parse_qs, urlsplit
 from urllib.parse import urlencode as encode_query
 
-type Query = dict[str, str | list[str]]
+from .query import Query
 
 
 class URL:
@@ -24,7 +23,7 @@ class URL:
 			port = parsed.port
 			path = parsed.path
 			if query is None:
-				query = cast(Query, parse_qs(parsed.query, keep_blank_values=True))
+				query = Query(parse_qs(parsed.query, keep_blank_values=True))
 
 		if (scheme is None) != (host is None):
 			raise ValueError("scheme and host must be supplied together")
@@ -35,7 +34,7 @@ class URL:
 		self.host = host
 		self.port = port
 		self.path = path
-		self.query = query or {}
+		self.query = query if query is not None else Query()
 
 	def __str__(self) -> str:
 		res = ""
@@ -44,8 +43,8 @@ class URL:
 			if self.port is not None:
 				res += f":{self.port}"
 		res += self.path
-		if self.query:
-			res += "?" + encode_query(self.query, True)
+		if self.query.items:
+			res += "?" + encode_query(self.query.items, True)
 		return res
 
 	def __repr__(self) -> str:
