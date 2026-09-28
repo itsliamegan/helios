@@ -23,7 +23,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "jinja2", specifier = "==3.1.*" },
-    { name = "luna", editable = "../luna" },
+    { name = "luna", git = "https://github.com/itsliamegan/luna?branch=main" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "werkzeug", specifier = "==3.1.*" },
 ]
@@ -50,15 +50,7 @@ wheels = [
 [[package]]
 name = "luna"
 version = "0.1.0"
-source = { editable = "../luna" }
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "ruff", specifier = ">=0.16.6" },
-    { name = "ty", specifier = ">=0.0.78" },
-]
+source = { git = "https://github.com/itsliamegan/luna?branch=main#3a0e73d0c5ad3e7b00920764d1f2bb50ef9dbf25" }
 
 [[package]]
 name = "markupsafe"
