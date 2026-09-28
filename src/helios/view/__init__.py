@@ -1,3 +1,5 @@
+from markupsafe import Markup
+
 from .attributes import Attributes
 from .component import Component
 from .config import Config
@@ -16,6 +18,7 @@ __all__ = [
 	"Config",
 	"Engine",
 	"Helpers",
+	"Markup",
 	"Provider",
 	"View",
 	"Views",
