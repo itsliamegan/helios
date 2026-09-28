@@ -1,8 +1,15 @@
-from luna.test.assertion import assert_eq
+from jinja2 import UndefinedError
+from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Container, Context
 from helios.http import Method, Request, Status, URL
-from helios.view import Engine, Views, memory
+from helios.view import Component, Engine, Views, memory
+
+
+class Greeting(Component):
+	template = "greeting"
+
+	name: str
 
 
 def test_views_render_html_responses():
@@ -64,6 +71,58 @@ def test_views_prefer_assigns_over_composers():
 	response = views.render("index", {"title": "Assigned"})
 
 	assert_eq(str(response.body), "Assigned")
+
+
+def test_views_share_composer_assigns_with_components():
+	engine = Engine(
+		memory.Driver(
+			{
+				"index": '{{ Greeting(name="Hello") }}',
+				"greeting": "{{ name }}, {{ user }}",
+			}
+		),
+		components=[Greeting],
+	)
+	engine.composer(lambda view, context: view.assign("user", "Ada"))
+	views = Views(engine, context())
+
+	response = views.render("index")
+
+	assert_eq(str(response.body), "Hello, Ada")
+
+
+def test_views_hide_assigns_from_components():
+	engine = Engine(
+		memory.Driver(
+			{
+				"index": '{{ Greeting(name="Hello") }}',
+				"greeting": "{{ name }}, {{ user }}",
+			}
+		),
+		components=[Greeting],
+	)
+	views = Views(engine, context())
+
+	with assert_raises(UndefinedError):
+		views.render("index", {"user": "Ada"})
+
+
+def test_views_share_composer_assigns_with_components_despite_assigns():
+	engine = Engine(
+		memory.Driver(
+			{
+				"index": '{{ user }} {{ Greeting(name="Hello") }}',
+				"greeting": "{{ name }}, {{ user }}",
+			}
+		),
+		components=[Greeting],
+	)
+	engine.composer(lambda view, context: view.assign("user", "Composed"))
+	views = Views(engine, context())
+
+	response = views.render("index", {"user": "Assigned"})
+
+	assert_eq(str(response.body), "Assigned Hello, Composed")
 
 
 def context() -> Context:

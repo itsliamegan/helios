@@ -34,5 +34,9 @@ class Views:
 		view = View(name)
 		for composer in self.engine.composers:
 			composer(view, self.context)
+		shared = dict(view.assigns)
 		view.assigns.update(assigns or {})
-		return Response.html(self.engine.render(view.name, view.assigns), status)
+		return Response.html(
+			self.engine.render(view.name, view.assigns, shared),
+			status,
+		)
