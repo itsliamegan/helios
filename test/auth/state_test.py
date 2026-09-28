@@ -1,8 +1,8 @@
 from uuid import uuid4
 
-from luna.test.assertion import assert_eq, assert_that
+from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.auth.state import Authenticator
+from helios.auth import AuthenticationError, Authenticator
 from helios.database import Model
 from helios.session.store import Session, Store
 
@@ -62,3 +62,21 @@ def test_keeps_other_session_values_on_sign_out():
 	auth.sign_out()
 
 	assert_that("_flash" in session)
+
+
+def test_returns_current_user():
+	user = User(name="Alice")
+	auth = Authenticator(Session(uuid4()), user)
+
+	current = auth.current()
+
+	assert_eq(current, user)
+
+
+def test_rejects_current_user_when_signed_out():
+	auth = Authenticator(Session(uuid4()))
+
+	with assert_raises(AuthenticationError) as raised:
+		auth.current()
+
+	assert_eq(str(raised.exception), "no user is signed in")

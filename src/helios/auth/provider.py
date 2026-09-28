@@ -8,8 +8,8 @@ from helios.view import Engine, View
 from .state import Authenticator, SESSION_KEY
 
 
-class Provider(Provider):
-	def __init__(self, user_type: type[Model]):
+class Provider[U: Model](Provider):
+	def __init__(self, user_type: type[U]):
 		self.user_type = user_type
 
 	def register(self, container: Container):
@@ -22,14 +22,14 @@ class Provider(Provider):
 	def compose(self, view: View, context: Context):
 		view.share("auth", context.get(Authenticator))
 
-	def authenticator(self, context: Context) -> Authenticator:
+	def authenticator(self, context: Context) -> Authenticator[U]:
 		session = context.get(Session)
 		user = self.user(session, context.get(Store))
 		if user is None and SESSION_KEY in session:
 			del session[SESSION_KEY]
 		return Authenticator(session, user)
 
-	def user(self, session: Session, store: Store) -> Model | None:
+	def user(self, session: Session, store: Store) -> U | None:
 		if SESSION_KEY not in session:
 			return None
 		raw_id = session[SESSION_KEY]
