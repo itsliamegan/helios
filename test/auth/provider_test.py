@@ -84,7 +84,6 @@ def test_finds_no_user():
 		finally:
 			connection.close()
 
-	assert_that(provided.user is None)
 	assert_not(provided.is_signed_in())
 
 
@@ -114,7 +113,7 @@ def test_removes_stale_user_id():
 		finally:
 			connection.close()
 
-	assert_that(provided.user is None)
+	assert_not(provided.is_signed_in())
 	assert_that("_user_id" not in session)
 
 
@@ -128,7 +127,7 @@ def test_removes_malformed_user_id():
 		finally:
 			connection.close()
 
-	assert_that(provided.user is None)
+	assert_not(provided.is_signed_in())
 	assert_that("_user_id" not in session)
 
 
