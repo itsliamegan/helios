@@ -11,7 +11,13 @@ from helios.http import Method, Request, Response, URL
 from helios.routing import Pattern, Route, Router
 from helios.session.store import Session
 import helios.view
-from helios.view import Views
+from helios.view import Component, Views
+
+
+class Notice(Component):
+	template = "notice"
+
+	label: str
 
 
 class Values(Provider):
@@ -60,6 +66,38 @@ def test_shares_flash_with_views():
 			app.close()
 
 	assert_eq(str(response.body), "Saved")
+
+
+def test_shares_flash_with_components():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("index.html").write_text('{{ Notice(label="Notice") }}')
+		views_dir.joinpath("notice.html").write_text(
+			'{{ label }}: {{ flash.get("notice") }}'
+		)
+		session = Session(uuid4(), {"_flash": {"notice": "Saved"}})
+
+		def index(request, context):
+			return context.get(Views).render("index")
+
+		app = Application(
+			Config(),
+			Router([Route(Method.GET, Pattern("/"), index)]),
+			[
+				Values(session),
+				helios.flash.Provider(),
+				helios.view.Provider(
+					helios.view.Config(views_dir),
+					components=[Notice],
+				),
+			],
+		)
+		try:
+			response = app.handle(Request(Method.GET, URL("/")))
+		finally:
+			app.close()
+
+	assert_eq(str(response.body), "Notice: Saved")
 
 
 def test_boots_without_views():

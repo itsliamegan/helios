@@ -12,7 +12,13 @@ from helios.http import Input, Method, Request, Response, URL
 from helios.routing import Pattern, Route, Router
 from helios.session.store import Session
 import helios.view
-from helios.view import Views
+from helios.view import Component, Views
+
+
+class Field(Component):
+	template = "field"
+
+	name: str
 
 
 class Values(Provider):
@@ -142,6 +148,36 @@ def test_shares_submission_with_views():
 		)
 
 	assert_eq(str(response.body), "|Title must be provided.|False")
+
+
+def test_shares_submission_with_components():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("edit.html").write_text('{{ Field(name="title") }}')
+		views_dir.joinpath("field.html").write_text(
+			"{{ name }}: {{ submission.error(name) }}"
+		)
+		session = Session(
+			uuid4(),
+			{"_flash": {"_errors": {"title": ["Title must be provided."]}}},
+		)
+
+		def edit(request, context):
+			return context.get(Views).render("edit")
+
+		response = handle(
+			session,
+			Route(Method.GET, Pattern("/"), edit),
+			Request(Method.GET, URL("/")),
+			[
+				helios.view.Provider(
+					helios.view.Config(views_dir),
+					components=[Field],
+				)
+			],
+		)
+
+	assert_eq(str(response.body), "title: Title must be provided.")
 
 
 def handle(session, route, request, providers=None):
