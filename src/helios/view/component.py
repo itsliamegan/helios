@@ -102,12 +102,12 @@ class Component:
 		current = rendering.get(None)
 		if current is None:
 			raise RuntimeError(f"{type(self).__name__} was rendered outside a view")
-		values = {}
+		assigns = {}
 		for name in type(self).props:
-			values[name] = getattr(self, name)
-		values["component"] = self
+			assigns[name] = getattr(self, name)
+		assigns["component"] = self
 		return Markup(
-			current.engine.render(View(self.template, current.shared), values)
+			current.engine.render(View(self.template, current.shared), assigns)
 		)
 
 	def __str__(self) -> str:

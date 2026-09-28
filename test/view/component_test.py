@@ -262,19 +262,6 @@ def test_renders_components_as_strings_inside_a_render():
 	assert_eq(html, "Chip: &lt;span&gt;&amp;lt;b&amp;gt;&lt;/span&gt;")
 
 
-def test_engine_renders_components():
-	engine = Engine(
-		memory.Driver({"chip": "<span>{{ name }}</span>"}), components=[Chip]
-	)
-	chip = Chip(name="Travel")
-
-	html = engine.render(chip)
-
-	assert_eq(html, "<span>Travel</span>")
-	with assert_raises(RuntimeError):
-		str(chip)
-
-
 def test_rejects_missing_arguments_from_templates():
 	engine = Engine(
 		memory.Driver({"index": "{{ Chip() }}", "chip": "{{ name }}"}),

@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Any, overload
+from typing import Any
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
 
@@ -48,33 +48,12 @@ class Engine:
 	def composer(self, composer: Composer):
 		self.composers.append(composer)
 
-	@overload
-	def render(
-		self,
-		renderable: View,
-		assigns: dict[str, Any] | None = None,
-	) -> str: ...
-
-	@overload
-	def render(self, renderable: Component) -> str: ...
-
-	def render(
-		self,
-		renderable: View | Component,
-		assigns: dict[str, Any] | None = None,
-	) -> str:
-		if isinstance(renderable, View):
-			shared = renderable.shared
-		else:
-			shared = {}
-		token = rendering.set(Rendering(self, shared))
+	def render(self, view: View, assigns: dict[str, Any] | None = None) -> str:
+		token = rendering.set(Rendering(self, view.shared))
 		try:
-			if isinstance(renderable, Component):
-				return str(renderable)
-			else:
-				assigns = assigns or {}
-				template = self.jinja.get_template(renderable.name)
-				return template.render({**shared, **assigns})
+			assigns = assigns or {}
+			template = self.jinja.get_template(view.name)
+			return template.render({**view.shared, **assigns})
 		finally:
 			rendering.reset(token)
 
