@@ -2,6 +2,7 @@ from uuid import UUID
 
 from luna.test.assertion import assert_eq, assert_that
 
+from helios.app import Container, Context
 from helios.http import Method, Request, Response, Status, URL
 from helios.routing import (
 	Group,
@@ -9,6 +10,14 @@ from helios.routing import (
 	Route,
 	Router,
 )
+
+
+def handle(req, ctx):
+	return Response.empty()
+
+
+def context(request: Request) -> Context:
+	return Context(Container(), request)
 
 
 def test_calling_route_runs_guards_before_handler():
@@ -22,22 +31,22 @@ def test_calling_route_runs_guards_before_handler():
 		return Response.empty(Status.OK)
 
 	route = Route(Method.GET, Pattern("/{id}"), handler, [guard])
-	res = route(Request(Method.GET, URL("/1")), None, id="1")
+	request = Request(Method.GET, URL("/1"))
+	res = route(request, context(request), id="1")
 
 	assert_eq(res.status, Status.OK)
 	assert_eq(calls, [("guard", "1"), ("handler", "1")])
 
 
 def test_group_without_prefix_or_guards_preserves_route_configuration():
-	handler = object()
-	route = Route(Method.GET, Pattern("/articles"), handler)
+	route = Route(Method.GET, Pattern("/articles"), handle)
 
 	effective = Router([Group(routes=[route])]).routes[0]
 
 	assert_that(effective is route)
 	assert_that(effective.method is Method.GET)
 	assert_eq(effective.pattern.raw, "/articles")
-	assert_that(effective.handler is handler)
+	assert_that(effective.handler is handle)
 	assert_eq(effective.guards, [])
 
 
@@ -47,8 +56,8 @@ def test_applies_group_prefix_to_direct_routes():
 			Group(
 				prefix="/articles",
 				routes=[
-					Route(Method.GET, Pattern("/"), object()),
-					Route(Method.GET, Pattern("/new"), object()),
+					Route(Method.GET, Pattern("/"), handle),
+					Route(Method.GET, Pattern("/new"), handle),
 				],
 			)
 		]
@@ -72,8 +81,8 @@ def test_composes_nested_group_prefixes_and_trailing_slashes():
 					Group(
 						prefix="/comments",
 						routes=[
-							Route(Method.GET, Pattern("/"), object()),
-							Route(Method.GET, Pattern("/{id:uuid}/"), object()),
+							Route(Method.GET, Pattern("/"), handle),
+							Route(Method.GET, Pattern("/{id:uuid}/"), handle),
 						],
 					),
 				],
@@ -108,7 +117,8 @@ def test_converts_params_in_grouped_patterns():
 			)
 		]
 	)
-	router(Request(Method.GET, URL(f"/articles/{id}")), None)
+	request = Request(Method.GET, URL(f"/articles/{id}"))
+	router(request, context(request))
 
 	assert_eq(called_with, [id])
 
@@ -122,8 +132,8 @@ def test_inherits_group_guards_into_every_descendant():
 			Group(
 				guards=[guard],
 				routes=[
-					Route(Method.GET, Pattern("/one"), object()),
-					Group(routes=[Route(Method.GET, Pattern("/two"), object())]),
+					Route(Method.GET, Pattern("/one"), handle),
+					Group(routes=[Route(Method.GET, Pattern("/two"), handle)]),
 				],
 			)
 		]
@@ -166,7 +176,8 @@ def test_runs_nested_and_route_guards_outermost_first():
 			)
 		]
 	)
-	router(Request(Method.GET, URL("/")), None)
+	request = Request(Method.GET, URL("/"))
+	router(request, context(request))
 
 	assert_eq(calls, ["outer", "inner", "route", "handler"])
 
@@ -195,16 +206,23 @@ def test_inherited_guard_response_stops_dispatch():
 			)
 		]
 	)
-	res = router(Request(Method.GET, URL("/")), None)
+	request = Request(Method.GET, URL("/"))
+	res = router(request, context(request))
 
 	assert_eq(res.status, Status.FORBIDDEN)
 	assert_eq(calls, ["outer"])
 
 
 def test_group_flattening_preserves_declaration_and_matching_order():
-	first = object()
-	second = object()
-	third = object()
+	def first(req, ctx):
+		return Response.empty()
+
+	def second(req, ctx):
+		return Response.empty()
+
+	def third(req, ctx):
+		return Response.empty()
+
 	router = Router(
 		[
 			Group(
@@ -229,7 +247,7 @@ def test_reusing_group_configuration_doesnt_mutate_sources():
 	def route_guard(req, ctx):
 		pass
 
-	route = Route(Method.GET, Pattern("/{id:uuid}/"), object(), guards=[route_guard])
+	route = Route(Method.GET, Pattern("/{id:uuid}/"), handle, guards=[route_guard])
 	shared = Group(prefix="/items", guards=[group_guard], routes=[route])
 	router = Router(
 		[

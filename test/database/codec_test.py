@@ -100,7 +100,7 @@ def test_finds_codecs_for_types():
 	found = Codec.for_type(Slug)
 
 	assert_that(isinstance(Codec.for_type(str), Str))
-	assert_that(isinstance(found, Slug.Codec))
+	assert isinstance(found, Slug.Codec)
 	assert_eq(encode(found, Slug("today")), "today")
 	assert_eq(Codec.for_type(list[str]), None)
 	assert_eq(Codec.for_type(object), None)

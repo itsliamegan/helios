@@ -82,7 +82,7 @@ def test_resolves_pending_annotations_on_first_use():
 
 def test_rejects_annotations_that_never_resolve():
 	class Post:
-		author: Author  # noqa: F821
+		author: Author  # noqa: F821  # ty: ignore[unresolved-reference]
 
 	(declaration,) = declarations(Post, annotation_of, ExampleError)
 

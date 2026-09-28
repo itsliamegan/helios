@@ -52,6 +52,7 @@ def test_encodes_text_and_binary_bodies():
 def test_creates_file_response():
 	response = Response.file(b"\x00\xff", "report.pdf", "application/pdf")
 
+	assert isinstance(response.body, Buffered)
 	assert_eq(response.body.to_bytes(), b"\x00\xff")
 	assert_eq(str(response.headers["Content-Type"]), "application/pdf")
 	assert_eq(

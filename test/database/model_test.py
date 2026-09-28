@@ -69,13 +69,13 @@ def test_rejects_missing_extra_non_init_and_null_attributes():
 		title: str
 
 	with assert_raises(TypeError):
-		Post()
+		Post()  # ty: ignore[missing-argument]
 	with assert_raises(TypeError):
-		Post(title="Intro", extra="value")
+		Post(title="Intro", extra="value")  # ty: ignore[unknown-argument]
 	with assert_raises(TypeError):
-		Post(title="Intro", id=uuid4())
+		Post(title="Intro", id=uuid4())  # ty: ignore[unknown-argument]
 	with assert_raises(ModelError):
-		Post(title=None)
+		Post(title=None)  # ty: ignore[invalid-argument-type]
 
 
 def test_requires_nullable_attributes_without_defaults():
@@ -83,7 +83,7 @@ def test_requires_nullable_attributes_without_defaults():
 		summary: str | None
 
 	with assert_raises(TypeError):
-		Post()
+		Post()  # ty: ignore[missing-argument]
 	assert_that(Post(summary=None).summary is None)
 
 
@@ -119,7 +119,7 @@ def test_resolves_codecs_nested_in_the_model():
 
 	assert_eq(post.slug.text, "intro")
 	with assert_raises(ModelError):
-		Post(slug="intro")
+		Post(slug="intro")  # ty: ignore[invalid-argument-type]
 
 
 def test_resolves_codecs_that_refer_to_the_model():
@@ -143,9 +143,10 @@ def test_resolves_codecs_that_refer_to_the_model():
 
 	post = Post(slug=Post.Slug("intro"))
 
+	assert post.slug is not None
 	assert_eq(post.slug.text, "intro")
 	with assert_raises(ModelError):
-		Post(slug="intro")
+		Post(slug="intro")  # ty: ignore[invalid-argument-type]
 
 
 def test_resolves_codecs_declared_after_the_model():
@@ -174,7 +175,7 @@ def test_resolves_codecs_declared_after_the_model():
 
 def test_rejects_unresolved_annotations_on_construction():
 	class Post(Model):
-		author: Author  # noqa: F821
+		author: Author  # noqa: F821  # ty: ignore[unresolved-reference]
 
 	with assert_raises(ModelError):
 		Post(author=None)

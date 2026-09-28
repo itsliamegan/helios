@@ -413,7 +413,7 @@ def test_rejects_undefined_annotations_on_construction():
 	class Card(Component):
 		template = "card"
 
-		author: Author  # noqa: F821
+		author: Author  # noqa: F821  # ty: ignore[unresolved-reference]
 
 	with assert_raises(ComponentError):
 		Card(author=None)

@@ -21,6 +21,7 @@ def test_creates_and_matches_password():
 def test_redacts_password_representation():
 	password = Password.from_plaintext("secret")
 	encoded = Password.Codec().encode(password)
+	assert isinstance(encoded, str)
 
 	assert_that(encoded not in repr(password))
 	assert_that("secret" not in repr(password))

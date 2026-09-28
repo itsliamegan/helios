@@ -9,6 +9,7 @@ import helios.app
 from helios.http import (
 	Buffered,
 	Cookies,
+	File,
 	Headers,
 	Method,
 	Response,
@@ -67,7 +68,7 @@ def test_adapts_headers():
 
 
 def test_adapts_content_info():
-	env = EnvironBuilder(content_type="text/html", content_length="100").get_environ()
+	env = EnvironBuilder(content_type="text/html", content_length=100).get_environ()
 
 	req = RequestAdapter(env).adapt()
 
@@ -111,6 +112,7 @@ def test_adapts_multipart_input_and_files():
 
 	assert_eq(req.input["title"], "Summer")
 	photo = req.files["photo"]
+	assert isinstance(photo, File)
 	assert_eq(photo.content, b"image bytes")
 	assert_eq(photo.filename, "beach.jpg")
 	assert_eq(photo.content_type, "image/jpeg")
@@ -131,6 +133,7 @@ def test_adapts_repeated_multipart_input_and_files():
 
 	assert_eq(req.input["tag"], ["summer", "holiday"])
 	photos = req.files["photo"]
+	assert isinstance(photos, list)
 	assert_eq([photo.content for photo in photos], [b"first", b"second"])
 	assert_eq([photo.filename for photo in photos], ["first.jpg", "second.jpg"])
 
@@ -143,7 +146,7 @@ def test_adapts_res():
 		Buffered("<h1>Index</h1>"),
 	)
 
-	def start_res(status, pairs):
+	def start_response(status, pairs, exc_info=None):
 		assert_eq(status, "200 OK")
 		assert_eq(
 			pairs,
@@ -156,7 +159,7 @@ def test_adapts_res():
 			],
 		)
 
-	body = ResponseAdapter(res, start_res).adapt()
+	body = ResponseAdapter(res, start_response).adapt()
 
 	assert_eq(list(body), [b"<h1>Index</h1>"])
 
@@ -164,10 +167,10 @@ def test_adapts_res():
 def test_adapts_binary_res():
 	res = Response.file(b"\x00\xff", "data.bin", "application/octet-stream")
 
-	def start_res(status, pairs):
+	def start_response(status, pairs, exc_info=None):
 		assert_eq(status, "200 OK")
 
-	body = ResponseAdapter(res, start_res).adapt()
+	body = ResponseAdapter(res, start_response).adapt()
 
 	assert_eq(list(body), [b"\x00\xff"])
 
@@ -177,7 +180,7 @@ def test_adapts_multiple_cookies():
 	res.cookies["session_id"] = "51d0d53a-11dd-47a5-b438-5eb1b84e1432"
 	res.cookies["csrf_token"] = "fd3e6aff6360af4d6ba905d4299cff81"
 
-	def start_res(status, pairs):
+	def start_response(status, pairs, exc_info=None):
 		assert_eq(
 			pairs,
 			[
@@ -189,7 +192,7 @@ def test_adapts_multiple_cookies():
 			],
 		)
 
-	ResponseAdapter(res, start_res).adapt()
+	ResponseAdapter(res, start_response).adapt()
 
 
 def test_client_routes_get_and_exposes_response():

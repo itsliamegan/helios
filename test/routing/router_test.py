@@ -2,6 +2,7 @@ from uuid import UUID
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
+from helios.app import Container, Context
 from helios.http import Method, Request, Response, Status, URL
 from helios.routing import (
 	Group,
@@ -13,19 +14,27 @@ from helios.routing import (
 )
 
 
+def handle(req, ctx):
+	return Response.empty()
+
+
+def context(request: Request) -> Context:
+	return Context(Container(), request)
+
+
 def test_dispatches_directly():
 	def handler(req, ctx):
 		return Response.empty(Status.OK)
 
 	router = Router([Route(Method.GET, Pattern("/"), handler)])
-	res = router(Request(Method.GET, URL("/")), None)
+	request = Request(Method.GET, URL("/"))
+	res = router(request, context(request))
 
 	assert_eq(res.status, Status.OK)
 
 
 def test_routes_to_root():
-	handler = object()
-	route = Route(Method.GET, Pattern("/"), handler)
+	route = Route(Method.GET, Pattern("/"), handle)
 	router = Router([route])
 
 	match = router.match(Method.GET, URL("/"))
@@ -34,8 +43,8 @@ def test_routes_to_root():
 
 
 def test_routes_by_path():
-	articles = Route(Method.GET, Pattern("/articles/"), object())
-	comments = Route(Method.GET, Pattern("/comments/"), object())
+	articles = Route(Method.GET, Pattern("/articles/"), handle)
+	comments = Route(Method.GET, Pattern("/comments/"), handle)
 	router = Router([articles, comments])
 
 	articles_match = router.match(Method.GET, URL("/articles/"))
@@ -46,8 +55,8 @@ def test_routes_by_path():
 
 
 def test_routes_by_method():
-	index = Route(Method.GET, Pattern("/articles/"), object())
-	store = Route(Method.POST, Pattern("/articles/"), object())
+	index = Route(Method.GET, Pattern("/articles/"), handle)
+	store = Route(Method.POST, Pattern("/articles/"), handle)
 	router = Router([index, store])
 
 	index_match = router.match(Method.GET, URL("/articles/"))
@@ -58,7 +67,7 @@ def test_routes_by_method():
 
 
 def test_routes_with_params():
-	route = Route(Method.GET, Pattern("/articles/{slug}"), object())
+	route = Route(Method.GET, Pattern("/articles/{slug}"), handle)
 	router = Router([route])
 
 	match = router.match(Method.GET, URL("/articles/intro"))
@@ -67,7 +76,7 @@ def test_routes_with_params():
 
 
 def test_routes_with_explicit_str_converter():
-	route = Route(Method.GET, Pattern("/articles/{slug:str}"), object())
+	route = Route(Method.GET, Pattern("/articles/{slug:str}"), handle)
 	router = Router([route])
 
 	match = router.match(Method.GET, URL("/articles/intro"))
@@ -77,7 +86,7 @@ def test_routes_with_explicit_str_converter():
 
 def test_routes_with_uuid_converter():
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
-	route = Route(Method.GET, Pattern("/articles/{id:uuid}"), object())
+	route = Route(Method.GET, Pattern("/articles/{id:uuid}"), handle)
 	router = Router([route])
 
 	match = router.match(Method.GET, URL(f"/articles/{id}"))
@@ -95,7 +104,8 @@ def test_passes_converted_params_to_handler_by_name():
 
 	router = Router([Route(Method.GET, Pattern("/articles/{id:uuid}/{slug}"), handler)])
 
-	router(Request(Method.GET, URL(f"/articles/{id}/intro")), None)
+	request = Request(Method.GET, URL(f"/articles/{id}/intro"))
+	router(request, context(request))
 
 	assert_eq(called_with, [("intro", id)])
 
@@ -109,8 +119,8 @@ def test_uuid_converter_doesnt_match_invalid_uuid():
 
 
 def test_routes_instead_of_param():
-	new = Route(Method.GET, Pattern("/articles/new"), object())
-	show = Route(Method.GET, Pattern("/articles/{slug}"), object())
+	new = Route(Method.GET, Pattern("/articles/new"), handle)
+	show = Route(Method.GET, Pattern("/articles/{slug}"), handle)
 	router = Router([new, show])
 
 	match = router.match(Method.GET, URL("/articles/new"))
@@ -119,7 +129,7 @@ def test_routes_instead_of_param():
 
 
 def test_routes_with_param_to_subroute():
-	route = Route(Method.POST, Pattern("/articles/{slug}/read"), object())
+	route = Route(Method.POST, Pattern("/articles/{slug}/read"), handle)
 	router = Router([route])
 
 	match = router.match(Method.POST, URL("/articles/intro/read"))
@@ -141,7 +151,8 @@ def test_runs_route_guards_in_order_before_handler():
 		return Response.empty(Status.OK)
 
 	router = Router([Route(Method.GET, Pattern("/"), handler, guards=[first, second])])
-	router(Request(Method.GET, URL("/")), None)
+	request = Request(Method.GET, URL("/"))
+	router(request, context(request))
 
 	assert_eq(calls, ["first", "second", "handler"])
 
@@ -161,7 +172,8 @@ def test_guard_response_stops_dispatch():
 		return Response.empty(Status.OK)
 
 	router = Router([Route(Method.GET, Pattern("/"), handler, guards=[stop, later])])
-	res = router(Request(Method.GET, URL("/")), None)
+	request = Request(Method.GET, URL("/"))
+	res = router(request, context(request))
 
 	assert_eq(res.status, Status.FORBIDDEN)
 	assert_eq(calls, ["stop"])
@@ -180,7 +192,8 @@ def test_passes_converted_params_to_guards_by_name():
 	router = Router(
 		[Route(Method.GET, Pattern("/articles/{id:uuid}"), handler, guards=[guard])]
 	)
-	router(Request(Method.GET, URL(f"/articles/{id}")), None)
+	request = Request(Method.GET, URL(f"/articles/{id}"))
+	router(request, context(request))
 
 	assert_eq(called_with, [id])
 
@@ -191,7 +204,7 @@ def test_doesnt_run_guards_for_unmatched_routes():
 	def guard(req, ctx):
 		calls.append("guard")
 
-	router = Router([Route(Method.GET, Pattern("/articles"), object(), guards=[guard])])
+	router = Router([Route(Method.GET, Pattern("/articles"), handle, guards=[guard])])
 	match = router.match(Method.GET, URL("/missing"))
 
 	assert_that(match is None)

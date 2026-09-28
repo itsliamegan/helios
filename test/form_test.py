@@ -254,7 +254,7 @@ def test_rejects_undefined_annotations():
 	with assert_raises(FormError):
 
 		class BadForm(Form):
-			author: Author  # noqa: F821
+			author: Author  # noqa: F821  # ty: ignore[unresolved-reference]
 
 
 def test_rejects_field_names_form_uses():

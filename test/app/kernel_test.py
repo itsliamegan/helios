@@ -2,7 +2,7 @@ from contextlib import contextmanager
 
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.app import Container, Kernel
+from helios.app import Container, Context, Kernel
 from helios.http import (
 	Buffered,
 	Cookies,
@@ -127,4 +127,8 @@ def test_rejects_unknown_method_override():
 	request = Request(Method.POST, URL("/"), input=Input({"_method": "delete"}))
 
 	with assert_raises(UnsupportedMethodError):
-		Kernel.adapt_artificial_method(request, None, lambda req, ctx: Response.empty())
+		Kernel.adapt_artificial_method(
+			request,
+			Context(Container(), request),
+			lambda req, ctx: Response.empty(),
+		)

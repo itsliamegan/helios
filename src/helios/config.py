@@ -17,7 +17,7 @@ FALSE_VALUES = {"false", "no", "off", "0"}
 
 
 class Config:
-	def __init__(self, values: dict[str, str]):
+	def __init__(self, values: Mapping[str, str]):
 		self.values = values
 
 	@classmethod
