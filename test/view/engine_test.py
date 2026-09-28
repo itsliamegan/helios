@@ -146,9 +146,25 @@ def test_renders_none_variables_in_conditions():
 	assert_eq(html, "")
 
 
+def test_renders_shared_values():
+	engine = Engine(memory.Driver({"index": "{{ title }}"}))
+
+	html = engine.render("index", shared={"title": "Shared"})
+
+	assert_eq(html, "Shared")
+
+
+def test_prefers_assigns_over_shared_values():
+	engine = Engine(memory.Driver({"index": "{{ title }}"}))
+
+	html = engine.render("index", {"title": "Assigned"}, {"title": "Shared"})
+
+	assert_eq(html, "Assigned")
+
+
 def test_engine_renders_without_composers():
 	engine = Engine(memory.Driver({"index": "{{ title }}"}))
-	engine.composer(lambda view, context: view.assign("title", "Composed"))
+	engine.composer(lambda view, context: view.share("title", "Composed"))
 
 	with assert_raises(UndefinedError):
 		engine.render("index")

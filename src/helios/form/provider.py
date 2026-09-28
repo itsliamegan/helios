@@ -30,4 +30,4 @@ class Provider(Provider):
 		)
 
 	def compose(self, view: View, context: Context):
-		view.assign("submission", context.get(Submission))
+		view.share("submission", context.get(Submission))

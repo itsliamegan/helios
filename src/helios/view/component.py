@@ -101,7 +101,7 @@ class Component:
 		current = rendering.get(None)
 		if current is None:
 			raise RuntimeError(f"{type(self).__name__} was rendered outside a view")
-		values = dict(current.shared)
+		values = {}
 		for name in type(self).props:
 			values[name] = getattr(self, name)
 		values["component"] = self

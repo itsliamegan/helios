@@ -10,14 +10,14 @@ from .engine import Engine
 @dataclass(init=False)
 class View:
 	name: str
-	assigns: dict[str, Any]
+	shared: dict[str, Any]
 
 	def __init__(self, name: str):
 		self.name = name
-		self.assigns = {}
+		self.shared = {}
 
-	def assign(self, name: str, value: Any):
-		self.assigns[name] = value
+	def share(self, name: str, value: Any):
+		self.shared[name] = value
 
 
 class Views:
@@ -34,9 +34,7 @@ class Views:
 		view = View(name)
 		for composer in self.engine.composers:
 			composer(view, self.context)
-		shared = dict(view.assigns)
-		view.assigns.update(assigns or {})
 		return Response.html(
-			self.engine.render(view.name, view.assigns, shared),
+			self.engine.render(view.name, assigns, view.shared),
 			status,
 		)

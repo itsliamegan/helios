@@ -67,14 +67,14 @@ class Engine:
 		assigns: dict[str, Any] | None = None,
 		shared: dict[str, Any] | None = None,
 	) -> str:
-		token = rendering.set(Rendering(self, shared or {}))
+		shared = shared or {}
+		token = rendering.set(Rendering(self, shared))
 		try:
 			if isinstance(renderable, Component):
 				return str(renderable)
 			else:
-				assigns = assigns or {}
 				template = self.jinja.get_template(renderable)
-				return template.render(**assigns)
+				return template.render({**shared, **(assigns or {})})
 		finally:
 			rendering.reset(token)
 
