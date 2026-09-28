@@ -454,3 +454,11 @@ def test_rejects_undefined_annotations_on_construction():
 
 	with assert_raises(ComponentError):
 		Card(author=None)
+
+
+def test_engine_renders_component():
+	engine = Engine(memory.Driver({"chip": "<i>{{ name }}</i>"}), components=[Chip])
+
+	html = engine.render(Chip(name="Ada"))
+
+	assert_eq(html, "<i>Ada</i>")
