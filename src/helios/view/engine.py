@@ -5,7 +5,7 @@ from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
 
 from helios.app import Context
 
-from .component import Component, rendering
+from .component import Component, Rendering, rendering
 from .extension import RenderExtension
 from .helpers import Helpers
 from .source import Driver
@@ -55,6 +55,7 @@ class Engine:
 		self,
 		renderable: str,
 		assigns: dict[str, Any] | None = None,
+		shared: dict[str, Any] | None = None,
 	) -> str: ...
 
 	@overload
@@ -64,8 +65,9 @@ class Engine:
 		self,
 		renderable: str | Component,
 		assigns: dict[str, Any] | None = None,
+		shared: dict[str, Any] | None = None,
 	) -> str:
-		token = rendering.set(self)
+		token = rendering.set(Rendering(self, shared or {}))
 		try:
 			if isinstance(renderable, Component):
 				return str(renderable)

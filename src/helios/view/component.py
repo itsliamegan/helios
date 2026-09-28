@@ -1,5 +1,6 @@
 from annotationlib import get_annotations
 from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform
 
 from markupsafe import Markup
@@ -18,7 +19,14 @@ from .error import ComponentError
 if TYPE_CHECKING:
 	from .engine import Engine
 
-rendering: ContextVar[Engine] = ContextVar("rendering")
+
+@dataclass
+class Rendering:
+	engine: Engine
+	shared: dict[str, Any]
+
+
+rendering: ContextVar[Rendering] = ContextVar("rendering")
 
 
 @dataclass_transform(kw_only_default=True, eq_default=False)
@@ -90,14 +98,14 @@ class Component:
 					)
 
 	def __html__(self) -> Markup:
-		engine = rendering.get(None)
-		if engine is None:
+		current = rendering.get(None)
+		if current is None:
 			raise RuntimeError(f"{type(self).__name__} was rendered outside a view")
-		values = {}
+		values = dict(current.shared)
 		for name in type(self).props:
 			values[name] = getattr(self, name)
 		values["component"] = self
-		return Markup(engine.render(self.template, values))
+		return Markup(current.engine.render(self.template, values, current.shared))
 
 	def __str__(self) -> str:
 		return str(self.__html__())

@@ -162,6 +162,55 @@ def test_hides_caller_assigns():
 		engine.render("index", {"name": "Travel", "title": "Posts"})
 
 
+def test_renders_shared_values():
+	engine = Engine(
+		memory.Driver(
+			{
+				"index": '{{ Chip(name="Travel") }}',
+				"chip": "{{ name }} for {{ user }}",
+			}
+		),
+		components=[Chip],
+	)
+
+	html = engine.render("index", shared={"user": "Ada"})
+
+	assert_eq(html, "Travel for Ada")
+
+
+def test_renders_shared_values_in_nested_components():
+	engine = Engine(
+		memory.Driver(
+			{
+				"index": '{{ Row(names=["a", "b"]) }}',
+				"row": "{% for name in names %}{{ Chip(name=name) }}{% endfor %}",
+				"chip": "{{ name }}{{ user }}",
+			}
+		),
+		components=[Chip, Row],
+	)
+
+	html = engine.render("index", shared={"user": "!"})
+
+	assert_eq(html, "a!b!")
+
+
+def test_prefers_props_over_shared_values():
+	engine = Engine(
+		memory.Driver(
+			{
+				"index": '{{ Chip(name="Travel") }}',
+				"chip": "{{ name }}",
+			}
+		),
+		components=[Chip],
+	)
+
+	html = engine.render("index", shared={"name": "Shared"})
+
+	assert_eq(html, "Travel")
+
+
 def test_renders_component_properties():
 	engine = Engine(
 		memory.Driver(
