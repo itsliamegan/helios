@@ -8,6 +8,7 @@ from helios.view import (
 	ComponentError,
 	Engine,
 	Helpers,
+	View,
 	memory,
 )
 
@@ -122,7 +123,7 @@ def test_renders_props():
 		components=[Chip],
 	)
 
-	html = engine.render("index", {"name": "<b>"})
+	html = engine.render(View("index"), {"name": "<b>"})
 
 	assert_eq(html, "<span>&lt;b&gt;</span>")
 
@@ -142,7 +143,7 @@ def test_renders_globals_and_filters():
 		components=[Chip],
 	)
 
-	html = engine.render("index")
+	html = engine.render(View("index"))
 
 	assert_eq(html, "TRAVEL on Cork")
 
@@ -159,7 +160,7 @@ def test_hides_caller_assigns():
 	)
 
 	with assert_raises(UndefinedError):
-		engine.render("index", {"name": "Travel", "title": "Posts"})
+		engine.render(View("index"), {"name": "Travel", "title": "Posts"})
 
 
 def test_renders_shared_values():
@@ -173,7 +174,7 @@ def test_renders_shared_values():
 		components=[Chip],
 	)
 
-	html = engine.render("index", shared={"user": "Ada"})
+	html = engine.render(View("index", {"user": "Ada"}))
 
 	assert_eq(html, "Travel for Ada")
 
@@ -190,7 +191,7 @@ def test_renders_shared_values_in_nested_components():
 		components=[Chip, Row],
 	)
 
-	html = engine.render("index", shared={"user": "!"})
+	html = engine.render(View("index", {"user": "!"}))
 
 	assert_eq(html, "a!b!")
 
@@ -206,7 +207,7 @@ def test_prefers_props_over_shared_values():
 		components=[Chip],
 	)
 
-	html = engine.render("index", shared={"name": "Shared"})
+	html = engine.render(View("index", {"name": "Shared"}))
 
 	assert_eq(html, "Travel")
 
@@ -222,7 +223,7 @@ def test_renders_component_properties():
 		components=[Post],
 	)
 
-	html = engine.render("index")
+	html = engine.render(View("index"))
 
 	assert_eq(html, "Travel (yours)")
 
@@ -239,7 +240,7 @@ def test_renders_nested_components():
 		components=[Chip, Row],
 	)
 
-	html = engine.render("index")
+	html = engine.render(View("index"))
 
 	assert_eq(html, "<ul><li>a</li><li>b</li></ul>")
 
@@ -256,7 +257,7 @@ def test_renders_components_as_strings_inside_a_render():
 		components=[Chip],
 	)
 
-	html = engine.render("index")
+	html = engine.render(View("index"))
 
 	assert_eq(html, "Chip: &lt;span&gt;&amp;lt;b&amp;gt;&lt;/span&gt;")
 
@@ -281,7 +282,7 @@ def test_rejects_missing_arguments_from_templates():
 	)
 
 	with assert_raises(TypeError):
-		engine.render("index")
+		engine.render(View("index"))
 
 
 def test_rejects_positional_arguments_from_templates():
@@ -291,7 +292,7 @@ def test_rejects_positional_arguments_from_templates():
 	)
 
 	with assert_raises(TypeError):
-		engine.render("index")
+		engine.render(View("index"))
 
 
 def test_rejects_unknown_keywords_without_attributes_prop():
@@ -303,7 +304,7 @@ def test_rejects_unknown_keywords_without_attributes_prop():
 	)
 
 	with assert_raises(TypeError):
-		engine.render("index")
+		engine.render(View("index"))
 
 
 def test_passes_attributes_through_from_templates():
@@ -320,7 +321,7 @@ def test_passes_attributes_through_from_templates():
 		components=[Link],
 	)
 
-	html = engine.render("index")
+	html = engine.render(View("index"))
 
 	assert_eq(
 		html,
@@ -340,7 +341,7 @@ def test_passes_attributes_bag_from_templates():
 		components=[Link],
 	)
 
-	html = engine.render("index", {"bag": Attributes(id="home")})
+	html = engine.render(View("index"), {"bag": Attributes(id="home")})
 
 	assert_eq(html, '<a href="/" class="external-link" id="home"></a>')
 
@@ -354,7 +355,7 @@ def test_rejects_unknown_attributes_from_templates():
 	)
 
 	with assert_raises(TypeError) as raised:
-		engine.render("index")
+		engine.render(View("index"))
 
 	assert_eq(str(raised.exception), 'Link does not accept the attribute "tabindex"')
 
@@ -371,7 +372,7 @@ def test_rejects_attributes_bag_with_loose_attributes():
 	)
 
 	with assert_raises(TypeError):
-		engine.render("index", {"bag": Attributes(class_="post-link")})
+		engine.render(View("index"), {"bag": Attributes(class_="post-link")})
 
 
 def test_rejects_components_with_the_same_name():

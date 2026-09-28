@@ -1,23 +1,10 @@
-from dataclasses import dataclass
 from typing import Any
 
 from helios.app import Context
 from helios.http import Response, Status
 
 from .engine import Engine
-
-
-@dataclass(init=False)
-class View:
-	name: str
-	shared: dict[str, Any]
-
-	def __init__(self, name: str):
-		self.name = name
-		self.shared = {}
-
-	def share(self, name: str, value: Any):
-		self.shared[name] = value
+from .view import View
 
 
 class Views:
@@ -35,6 +22,6 @@ class Views:
 		for composer in self.engine.composers:
 			composer(view, self.context)
 		return Response.html(
-			self.engine.render(view.name, assigns, view.shared),
+			self.engine.render(view, assigns),
 			status,
 		)

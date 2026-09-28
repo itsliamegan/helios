@@ -6,13 +6,13 @@ from jinja2 import UndefinedError
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
 
-from helios.view import Engine, Helpers, file, memory
+from helios.view import Engine, Helpers, View, file, memory
 
 
 def test_renders_simple():
 	engine = Engine(memory.Driver({"index": "<h1>{{ title }}</h1>"}))
 
-	html = engine.render("index", {"title": "Index"})
+	html = engine.render(View("index"), {"title": "Index"})
 
 	assert_eq(html, "<h1>Index</h1>")
 
@@ -27,7 +27,7 @@ def test_renders_inherited():
 		)
 	)
 
-	html = engine.render("show", {"title": "Intro"})
+	html = engine.render(View("show"), {"title": "Intro"})
 
 	assert_eq(html, "<h1>Intro</h1><p>An article.</p>")
 
@@ -38,7 +38,7 @@ def test_renders_application_filters():
 		Helpers(filters={"shout": lambda text: text.upper() + "!"}),
 	)
 
-	html = engine.render("index", {"title": "hello"})
+	html = engine.render(View("index"), {"title": "hello"})
 
 	assert_eq(html, "HELLO!")
 
@@ -49,7 +49,7 @@ def test_renders_application_globals():
 		Helpers(globals={"greet": lambda name: f"Hi {name}", "site": "Cork"}),
 	)
 
-	html = engine.render("index", {"name": "Ada"})
+	html = engine.render(View("index"), {"name": "Ada"})
 
 	assert_eq(html, "Hi Ada from Cork")
 
@@ -60,7 +60,7 @@ def test_keeps_default_filters_alongside_application_filters():
 		Helpers(filters={"shout": lambda text: text.upper()}),
 	)
 
-	html = engine.render("index", {"day": datetime(2026, 4, 7, tzinfo=UTC)})
+	html = engine.render(View("index"), {"day": datetime(2026, 4, 7, tzinfo=UTC)})
 
 	assert_eq(html, "Apr 7, 2026")
 
@@ -71,7 +71,7 @@ def test_application_filters_override_defaults():
 		Helpers(filters={"date": lambda day: day.strftime("%Y-%m-%d")}),
 	)
 
-	html = engine.render("index", {"day": datetime(2026, 4, 7, tzinfo=UTC)})
+	html = engine.render(View("index"), {"day": datetime(2026, 4, 7, tzinfo=UTC)})
 
 	assert_eq(html, "2026-04-07")
 
@@ -82,7 +82,7 @@ def test_escapes_plain_string_helper_output():
 		Helpers(filters={"bold": lambda text: f"<b>{text}</b>"}),
 	)
 
-	html = engine.render("index", {"title": "Hi"})
+	html = engine.render(View("index"), {"title": "Hi"})
 
 	assert_eq(html, "&lt;b&gt;Hi&lt;/b&gt;")
 
@@ -93,7 +93,7 @@ def test_renders_markup_helper_output_unescaped():
 		Helpers(filters={"bold": lambda text: Markup("<b>{}</b>").format(text)}),
 	)
 
-	html = engine.render("index", {"title": "<i>"})
+	html = engine.render(View("index"), {"title": "<i>"})
 
 	assert_eq(html, "<b>&lt;i&gt;</b>")
 
@@ -101,7 +101,7 @@ def test_renders_markup_helper_output_unescaped():
 def test_escapes_assigns():
 	engine = Engine(memory.Driver({"posts.index": "<h1>{{ title }}</h1>"}))
 
-	html = engine.render("posts.index", {"title": "<script>alert(1)</script>"})
+	html = engine.render(View("posts.index"), {"title": "<script>alert(1)</script>"})
 
 	assert_eq(html, "<h1>&lt;script&gt;alert(1)&lt;/script&gt;</h1>")
 
@@ -114,34 +114,34 @@ def test_escapes_assigns_in_loaded_templates():
 
 		engine = Engine(file.Driver(views_dir))
 
-		assert_eq(engine.render("posts.index", {"title": "<b>"}), "&lt;b&gt;")
+		assert_eq(engine.render(View("posts.index"), {"title": "<b>"}), "&lt;b&gt;")
 
 
 def test_rejects_undefined_variables():
 	engine = Engine(memory.Driver({"index": "<h1>{{ titel }}</h1>"}))
 
 	with assert_raises(UndefinedError):
-		engine.render("index", {"title": "Index"})
+		engine.render(View("index"), {"title": "Index"})
 
 
 def test_rejects_undefined_attributes():
 	engine = Engine(memory.Driver({"index": "<h1>{{ post.titel }}</h1>"}))
 
 	with assert_raises(UndefinedError):
-		engine.render("index", {"post": {"title": "Index"}})
+		engine.render(View("index"), {"post": {"title": "Index"}})
 
 
 def test_rejects_undefined_variables_in_conditions():
 	engine = Engine(memory.Driver({"index": "{% if error %}{{ error }}{% endif %}"}))
 
 	with assert_raises(UndefinedError):
-		engine.render("index")
+		engine.render(View("index"))
 
 
 def test_renders_none_variables_in_conditions():
 	engine = Engine(memory.Driver({"index": "{% if error %}{{ error }}{% endif %}"}))
 
-	html = engine.render("index", {"error": None})
+	html = engine.render(View("index"), {"error": None})
 
 	assert_eq(html, "")
 
@@ -149,7 +149,7 @@ def test_renders_none_variables_in_conditions():
 def test_renders_shared_values():
 	engine = Engine(memory.Driver({"index": "{{ title }}"}))
 
-	html = engine.render("index", shared={"title": "Shared"})
+	html = engine.render(View("index", {"title": "Shared"}))
 
 	assert_eq(html, "Shared")
 
@@ -157,7 +157,7 @@ def test_renders_shared_values():
 def test_prefers_assigns_over_shared_values():
 	engine = Engine(memory.Driver({"index": "{{ title }}"}))
 
-	html = engine.render("index", {"title": "Assigned"}, {"title": "Shared"})
+	html = engine.render(View("index", {"title": "Shared"}), {"title": "Assigned"})
 
 	assert_eq(html, "Assigned")
 
@@ -167,4 +167,4 @@ def test_engine_renders_without_composers():
 	engine.composer(lambda view, context: view.share("title", "Composed"))
 
 	with assert_raises(UndefinedError):
-		engine.render("index")
+		engine.render(View("index"))

@@ -5,7 +5,8 @@ from .engine import Composer, Engine
 from .error import ComponentError
 from .helpers import Helpers
 from .provider import Provider
-from .views import View, Views
+from .view import View
+from .views import Views
 
 __all__ = [
 	"Attributes",

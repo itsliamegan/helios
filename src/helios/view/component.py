@@ -15,6 +15,7 @@ from helios.declarative import (
 
 from .attributes import Attributes, html_name
 from .error import ComponentError
+from .view import View
 
 if TYPE_CHECKING:
 	from .engine import Engine
@@ -105,7 +106,9 @@ class Component:
 		for name in type(self).props:
 			values[name] = getattr(self, name)
 		values["component"] = self
-		return Markup(current.engine.render(self.template, values, current.shared))
+		return Markup(
+			current.engine.render(View(self.template, current.shared), values)
+		)
 
 	def __str__(self) -> str:
 		return str(self.__html__())

@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Any, TYPE_CHECKING, overload
+from typing import Any, overload
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
 
@@ -9,9 +9,7 @@ from .component import Component, Rendering, rendering
 from .extension import RenderExtension
 from .helpers import Helpers
 from .source import Driver
-
-if TYPE_CHECKING:
-	from .views import View
+from .view import View
 
 
 class Engine:
@@ -53,9 +51,8 @@ class Engine:
 	@overload
 	def render(
 		self,
-		renderable: str,
+		renderable: View,
 		assigns: dict[str, Any] | None = None,
-		shared: dict[str, Any] | None = None,
 	) -> str: ...
 
 	@overload
@@ -63,18 +60,21 @@ class Engine:
 
 	def render(
 		self,
-		renderable: str | Component,
+		renderable: View | Component,
 		assigns: dict[str, Any] | None = None,
-		shared: dict[str, Any] | None = None,
 	) -> str:
-		shared = shared or {}
+		if isinstance(renderable, View):
+			shared = renderable.shared
+		else:
+			shared = {}
 		token = rendering.set(Rendering(self, shared))
 		try:
 			if isinstance(renderable, Component):
 				return str(renderable)
 			else:
-				template = self.jinja.get_template(renderable)
-				return template.render({**shared, **(assigns or {})})
+				assigns = assigns or {}
+				template = self.jinja.get_template(renderable.name)
+				return template.render({**shared, **assigns})
 		finally:
 			rendering.reset(token)
 

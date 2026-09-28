@@ -1,6 +1,6 @@
 from luna.test.assertion import assert_eq
 
-from helios.view import Engine, memory
+from helios.view import Engine, View, memory
 
 
 def test_memory_reloads_changed_templates_when_reloading():
@@ -9,4 +9,4 @@ def test_memory_reloads_changed_templates_when_reloading():
 
 	templates["index"] = "After"
 
-	assert_eq(engine.render("index"), "After")
+	assert_eq(engine.render(View("index")), "After")
