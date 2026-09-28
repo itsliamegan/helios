@@ -4,7 +4,7 @@ from typing import Any, cast
 
 from helios.http import Request
 
-from .container import Container, DependencyError, Scoped
+from .container import Container, DependencyError, Scoped, unparameterized
 
 
 class Context:
@@ -16,6 +16,7 @@ class Context:
 		self.error: Exception | None = None
 
 	def get[T](self, key: type[T]) -> T:
+		key = unparameterized(key)
 		if key is Request:
 			return cast(T, self.request)
 		if key in self.scoped:
@@ -34,6 +35,7 @@ class Context:
 		return value
 
 	def resolved[T](self, key: type[T]) -> T | None:
+		key = unparameterized(key)
 		if key is Request:
 			return cast(T, self.request)
 		if key in self.scoped:

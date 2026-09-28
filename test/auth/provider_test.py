@@ -57,11 +57,11 @@ def create_store(path: Path):
 	return connection, Store(connection, [User])
 
 
-def resolve(store: Store, session: Session) -> Authenticator:
+def resolve(store: Store, session: Session) -> Authenticator[User]:
 	resolved = []
 
 	def index(request, context):
-		resolved.append(context.get(Authenticator))
+		resolved.append(context.get(Authenticator[User]))
 		return Response.empty()
 
 	app = Application(

@@ -74,3 +74,14 @@ def test_constructs_one_singleton_across_threads():
 
 	assert_eq(len(calls), 1)
 	assert all(value is values[0] for value in values)
+
+
+def test_resolves_parameterized_keys_by_their_class():
+	container = Container()
+	container.singleton(list[int], lambda container: [1])
+
+	assert_eq(
+		[container.bound(list), container.bound(list[str])],
+		[True, True],
+	)
+	assert container.get(list[str]) is container.get(list)

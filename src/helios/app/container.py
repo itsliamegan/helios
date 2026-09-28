@@ -2,7 +2,7 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager, ExitStack
 from dataclasses import dataclass
 from threading import RLock
-from typing import Any, TYPE_CHECKING, cast
+from typing import Any, TYPE_CHECKING, cast, get_origin
 
 if TYPE_CHECKING:
 	from .context import Context
@@ -47,15 +47,17 @@ class Container:
 		self.register(key, Scoped(factory))
 
 	def register(self, key: type[Any], binding: Binding):
+		key = unparameterized(key)
 		if isinstance(binding, Instance) and binding.value is None:
 			raise DependencyError(f"{key.__qualname__} cannot be bound to None")
 		self.bindings[key] = binding
 		self.singletons.pop(key, None)
 
 	def bound(self, key: type[Any]) -> bool:
-		return key in self.bindings
+		return unparameterized(key) in self.bindings
 
 	def get[T](self, key: type[T]) -> T:
+		key = unparameterized(key)
 		binding = self.bindings.get(key)
 		if binding is None:
 			raise DependencyError(f"nothing provides {key.__qualname__}")
@@ -75,6 +77,7 @@ class Container:
 			return value
 
 	def resolved[T](self, key: type[T]) -> T | None:
+		key = unparameterized(key)
 		binding = self.bindings.get(key)
 		if binding is None or isinstance(binding, Scoped):
 			return None
@@ -88,3 +91,7 @@ class Container:
 
 	def close(self):
 		self.resources.close()
+
+
+def unparameterized(key: type[Any]) -> type[Any]:
+	return get_origin(key) or key

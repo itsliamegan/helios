@@ -48,3 +48,15 @@ def test_resolved_does_not_construct_lazy_services():
 
 	assert context.resolved(dict) is not None
 	assert_eq(seen, ["scoped"])
+
+
+def test_resolves_parameterized_keys_by_their_class():
+	container = Container()
+	container.scoped(dict, lambda context: {})
+	context = Context(container, request())
+
+	assert_eq(context.resolved(dict[str, int]), None)
+	value = context.get(dict[str, int])
+
+	assert context.get(dict) is value
+	assert context.resolved(dict[str, str]) is value
