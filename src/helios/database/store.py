@@ -139,9 +139,9 @@ class Store:
 			)
 			order = f" ORDER BY {keys}"
 		limit = ""
-		if query._limit is not None:
+		if query.count is not None:
 			limit = " LIMIT ?"
-			parameters.append(query._limit)
+			parameters.append(query.count)
 		sql = (
 			f"SELECT {columns} FROM {quote_identifier(model_type.table)}"
 			f"{where}{order}{limit}"
@@ -175,9 +175,9 @@ class Store:
 	def execute_exists(self, query: Query[Any]) -> bool:
 		where, parameters = compile_conditions(query)
 		limit = ""
-		if query._limit is not None:
+		if query.count is not None:
 			limit = " LIMIT ?"
-			parameters.append(query._limit)
+			parameters.append(query.count)
 		sql = (
 			f"SELECT EXISTS (SELECT 1 FROM {quote_identifier(query.model_type.table)}"
 			f"{where}{limit})"

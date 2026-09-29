@@ -101,7 +101,7 @@ class Query[T: Model]:
 	model_type: type[T]
 	clauses: tuple[Clause, ...] = ()
 	ordering: tuple[tuple[str, Direction], ...] = ()
-	_limit: int | None = None
+	count: int | None = None
 
 	def where(self, conditions: dict[str, Any]) -> Query[T]:
 		return self.adding(Clause((group(self.model_type, conditions),)))
@@ -124,7 +124,7 @@ class Query[T: Model]:
 			model_type=self.model_type,
 			clauses=(*self.clauses, clause),
 			ordering=self.ordering,
-			_limit=self._limit,
+			count=self.count,
 		)
 
 	def order_by(self, name: str, direction: Direction = "asc") -> Query[T]:
@@ -136,7 +136,7 @@ class Query[T: Model]:
 			model_type=self.model_type,
 			clauses=self.clauses,
 			ordering=(*self.ordering, (name, direction)),
-			_limit=self._limit,
+			count=self.count,
 		)
 
 	def limit(self, count: int) -> Query[T]:
@@ -147,19 +147,19 @@ class Query[T: Model]:
 			model_type=self.model_type,
 			clauses=self.clauses,
 			ordering=self.ordering,
-			_limit=count,
+			count=count,
 		)
 
 	def all(self) -> list[T]:
 		return self.store.execute(self)
 
 	def first(self) -> T | None:
-		found = self.limit(0 if self._limit == 0 else 1).all()
+		found = self.limit(0 if self.count == 0 else 1).all()
 		return found[0] if found else None
 
 	def count_by(self, name: str) -> dict[Any, int]:
 		self.model_type.attribute(name)
-		if self._limit is not None:
+		if self.count is not None:
 			raise ModelError(
 				f"Query on {self.model_type.__name__} cannot count_by with a limit"
 			)

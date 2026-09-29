@@ -60,19 +60,21 @@ class Attribute:
 				f"{owner.__name__}.{self.name} has not been initialized"
 			) from None
 
+	def check(self, value: object, model_type: type):
+		problem = self.problem(value)
+		if problem is not None:
+			raise ModelError(f"{model_type.__name__}.{self.name}: {problem}")
+
 	def problem(self, value: object) -> str | None:
-		if value is None:
-			return None if self.nullable else "cannot be null"
+		if value is None and self.nullable:
+			return None
+		elif value is None:
+			return "cannot be null"
 		try:
 			self.codec.check(value)
 		except (TypeError, ValueError) as error:
 			return str(error)
 		return None
-
-	def check(self, value: object, model_type: type):
-		problem = self.problem(value)
-		if problem is not None:
-			raise ModelError(f"{model_type.__name__}.{self.name}: {problem}")
 
 	def encode(self, value: object, model_type: type) -> Scalar | None:
 		self.check(value, model_type)
