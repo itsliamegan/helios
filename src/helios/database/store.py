@@ -127,10 +127,10 @@ class Store:
 
 	def query[T: Model](self, model_type: type[T]) -> Query[T]:
 		self.registry.get(model_type)
-		return Query(store=self, model_type=model_type)
+		return Query(self, model_type)
 
-	def execute[T: Model](self, query: Query[T]) -> list[T]:
-		statement = self.grammar.select(query)
+	def execute[T: Model](self, query: Query[T], count: int | None) -> list[T]:
+		statement = self.grammar.select(query, count)
 		return self.execute_select(
 			query.model_type, statement.sql, statement.parameters
 		)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Literal, TYPE_CHECKING
 
 from .clause import Clause
@@ -15,66 +14,50 @@ if TYPE_CHECKING:
 type Direction = Literal["asc", "desc"]
 
 
-@dataclass
 class Query[T: Model]:
-	store: Store
-	model_type: type[T]
-	clauses: tuple[Clause, ...] = ()
-	ordering: tuple[tuple[str, Direction], ...] = ()
-	count: int | None = None
+	def __init__(self, store: Store, model_type: type[T]):
+		self.store = store
+		self.model_type = model_type
+		self.clauses: list[Clause] = []
+		self.ordering: list[tuple[str, Direction]] = []
+		self.count: int | None = None
 
 	def where(self, conditions: dict[str, Any]) -> Query[T]:
-		return self.adding(Clause((parse(self.model_type, conditions),)))
+		self.clauses.append(Clause((parse(self.model_type, conditions),)))
+		return self
 
 	def where_not(self, conditions: dict[str, Any]) -> Query[T]:
-		clause = Clause((parse(self.model_type, conditions),), negated=True)
-		return self.adding(clause)
+		group = parse(self.model_type, conditions)
+		self.clauses.append(Clause((group,), negated=True))
+		return self
 
 	def where_any(self, *groups: dict[str, Any]) -> Query[T]:
 		if not groups:
 			raise ModelError(
 				f"Query on {self.model_type.__name__} has where_any with no groups"
 			)
-		clause = Clause(tuple(parse(self.model_type, each) for each in groups))
-		return self.adding(clause)
-
-	def adding(self, clause: Clause) -> Query[T]:
-		return Query(
-			store=self.store,
-			model_type=self.model_type,
-			clauses=(*self.clauses, clause),
-			ordering=self.ordering,
-			count=self.count,
-		)
+		parsed = tuple(parse(self.model_type, group) for group in groups)
+		self.clauses.append(Clause(parsed))
+		return self
 
 	def order_by(self, name: str, direction: Direction = "asc") -> Query[T]:
 		self.model_type.attribute(name)
 		if direction not in ("asc", "desc"):
 			raise ValueError("direction must be 'asc' or 'desc'")
-		return Query(
-			store=self.store,
-			model_type=self.model_type,
-			clauses=self.clauses,
-			ordering=(*self.ordering, (name, direction)),
-			count=self.count,
-		)
+		self.ordering.append((name, direction))
+		return self
 
 	def limit(self, count: int) -> Query[T]:
 		if not isinstance(count, int) or isinstance(count, bool) or count < 0:
 			raise ValueError("limit must be a non-negative integer")
-		return Query(
-			store=self.store,
-			model_type=self.model_type,
-			clauses=self.clauses,
-			ordering=self.ordering,
-			count=count,
-		)
+		self.count = count
+		return self
 
 	def all(self) -> list[T]:
-		return self.store.execute(self)
+		return self.store.execute(self, self.count)
 
 	def first(self) -> T | None:
-		found = self.limit(0 if self.count == 0 else 1).all()
+		found = self.store.execute(self, 0 if self.count == 0 else 1)
 		return found[0] if found else None
 
 	def count_by(self, name: str) -> dict[Any, int]:

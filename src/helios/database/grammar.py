@@ -23,7 +23,7 @@ def join(fragments: Iterable[Fragment], separator: str = "") -> Fragment:
 
 
 class Grammar:
-	def select(self, query: Query[Any]) -> Fragment:
+	def select(self, query: Query[Any], count: int | None) -> Fragment:
 		columns = ", ".join(
 			quote_identifier(name) for name in query.model_type.attributes
 		)
@@ -32,7 +32,7 @@ class Grammar:
 				Fragment(f"SELECT {columns} FROM {self.table(query)}"),
 				self.where(query),
 				self.order(query),
-				self.limit(query),
+				self.limit(count),
 			]
 		)
 
@@ -51,7 +51,7 @@ class Grammar:
 			[
 				Fragment(f"SELECT EXISTS (SELECT 1 FROM {self.table(query)}"),
 				self.where(query),
-				self.limit(query),
+				self.limit(query.count),
 				Fragment(")"),
 			]
 		)
@@ -99,7 +99,7 @@ class Grammar:
 		)
 		return Fragment(f" ORDER BY {keys}")
 
-	def limit(self, query: Query[Any]) -> Fragment:
-		if query.count is None:
+	def limit(self, count: int | None) -> Fragment:
+		if count is None:
 			return Fragment("")
-		return Fragment(" LIMIT ?", (query.count,))
+		return Fragment(" LIMIT ?", (count,))

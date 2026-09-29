@@ -178,24 +178,37 @@ def test_orders_limits_and_finds_first():
 			connection.close()
 
 
-def test_derived_queries_are_independent_and_reusable():
+def test_orders_by_each_sort_key_in_turn():
 	with TemporaryDirectory() as directory:
 		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
-			base = store.query(Item).where({"group": "one"})
-			first = base.order_by("rank").limit(1)
-			second = base.order_by("rank", "desc").limit(2)
-
-			assert_eq(names(first.all()), ["Beta"])
-			assert_eq(names(second.all()), ["Alpha", "Beta"])
-			assert_eq(set(names(base.all())), {"Alpha", "Beta"})
-			assert_eq(names(first.all()), ["Beta"])
-
 			store.create(Item, name="Delta", group="one", rank=1)
-			ranked = base.order_by("rank")
-			sorted_by_both = ranked.order_by("name", "desc")
-			assert_eq(names(sorted_by_both.all()), ["Delta", "Beta", "Alpha"])
-			assert_eq(names(ranked.order_by("name").all()), ["Beta", "Delta", "Alpha"])
+
+			assert_eq(
+				names(
+					store.query(Item).order_by("rank").order_by("name", "desc").all()
+				),
+				["Delta", "Beta", "Alpha", "Gamma"],
+			)
+			assert_eq(
+				names(store.query(Item).order_by("rank").order_by("name").all()),
+				["Beta", "Delta", "Alpha", "Gamma"],
+			)
+		finally:
+			connection.close()
+
+
+def test_running_a_query_leaves_it_unchanged():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			query = store.query(Item).where({"group": "one"}).order_by("rank")
+
+			assert_eq(query.first().name, "Beta")
+			assert_eq(query.exists(), True)
+			assert_eq(query.count_by("group"), {"one": 2})
+			assert_eq(names(query.all()), ["Beta", "Alpha"])
+			assert_eq(names(query.all()), ["Beta", "Alpha"])
 		finally:
 			connection.close()
 
