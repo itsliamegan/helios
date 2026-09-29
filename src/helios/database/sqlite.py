@@ -33,6 +33,10 @@ class Cursor:
 			return ()
 		return tuple(column[0] for column in description)
 
+	@property
+	def changed_rows(self) -> int:
+		return self.cursor.rowcount
+
 	def fetch_one(self) -> tuple[Scalar | None, ...] | None:
 		try:
 			return self.cursor.fetchone()

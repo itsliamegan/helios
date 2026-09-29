@@ -121,3 +121,26 @@ def test_translates_statement_errors_without_bound_values():
 			assert_that(secret not in str(exception))
 		finally:
 			connection.close()
+
+
+def test_cursor_reports_changed_rows():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
+		connection = connect(Config(path))
+		try:
+			connection.begin()
+			connection.execute("INSERT INTO posts VALUES ('A'), ('B')").close()
+
+			matching_two = connection.execute("UPDATE posts SET title = 'C'")
+			matching_none = connection.execute(
+				"UPDATE posts SET title = 'D' WHERE title = 'missing'"
+			)
+			try:
+				assert_eq(matching_two.changed_rows, 2)
+				assert_eq(matching_none.changed_rows, 0)
+			finally:
+				matching_two.close()
+				matching_none.close()
+		finally:
+			connection.close()
