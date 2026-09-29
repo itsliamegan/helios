@@ -22,7 +22,7 @@ def test_constructs_model_with_table_defaults_and_nulls():
 	assert_that(isinstance(post.id, UUID))
 
 
-def test_leaves_created_at_unset_until_saved():
+def test_constructed_record_has_no_created_at():
 	class Post(Model):
 		title: str
 
@@ -39,29 +39,24 @@ def test_preserves_explicit_null_instead_of_default():
 	assert_that(Post(title=None).title is None)
 
 
-def test_assigns_canonical_values_and_nulls():
+def test_assigning_an_attribute_raises_and_keeps_the_value():
 	class Post(Model):
 		title: str
-		summary: str | None = None
 
 	post = Post(title="Intro")
-	post.title = "Revised"
-	post.summary = "Short"
-	post.summary = None
+	original_id = post.id
 
-	assert_eq(post.title, "Revised")
-	assert_that(post.summary is None)
+	with assert_raises(AttributeError) as raised:
+		post.title = "Revised"
+	with assert_raises(AttributeError):
+		post.id = uuid4()
 
-
-def test_failed_assignment_preserves_value():
-	class Post(Model):
-		points: int
-
-	post = Post(points=3)
-	with assert_raises(ModelError):
-		post.points = True
-
-	assert_eq(post.points, 3)
+	exception = raised.exception
+	assert exception is not None
+	assert_that("Post.title" in str(exception))
+	assert_that("store.update" in str(exception))
+	assert_eq(post.title, "Intro")
+	assert_eq(post.id, original_id)
 
 
 def test_rejects_missing_extra_non_init_and_null_attributes():
@@ -229,12 +224,19 @@ def test_rejects_attributes_named_like_model_metadata():
 	with assert_raises(ModelError):
 
 		class Annotated(Model):
-			lifecycle: str
+			attributes: str
 
 	with assert_raises(ModelError):
 
 		class Assigned(Model):
 			attributes = {}
+
+
+def test_declares_an_attribute_named_values():
+	class Tally(Model):
+		values: str
+
+	assert_eq(Tally(values="a").values, "a")
 
 
 def test_rejects_multiple_model_bases():

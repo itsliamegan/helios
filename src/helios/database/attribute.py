@@ -54,7 +54,7 @@ class Attribute:
 		if instance is None:
 			return self
 		try:
-			return instance.values[self.name]
+			return instance._values[self.name]
 		except KeyError:
 			raise AttributeError(
 				f"{owner.__name__}.{self.name} has not been initialized"
@@ -82,9 +82,9 @@ class Attribute:
 		return value
 
 	def __set__(self, instance: Model, value: object):
-		self.check(value, type(instance))
-		instance.values[self.name] = value
-		instance._changes.mark(self.name)
+		raise AttributeError(
+			f"{type(instance).__name__}.{self.name} is read-only; use store.update"
+		)
 
 
 def generated(init: bool = False) -> Any:
