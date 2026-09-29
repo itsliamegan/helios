@@ -4,7 +4,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Literal, TYPE_CHECKING
 
-from .attribute import Attribute
 from .codec import Scalar, encode
 from .error import ModelError
 from .key import Key
@@ -25,7 +24,12 @@ ORDERINGS = ("<", "<=", ">", ">=")
 class Comparison:
 	name: str
 	operator: Operator
-	value: Scalar | None
+	value: Scalar
+
+
+@dataclass
+class IsNull:
+	name: str
 
 
 @dataclass
@@ -35,7 +39,7 @@ class Membership:
 	includes_null: bool
 
 
-type Condition = Comparison | Membership
+type Condition = Comparison | IsNull | Membership
 type Group = tuple[Condition, ...]
 
 
@@ -76,24 +80,28 @@ def condition(model_type: type[Model], text: object, value: object) -> Condition
 				"expected an iterable other than str or bytes, "
 				f"got {type(value).__name__}"
 			)
-		encoded: list[Scalar | None] = []
-		for member in value:
+		members = list(value)
+		for member in members:
 			problem = attribute.problem(member)
 			if problem is not None:
 				raise invalid(problem)
-			encoded.append(encoded_value(attribute, member))
-		values = tuple(dict.fromkeys(item for item in encoded if item is not None))
-		return Membership(name, values, None in encoded)
+		values = tuple(
+			dict.fromkeys(
+				encode(attribute.codec, member)
+				for member in members
+				if member is not None
+			)
+		)
+		return Membership(name, values, None in members)
 	if value is None and operator in ORDERINGS:
 		raise invalid("cannot compare with None")
 	problem = attribute.problem(value)
 	if problem is not None:
 		raise invalid(problem)
-	return Comparison(name, operator, encoded_value(attribute, value))
-
-
-def encoded_value(attribute: Attribute, value: object) -> Scalar | None:
-	return None if value is None else encode(attribute.codec, value)
+	elif value is None:
+		return IsNull(name)
+	else:
+		return Comparison(name, operator, encode(attribute.codec, value))
 
 
 @dataclass

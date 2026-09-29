@@ -6,7 +6,7 @@ from uuid import UUID
 from .codec import Scalar
 from .error import DatabaseError, ModelError, NotFoundError
 from .model import Model
-from .query import Comparison, Membership, Query
+from .query import Comparison, IsNull, Membership, Query
 from .sqlite import Connection, quote_identifier
 
 
@@ -248,7 +248,7 @@ def compile_conditions(query: Query[Any]) -> tuple[str, list[Any]]:
 			conditions: list[str] = []
 			for condition in group:
 				match condition:
-					case Comparison(name=name, operator="=", value=None):
+					case IsNull(name=name):
 						conditions.append(f"{quote_identifier(name)} IS NULL")
 					case Comparison(name=name, operator=operator, value=value):
 						conditions.append(f"{quote_identifier(name)} {operator} ?")
