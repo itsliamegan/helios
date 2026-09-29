@@ -4,9 +4,10 @@ from typing import Any, cast
 from uuid import UUID
 
 from .codec import Scalar
+from .condition import Comparison, IsNull, Membership
 from .error import DatabaseError, ModelError, NotFoundError
 from .model import Model
-from .query import Comparison, IsNull, Membership, Query
+from .query import Query
 from .sqlite import Connection, quote_identifier
 
 
