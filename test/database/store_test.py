@@ -103,7 +103,7 @@ def test_crud_and_scalar_round_trip():
 			assert_eq(found.id, created.id)
 			assert_eq([item.id for item in store.find_all(Record)], [created.id])
 			assert_eq(
-				[item.id for item in store.find_by(Record, active=True)],
+				[item.id for item in store.find_by(Record, {"active": True})],
 				[created.id],
 			)
 			assert_that(isinstance(found.id, UUID))

@@ -6,7 +6,7 @@ from uuid import UUID
 from .codec import Scalar
 from .error import DatabaseError, ModelError, NotFoundError
 from .model import Model
-from .query import Filter, Membership, Query
+from .query import Comparison, Membership, Query
 from .sqlite import Connection, quote_identifier
 
 
@@ -108,7 +108,7 @@ class Store:
 			raise NotFoundError(model_type, record.id)
 
 	def find_one[T: Model](self, model_type: type[T], id: UUID) -> T:
-		found = self.query(model_type).where(id=id).first()
+		found = self.query(model_type).where({"id": id}).first()
 		if found is None:
 			raise NotFoundError(model_type, id)
 		return found
@@ -116,41 +116,29 @@ class Store:
 	def find_all[T: Model](self, model_type: type[T]) -> list[T]:
 		return self.query(model_type).all()
 
-	def find_by[T: Model](self, model_type: type[T], **attributes: Any) -> list[T]:
-		return self.query(model_type).where(**attributes).all()
+	def find_by[T: Model](
+		self,
+		model_type: type[T],
+		conditions: dict[str, Any],
+	) -> list[T]:
+		return self.query(model_type).where(conditions).all()
 
 	def query[T: Model](self, model_type: type[T]) -> Query[T]:
 		self.registry.get(model_type)
-		return Query(self, model_type)
+		return Query(store=self, model_type=model_type)
 
 	def execute[T: Model](self, query: Query[T]) -> list[T]:
 		model_type = query.model_type
 		columns = ", ".join(quote_identifier(name) for name in model_type.attributes)
-		clauses: list[str] = []
-		parameters: list[Any] = []
-		for predicate in query.predicates:
-			match predicate:
-				case Filter(name=name, value=None):
-					clauses.append(f"{quote_identifier(name)} IS NULL")
-				case Filter(name=name, value=value):
-					clauses.append(f"{quote_identifier(name)} = ?")
-					parameters.append(value)
-				case Membership(name=name, values=values, includes_null=includes_null):
-					placeholders = ", ".join("?" for _ in values)
-					clause = f"{quote_identifier(name)} IN ({placeholders})"
-					if includes_null:
-						clause = f"({clause} OR {quote_identifier(name)} IS NULL)"
-					clauses.append(clause)
-					parameters.extend(values)
-		where = f" WHERE {" AND ".join(clauses)}" if clauses else ""
+		where, parameters = compile_conditions(query)
 		order = ""
 		if query.ordering is not None:
 			name, direction = query.ordering
 			order = f" ORDER BY {quote_identifier(name)} {direction.upper()}"
 		limit = ""
-		if query.count is not None:
+		if query._limit is not None:
 			limit = " LIMIT ?"
-			parameters.append(query.count)
+			parameters.append(query._limit)
 		sql = (
 			f"SELECT {columns} FROM {quote_identifier(model_type.table)}"
 			f"{where}{order}{limit}"
@@ -205,3 +193,36 @@ class Store:
 			) from error
 
 		return cast(T, model_type.hydrate(values))
+
+
+def compile_conditions(query: Query[Any]) -> tuple[str, list[Any]]:
+	parameters: list[Any] = []
+	clauses: list[str] = []
+	for clause in query.clauses:
+		groups: list[str] = []
+		for group in clause.groups:
+			conditions: list[str] = []
+			for condition in group:
+				match condition:
+					case Comparison(name=name, operator="=", value=None):
+						conditions.append(f"{quote_identifier(name)} IS NULL")
+					case Comparison(name=name, operator=operator, value=value):
+						conditions.append(f"{quote_identifier(name)} {operator} ?")
+						parameters.append(value)
+					case Membership(
+						name=name,
+						values=values,
+						includes_null=includes_null,
+					):
+						placeholders = ", ".join("?" for _ in values)
+						rendered = f"{quote_identifier(name)} IN ({placeholders})"
+						if includes_null:
+							rendered = (
+								f"({rendered} OR {quote_identifier(name)} IS NULL)"
+							)
+						conditions.append(rendered)
+						parameters.extend(values)
+			groups.append(f"({" AND ".join(conditions)})")
+		clauses.append(f"({" OR ".join(groups)})")
+	where = f" WHERE {" AND ".join(clauses)}" if clauses else ""
+	return where, parameters
