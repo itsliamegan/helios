@@ -156,3 +156,14 @@ class Query[T: Model]:
 	def first(self) -> T | None:
 		found = self.limit(0 if self._limit == 0 else 1).all()
 		return found[0] if found else None
+
+	def count_by(self, name: str) -> dict[Any, int]:
+		self.model_type.attribute(name)
+		if self._limit is not None:
+			raise ModelError(
+				f"Query on {self.model_type.__name__} cannot count_by with a limit"
+			)
+		return self.store.execute_count_by(self, name)
+
+	def exists(self) -> bool:
+		return self.store.execute_exists(self)

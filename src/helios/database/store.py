@@ -148,6 +148,47 @@ class Store:
 		)
 		return self.execute_select(model_type, sql, parameters)
 
+	def execute_count_by(self, query: Query[Any], name: str) -> dict[Any, int]:
+		model_type = query.model_type
+		attribute = model_type.attribute(name)
+		where, parameters = compile_conditions(query)
+		column = quote_identifier(name)
+		sql = (
+			f"SELECT {column}, COUNT(*) FROM {quote_identifier(model_type.table)}"
+			f"{where} GROUP BY {column}"
+		)
+		cursor = self.connection.execute(sql, parameters)
+		try:
+			rows = cursor.fetch_all()
+		finally:
+			cursor.close()
+		try:
+			return {
+				attribute.decode(key, model_type): cast(int, count)
+				for key, count in rows
+			}
+		except (TypeError, ValueError) as error:
+			raise DatabaseError(
+				"database row contains an invalid model value"
+			) from error
+
+	def execute_exists(self, query: Query[Any]) -> bool:
+		where, parameters = compile_conditions(query)
+		limit = ""
+		if query._limit is not None:
+			limit = " LIMIT ?"
+			parameters.append(query._limit)
+		sql = (
+			f"SELECT EXISTS (SELECT 1 FROM {quote_identifier(query.model_type.table)}"
+			f"{where}{limit})"
+		)
+		cursor = self.connection.execute(sql, parameters)
+		try:
+			rows = cursor.fetch_all()
+		finally:
+			cursor.close()
+		return rows[0][0] == 1
+
 	def select[T: Model](
 		self,
 		model_type: type[T],

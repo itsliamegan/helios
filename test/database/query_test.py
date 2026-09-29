@@ -200,6 +200,43 @@ def test_derived_queries_are_independent_and_reusable():
 			connection.close()
 
 
+def test_count_by_groups_rows():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			alpha = store.find_by(Item, {"name": "Alpha"})[0]
+			assert_eq(
+				store.query(Item).count_by("group"),
+				{"one": 2, None: 1},
+			)
+			assert_eq(
+				store.query(Item).where({"name": "Alpha"}).count_by("id"),
+				{alpha.id: 1},
+			)
+			assert_eq(
+				store.query(Item).where({"rank <": 3}).count_by("group"),
+				{"one": 2},
+			)
+			assert_eq(
+				store.query(Item).order_by("rank", "desc").count_by("rank"),
+				{1: 1, 2: 1, 3: 1},
+			)
+			assert_eq(store.query(Item).where({"rank >": 5}).count_by("rank"), {})
+		finally:
+			connection.close()
+
+
+def test_exists_reports_matching_rows():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			assert_eq(store.query(Item).where({"name": "Alpha"}).exists(), True)
+			assert_eq(store.query(Item).where({"name": "missing"}).exists(), False)
+			assert_eq(store.query(Item).limit(0).exists(), False)
+		finally:
+			connection.close()
+
+
 def test_binds_sql_looking_filter_values_as_data():
 	with TemporaryDirectory() as directory:
 		connection, store = open_store(Path(directory, "app.sqlite"))
@@ -429,6 +466,20 @@ def test_rejects_conditions_that_are_not_dictionaries():
 			connection.close()
 
 
+def test_rejects_count_by_with_a_limit():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			with assert_raises(ModelError) as raised:
+				store.query(Item).limit(2).count_by("rank")
+			assert_eq(
+				str(raised.exception),
+				"Query on Item cannot count_by with a limit",
+			)
+		finally:
+			connection.close()
+
+
 def test_rejects_unknown_attributes():
 	with TemporaryDirectory() as directory:
 		connection, store = open_store(Path(directory, "app.sqlite"))
@@ -439,6 +490,8 @@ def test_rejects_unknown_attributes():
 				store.query(Item).where({"group.name": "one"})
 			with assert_raises(ModelError):
 				store.query(Item).order_by("missing")
+			with assert_raises(ModelError):
+				store.query(Item).count_by("missing")
 		finally:
 			connection.close()
 
