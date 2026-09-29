@@ -100,7 +100,7 @@ class Query[T: Model]:
 	store: Store
 	model_type: type[T]
 	clauses: tuple[Clause, ...] = ()
-	ordering: tuple[str, Direction] | None = None
+	ordering: tuple[tuple[str, Direction], ...] = ()
 	_limit: int | None = None
 
 	def where(self, conditions: dict[str, Any]) -> Query[T]:
@@ -135,7 +135,7 @@ class Query[T: Model]:
 			store=self.store,
 			model_type=self.model_type,
 			clauses=self.clauses,
-			ordering=(name, direction),
+			ordering=(*self.ordering, (name, direction)),
 			_limit=self._limit,
 		)
 

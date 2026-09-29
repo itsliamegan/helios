@@ -190,6 +190,12 @@ def test_derived_queries_are_independent_and_reusable():
 			assert_eq(names(second.all()), ["Alpha", "Beta"])
 			assert_eq(set(names(base.all())), {"Alpha", "Beta"})
 			assert_eq(names(first.all()), ["Beta"])
+
+			store.create(Item, name="Delta", group="one", rank=1)
+			ranked = base.order_by("rank")
+			sorted_by_both = ranked.order_by("name", "desc")
+			assert_eq(names(sorted_by_both.all()), ["Delta", "Beta", "Alpha"])
+			assert_eq(names(ranked.order_by("name").all()), ["Beta", "Delta", "Alpha"])
 		finally:
 			connection.close()
 

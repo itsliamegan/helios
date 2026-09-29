@@ -132,9 +132,12 @@ class Store:
 		columns = ", ".join(quote_identifier(name) for name in model_type.attributes)
 		where, parameters = compile_conditions(query)
 		order = ""
-		if query.ordering is not None:
-			name, direction = query.ordering
-			order = f" ORDER BY {quote_identifier(name)} {direction.upper()}"
+		if query.ordering:
+			keys = ", ".join(
+				f"{quote_identifier(name)} {direction.upper()}"
+				for name, direction in query.ordering
+			)
+			order = f" ORDER BY {keys}"
 		limit = ""
 		if query._limit is not None:
 			limit = " LIMIT ?"
