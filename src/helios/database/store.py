@@ -4,8 +4,8 @@ from typing import Any, cast
 from uuid import UUID
 
 from .codec import Scalar
-from .condition import Comparison, IsNull, Membership
 from .error import DatabaseError, ModelError, NotFoundError
+from .grammar import Grammar
 from .model import Model
 from .query import Query
 from .sqlite import Connection, quote_identifier
@@ -39,6 +39,7 @@ class Store:
 		self.registry = (
 			model_types if isinstance(model_types, Registry) else Registry(model_types)
 		)
+		self.grammar = Grammar()
 
 	def create[**P, T: Model](
 		self,
@@ -129,40 +130,16 @@ class Store:
 		return Query(store=self, model_type=model_type)
 
 	def execute[T: Model](self, query: Query[T]) -> list[T]:
-		model_type = query.model_type
-		columns = ", ".join(quote_identifier(name) for name in model_type.attributes)
-		where, parameters = compile_conditions(query)
-		order = ""
-		if query.ordering:
-			keys = ", ".join(
-				f"{quote_identifier(name)} {direction.upper()}"
-				for name, direction in query.ordering
-			)
-			order = f" ORDER BY {keys}"
-		limit = ""
-		if query.count is not None:
-			limit = " LIMIT ?"
-			parameters.append(query.count)
-		sql = (
-			f"SELECT {columns} FROM {quote_identifier(model_type.table)}"
-			f"{where}{order}{limit}"
+		statement = self.grammar.select(query)
+		return self.execute_select(
+			query.model_type, statement.sql, statement.parameters
 		)
-		return self.execute_select(model_type, sql, parameters)
 
 	def execute_count_by(self, query: Query[Any], name: str) -> dict[Any, int]:
 		model_type = query.model_type
 		attribute = model_type.attribute(name)
-		where, parameters = compile_conditions(query)
-		column = quote_identifier(name)
-		sql = (
-			f"SELECT {column}, COUNT(*) FROM {quote_identifier(model_type.table)}"
-			f"{where} GROUP BY {column}"
-		)
-		cursor = self.connection.execute(sql, parameters)
-		try:
-			rows = cursor.fetch_all()
-		finally:
-			cursor.close()
+		statement = self.grammar.count_by(query, name)
+		_columns, rows = self.fetch(statement.sql, statement.parameters)
 		try:
 			return {
 				attribute.decode(key, model_type): cast(int, count)
@@ -174,20 +151,8 @@ class Store:
 			) from error
 
 	def execute_exists(self, query: Query[Any]) -> bool:
-		where, parameters = compile_conditions(query)
-		limit = ""
-		if query.count is not None:
-			limit = " LIMIT ?"
-			parameters.append(query.count)
-		sql = (
-			f"SELECT EXISTS (SELECT 1 FROM {quote_identifier(query.model_type.table)}"
-			f"{where}{limit})"
-		)
-		cursor = self.connection.execute(sql, parameters)
-		try:
-			rows = cursor.fetch_all()
-		finally:
-			cursor.close()
+		statement = self.grammar.exists(query)
+		_columns, rows = self.fetch(statement.sql, statement.parameters)
 		return rows[0][0] == 1
 
 	def select[T: Model](
@@ -205,13 +170,19 @@ class Store:
 		sql: str,
 		parameters: Iterable[Any],
 	) -> list[T]:
+		column_names, rows = self.fetch(sql, parameters)
+		return [self.hydrate(model_type, column_names, row) for row in rows]
+
+	def fetch(
+		self,
+		sql: str,
+		parameters: Iterable[Any],
+	) -> tuple[tuple[str, ...], list[tuple[Scalar | None, ...]]]:
 		cursor = self.connection.execute(sql, parameters)
 		try:
-			column_names = cursor.columns
-			rows = cursor.fetch_all()
+			return cursor.columns, cursor.fetch_all()
 		finally:
 			cursor.close()
-		return [self.hydrate(model_type, column_names, row) for row in rows]
 
 	def hydrate[T: Model](
 		self,
@@ -238,37 +209,3 @@ class Store:
 			) from error
 
 		return cast(T, model_type.hydrate(values))
-
-
-def compile_conditions(query: Query[Any]) -> tuple[str, list[Any]]:
-	parameters: list[Any] = []
-	clauses: list[str] = []
-	for clause in query.clauses:
-		groups: list[str] = []
-		for group in clause.groups:
-			conditions: list[str] = []
-			for condition in group:
-				match condition:
-					case IsNull(name=name):
-						conditions.append(f"{quote_identifier(name)} IS NULL")
-					case Comparison(name=name, operator=operator, value=value):
-						conditions.append(f"{quote_identifier(name)} {operator} ?")
-						parameters.append(value)
-					case Membership(
-						name=name,
-						values=values,
-						includes_null=includes_null,
-					):
-						placeholders = ", ".join("?" for _ in values)
-						rendered = f"{quote_identifier(name)} IN ({placeholders})"
-						if includes_null:
-							rendered = (
-								f"({rendered} OR {quote_identifier(name)} IS NULL)"
-							)
-						conditions.append(rendered)
-						parameters.extend(values)
-			groups.append(f"({" AND ".join(conditions)})")
-		rendered = f"({" OR ".join(groups)})"
-		clauses.append(f"{rendered} IS NOT 1" if clause.negated else rendered)
-	where = f" WHERE {" AND ".join(clauses)}" if clauses else ""
-	return where, parameters
