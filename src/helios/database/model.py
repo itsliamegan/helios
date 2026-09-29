@@ -1,7 +1,5 @@
 from annotationlib import Format, get_annotations
-from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum, auto
 from typing import Any, ClassVar, dataclass_transform
 from uuid import UUID, uuid4
 
@@ -9,31 +7,6 @@ from helios.declarative import check_init_keywords, check_single_base, declarati
 
 from .attribute import Attribute, declare, generated
 from .error import ModelError
-
-
-class Lifecycle(Enum):
-	NEW = auto()
-	SAVED = auto()
-	DELETED = auto()
-
-
-@dataclass
-class Changes:
-	revisions: dict[str, int]
-
-	def __init__(self):
-		self.revisions = {}
-
-	def mark(self, name: str):
-		self.revisions[name] = self.revisions.get(name, 0) + 1
-
-	def snapshot(self) -> dict[str, int]:
-		return dict(self.revisions)
-
-	def accept(self, snapshot: dict[str, int]):
-		for name, revision in snapshot.items():
-			if self.revisions.get(name) == revision:
-				del self.revisions[name]
 
 
 class ResolvedAttributes:
@@ -66,17 +39,13 @@ class Model:
 		declare_attributes(cls, dict(Model._attributes))
 
 	def __init__(self, **attributes: Any):
-		self.values = type(self).initialize(attributes)
-		self.values["id"] = uuid4()
-		self._changes = Changes()
-		self._lifecycle = Lifecycle.NEW
+		self._values = type(self).initialize(attributes)
+		self._values["id"] = uuid4()
 
 	@classmethod
 	def hydrate(cls, values: dict[str, Any]) -> Model:
 		model = cls.__new__(cls)
-		model.values = {name: values[name] for name in cls.attributes}
-		model._changes = Changes()
-		model._lifecycle = Lifecycle.SAVED
+		model._values = {name: values[name] for name in cls.attributes}
 		return model
 
 	@classmethod
@@ -108,10 +77,6 @@ class Model:
 			values[name] = value
 		return values
 
-	@property
-	def lifecycle(self) -> Lifecycle:
-		return self._lifecycle
-
 	def __repr__(self) -> str:
 		return f"{type(self).__name__}({self.id!r})"
 
@@ -139,6 +104,6 @@ def declare_attributes(model_type: type[Model], attributes: dict[str, Attribute]
 	model_type._attributes = attributes
 
 
-METADATA = {"attributes", "lifecycle"}
+METADATA = {"attributes"}
 
 declare_attributes(Model, {})

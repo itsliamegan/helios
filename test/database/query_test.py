@@ -269,7 +269,7 @@ def test_where_in_binds_sql_looking_candidate_values_as_data():
 			connection.close()
 
 
-def test_raw_select_preserves_order_and_identity():
+def test_raw_select_preserves_order():
 	with TemporaryDirectory() as directory:
 		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
@@ -289,8 +289,7 @@ def test_raw_select_preserves_order_and_identity():
 				("featured",),
 			)
 
-			assert_eq(selected, [alpha])
-			assert_that(selected[0] is alpha)
+			assert_eq([item.id for item in selected], [alpha.id])
 		finally:
 			connection.close()
 

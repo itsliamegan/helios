@@ -150,7 +150,7 @@ def test_unexpected_exception_rolls_back_and_next_request_can_use_database():
 		assert_eq(titles(path), ["Committed"])
 
 
-def test_request_shares_transaction_and_identity_map():
+def test_request_shares_transaction():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_schema(path)
@@ -158,11 +158,8 @@ def test_request_shares_transaction_and_identity_map():
 		def create(request, context):
 			store = context.get(Store)
 			post = store.create(Post, title="Intro")
-			post.title = "Unsaved"
-			assert_that(store.find_one(Post, post.id) is post)
-			assert_eq(store.find_one(Post, post.id).title, "Unsaved")
-			post.title = "Revised"
-			store.save(post)
+			store.update(post, title="Revised")
+			assert_eq(store.find_one(Post, post.id).title, "Revised")
 			return Response.empty(Status.OK)
 
 		app = application(path, create)

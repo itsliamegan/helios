@@ -99,7 +99,8 @@ def test_finds_user_from_session():
 		finally:
 			connection.close()
 
-	assert_eq(provided.user, user)
+	assert provided.user is not None
+	assert_eq(provided.user.id, user.id)
 	assert_that(provided.is_signed_in())
 
 

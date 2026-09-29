@@ -1,11 +1,11 @@
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
 from .codec import Scalar
 from .error import DatabaseError, ModelError, NotFoundError
-from .model import Lifecycle, Model
+from .model import Model
 from .query import Filter, Membership, Query
 from .sqlite import Connection, quote_identifier
 
@@ -38,74 +38,74 @@ class Store:
 		self.registry = (
 			model_types if isinstance(model_types, Registry) else Registry(model_types)
 		)
-		self.identity: dict[tuple[type[Model], UUID], Model] = {}
 
-	def create[T: Model](self, model_type: type[T], **attributes: Any) -> T:
-		self.registry.get(model_type)
-		model = model_type(**attributes)
-		self.save(model)
-		return model
-
-	def save(self, model: Model):
-		model_type = self.registry.get(type(model))
-		if model._lifecycle is Lifecycle.NEW:
-			self.insert(model_type, model)
-			return
-		self.update(model_type, model)
-
-	def insert[T: Model](self, model_type: type[T], model: T):
+	def create[**P, T: Model](
+		self,
+		model_type: Callable[P, T],
+		*args: P.args,
+		**values: P.kwargs,
+	) -> T:
+		registered = self.registry.get(cast(type[T], model_type))
+		record = model_type(*args, **values)
 		created_at = datetime.now(UTC)
-		values = dict(model.values)
-		values["created_at"] = created_at
-		changes = model._changes.snapshot()
-		names = tuple(model_type.attributes)
+		attributes = {**record._values, "created_at": created_at}
+		names = tuple(registered.attributes)
 		columns = ", ".join(quote_identifier(name) for name in names)
 		placeholders = ", ".join("?" for _ in names)
 		parameters = [
-			model_type.attributes[name].encode(values[name], model_type)
+			registered.attributes[name].encode(attributes[name], registered)
 			for name in names
 		]
 		sql = (
-			f"INSERT INTO {quote_identifier(model_type.table)} ({columns}) "
+			f"INSERT INTO {quote_identifier(registered.table)} ({columns}) "
 			f"VALUES ({placeholders})"
 		)
 		self.connection.execute(sql, parameters).close()
+		record._values["created_at"] = created_at
+		return record
 
-		model.values["created_at"] = created_at
-		model._lifecycle = Lifecycle.SAVED
-		model._changes.accept(changes)
-		self.identity[(model_type, model.id)] = model
-
-	def update[T: Model](self, model_type: type[T], model: T):
-		changes = model._changes.snapshot()
-		names = tuple(name for name in model_type.attributes if name in changes)
-		if not names:
-			return
-		assignments = ", ".join(f"{quote_identifier(name)} = ?" for name in names)
+	def update(self, record: Model, **values: Any):
+		model_type = self.registry.get(type(record))
+		if not values:
+			raise ModelError(f"{model_type.__name__}.update requires values")
+		encoded: dict[str, Scalar | None] = {}
+		for name, value in values.items():
+			attribute = model_type.attribute(name)
+			if not attribute.init:
+				raise ModelError(f"{model_type.__name__}.{name} is generated")
+			encoded[name] = attribute.encode(value, model_type)
+		assignments = ", ".join(f"{quote_identifier(name)} = ?" for name in encoded)
 		parameters = [
-			model_type.attributes[name].encode(model.values[name], model_type)
-			for name in names
+			*encoded.values(),
+			model_type.attributes["id"].encode(record.id, model_type),
 		]
-		parameters.append(model_type.attributes["id"].encode(model.id, model_type))
 		sql = (
 			f"UPDATE {quote_identifier(model_type.table)} SET {assignments} "
 			f"WHERE {quote_identifier("id")} = ?"
 		)
-		self.connection.execute(sql, parameters).close()
-		model._changes.accept(changes)
+		cursor = self.connection.execute(sql, parameters)
+		try:
+			changed_rows = cursor.changed_rows
+		finally:
+			cursor.close()
+		if changed_rows == 0:
+			raise NotFoundError(model_type, record.id)
+		record._values.update(values)
 
-	def delete(self, model: Model):
-		model_type = self.registry.get(type(model))
-		identifier = model_type.attributes["id"].encode(model.id, model_type)
+	def delete(self, record: Model):
+		model_type = self.registry.get(type(record))
 		sql = (
 			f"DELETE FROM {quote_identifier(model_type.table)} "
 			f"WHERE {quote_identifier("id")} = ?"
 		)
-		self.connection.execute(sql, (identifier,)).close()
-		model._lifecycle = Lifecycle.DELETED
-		key = (model_type, model.id)
-		if self.identity.get(key) is model:
-			del self.identity[key]
+		identifier = model_type.attributes["id"].encode(record.id, model_type)
+		cursor = self.connection.execute(sql, (identifier,))
+		try:
+			changed_rows = cursor.changed_rows
+		finally:
+			cursor.close()
+		if changed_rows == 0:
+			raise NotFoundError(model_type, record.id)
 
 	def find_one[T: Model](self, model_type: type[T], id: UUID) -> T:
 		found = self.query(model_type).where(id=id).first()
@@ -204,10 +204,4 @@ class Store:
 				"database row contains an invalid model value"
 			) from error
 
-		identifier = cast(UUID, values["id"])
-		existing = self.identity.get((model_type, identifier))
-		if existing is not None:
-			return cast(T, existing)
-		model = cast(T, model_type.hydrate(values))
-		self.identity[(model_type, identifier)] = model
-		return model
+		return cast(T, model_type.hydrate(values))
