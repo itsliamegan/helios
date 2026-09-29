@@ -7,6 +7,7 @@ from typing import Any, Literal, TYPE_CHECKING
 from .attribute import Attribute
 from .codec import Scalar, encode
 from .error import ModelError
+from .key import Key
 from .model import Model
 
 if TYPE_CHECKING:
@@ -56,18 +57,18 @@ def group(model_type: type[Model], conditions: object) -> Group:
 	return tuple(condition(model_type, key, value) for key, value in conditions.items())
 
 
-def condition(model_type: type[Model], key: object, value: object) -> Condition:
+def condition(model_type: type[Model], text: object, value: object) -> Condition:
 	subject = f"Query on {model_type.__name__}"
-	parts = key.split(" ") if isinstance(key, str) else []
-	if not 1 <= len(parts) <= 2 or not all(parts):
-		raise ModelError(f"{subject} has {key!r}, which is not a condition key")
-	name, operator = parts if len(parts) == 2 else (parts[0], "=")
+	key = Key.parse(text)
+	if key is None:
+		raise ModelError(f"{subject} has {text!r}, which is not a condition key")
+	name, operator = key.name, key.operator
 	if operator not in (*COMPARISONS, "in"):
-		raise ModelError(f"{subject} has {key!r}, which has an unknown operator")
+		raise ModelError(f"{subject} has {text!r}, which has an unknown operator")
 	attribute = model_type.attribute(name)
 
 	def invalid(reason: str) -> ModelError:
-		return ModelError(f"{subject} has an invalid value for {key!r}: {reason}")
+		return ModelError(f"{subject} has an invalid value for {text!r}: {reason}")
 
 	if operator == "in":
 		if isinstance(value, (str, bytes)) or not isinstance(value, Iterable):
