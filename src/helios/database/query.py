@@ -41,6 +41,7 @@ type Group = tuple[Condition, ...]
 @dataclass
 class Clause:
 	groups: tuple[Group, ...]
+	negated: bool = False
 
 
 def group(model_type: type[Model], conditions: object) -> Group:
@@ -103,7 +104,21 @@ class Query[T: Model]:
 	_limit: int | None = None
 
 	def where(self, conditions: dict[str, Any]) -> Query[T]:
-		clause = Clause((group(self.model_type, conditions),))
+		return self.adding(Clause((group(self.model_type, conditions),)))
+
+	def where_not(self, conditions: dict[str, Any]) -> Query[T]:
+		clause = Clause((group(self.model_type, conditions),), negated=True)
+		return self.adding(clause)
+
+	def where_any(self, *groups: dict[str, Any]) -> Query[T]:
+		if not groups:
+			raise ModelError(
+				f"Query on {self.model_type.__name__} has where_any with no groups"
+			)
+		clause = Clause(tuple(group(self.model_type, each) for each in groups))
+		return self.adding(clause)
+
+	def adding(self, clause: Clause) -> Query[T]:
 		return Query(
 			store=self.store,
 			model_type=self.model_type,

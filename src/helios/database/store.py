@@ -223,6 +223,7 @@ def compile_conditions(query: Query[Any]) -> tuple[str, list[Any]]:
 						conditions.append(rendered)
 						parameters.extend(values)
 			groups.append(f"({" AND ".join(conditions)})")
-		clauses.append(f"({" OR ".join(groups)})")
+		rendered = f"({" OR ".join(groups)})"
+		clauses.append(f"{rendered} IS NOT 1" if clause.negated else rendered)
 	where = f" WHERE {" AND ".join(clauses)}" if clauses else ""
 	return where, parameters

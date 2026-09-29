@@ -107,6 +107,56 @@ def test_filters_by_comparison_operators():
 			connection.close()
 
 
+def test_where_any_joins_groups_with_or():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			assert_eq(
+				set(
+					names(
+						store.query(Item)
+						.where_any({"group": "one", "rank": 1}, {"rank >": 2})
+						.all()
+					)
+				),
+				{"Beta", "Gamma"},
+			)
+			assert_eq(
+				names(
+					store.query(Item)
+					.where({"group": "one"})
+					.where_any({"rank": 2}, {"rank": 3})
+					.all()
+				),
+				["Alpha"],
+			)
+		finally:
+			connection.close()
+
+
+def test_where_not_is_the_exact_complement_of_where():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
+			everything = set(names(store.query(Item).all()))
+			for conditions in (
+				{"group <": "two"},
+				{"group": "one", "rank": 1},
+				{"group in": ["one"]},
+			):
+				kept = set(names(store.query(Item).where(conditions).all()))
+				dropped = set(names(store.query(Item).where_not(conditions).all()))
+
+				assert_eq(kept & dropped, set())
+				assert_eq(kept | dropped, everything)
+			assert_eq(
+				names(store.query(Item).where_not({"group <": "two"}).all()),
+				["Gamma"],
+			)
+		finally:
+			connection.close()
+
+
 def test_orders_limits_and_finds_first():
 	with TemporaryDirectory() as directory:
 		connection, store = open_store(Path(directory, "app.sqlite"))
@@ -323,11 +373,31 @@ def test_rejects_empty_condition_groups():
 	with TemporaryDirectory() as directory:
 		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
+			query = store.query(Item)
+			for build in (
+				lambda: query.where({}),
+				lambda: query.where_not({}),
+				lambda: query.where_any({}),
+			):
+				with assert_raises(ModelError) as raised:
+					build()
+				assert_eq(
+					str(raised.exception),
+					"Query on Item has an empty condition group",
+				)
+		finally:
+			connection.close()
+
+
+def test_rejects_where_any_with_no_groups():
+	with TemporaryDirectory() as directory:
+		connection, store = open_store(Path(directory, "app.sqlite"))
+		try:
 			with assert_raises(ModelError) as raised:
-				store.query(Item).where({})
+				store.query(Item).where_any()
 			assert_eq(
 				str(raised.exception),
-				"Query on Item has an empty condition group",
+				"Query on Item has where_any with no groups",
 			)
 		finally:
 			connection.close()
@@ -339,6 +409,12 @@ def test_rejects_conditions_that_are_not_dictionaries():
 		try:
 			with assert_raises(ModelError) as raised:
 				store.query(Item).where([("rank", 1)])
+			assert_eq(
+				str(raised.exception),
+				"Query on Item takes a dictionary of conditions, got list",
+			)
+			with assert_raises(ModelError) as raised:
+				store.query(Item).where_any({"rank": 1}, [])
 			assert_eq(
 				str(raised.exception),
 				"Query on Item takes a dictionary of conditions, got list",
