@@ -60,25 +60,26 @@ class Attribute:
 				f"{owner.__name__}.{self.name} has not been initialized"
 			) from None
 
-	def check(self, value: object, model_type: type):
+	def check(self, value: object):
 		if value is None:
 			if self.nullable:
 				return
-			raise ModelError(f"{model_type.__name__}.{self.name}: cannot be null")
-		try:
-			self.codec.check(value)
-		except (TypeError, ValueError) as error:
-			raise ModelError(f"{model_type.__name__}.{self.name}: {error}") from error
+			else:
+				raise ValueError("cannot be null")
+		self.codec.check(value)
 
 	def encode(self, value: object, model_type: type) -> Scalar | None:
-		self.check(value, model_type)
+		try:
+			self.check(value)
+		except (TypeError, ValueError) as error:
+			raise ModelError(f"{model_type.__name__}.{self.name}: {error}") from error
 		if value is None:
 			return None
 		return encode(self.codec, value)
 
-	def decode(self, raw: Scalar | None, model_type: type) -> object:
+	def decode(self, raw: Scalar | None) -> object:
 		value = None if raw is None else self.codec.decode(raw)
-		self.check(value, model_type)
+		self.check(value)
 		return value
 
 	def __set__(self, instance: Model, value: object):

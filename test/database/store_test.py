@@ -136,6 +136,47 @@ def test_crud_and_scalar_round_trip():
 			second_connection.close()
 
 
+def test_find_by_matches_the_equivalent_query():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path)
+		connection = connect(Config(path))
+		connection.begin()
+		store = Store(connection, [Record])
+		try:
+			created = [
+				store.create(Record, **record_values(name))
+				for name in ("Alpha", "Beta", "Gamma")
+			]
+
+			found = {record.id for record in store.find_by(Record, name="Beta")}
+			queried = {
+				record.id
+				for record in store.query(Record).where({"name": "Beta"}).all()
+			}
+
+			assert_eq(found, {created[1].id})
+			assert_eq(found, queried)
+		finally:
+			connection.close()
+
+
+def test_find_by_supports_only_attribute_equality():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path)
+		connection = connect(Config(path))
+		connection.begin()
+		store = Store(connection, [Record])
+		try:
+			store.create(Record, **record_values("Alpha"))
+
+			with assert_raises(ModelError):
+				store.find_by(Record, **{"name >=": "Alpha"})
+		finally:
+			connection.close()
+
+
 def test_failed_create_leaves_no_row():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
