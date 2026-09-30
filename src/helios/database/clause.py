@@ -5,16 +5,13 @@ from typing import Literal, TypeIs
 from .attribute import Attribute
 from .codec import Scalar, encode
 from .error import ModelError
-from .key import Key
 from .model import Model
 
 type Operator = Literal["=", "<", "<=", ">", ">="]
 
 OPERATORS = ("=", "<", "<=", ">", ">=", "in")
 
-
-def is_operator(text: str) -> TypeIs[Operator | Literal["in"]]:
-	return text in OPERATORS
+MALFORMED = "is not of the form 'name' or 'name operator'"
 
 
 @dataclass
@@ -37,39 +34,51 @@ class Group:
 		if not conditions:
 			raise ModelError(f"{subject} has an empty condition group")
 
-		return cls(
-			tuple(
-				cls.condition(model_type, text, value)
-				for text, value in conditions.items()
-			)
-		)
+		parsed: list[Condition] = []
+		for text, value in conditions.items():
+			if not isinstance(text, str):
+				raise ModelError(f"{subject} has {text!r}, which {MALFORMED}")
+			try:
+				key = Key.parse(text)
+			except ValueError as error:
+				raise ModelError(f"{subject} has {text!r}, which {error}") from error
 
-	@staticmethod
-	def condition(model_type: type[Model], text: object, value: object) -> Condition:
-		subject = f"Query on {model_type.__name__}"
-		key = Key.parse(text) if isinstance(text, str) else None
-		if key is None:
-			raise ModelError(
-				f"{subject} has {text!r}, "
-				"which is not of the form 'name' or 'name operator'"
-			)
-		operator = key.operator
-		if not is_operator(operator):
-			raise ModelError(f"{subject} has {text!r}, which has an unknown operator")
+			attribute = model_type.attribute(key.name)
+			try:
+				parsed.append(key.condition(attribute, value))
+			except (TypeError, ValueError) as error:
+				raise ModelError(
+					f"{subject} has an invalid value for {text!r}: {error}"
+				) from error
+		return cls(tuple(parsed))
 
-		attribute = model_type.attribute(key.name)
-		try:
-			match operator:
-				case "in":
-					return Membership.parse(attribute, value)
-				case "=" if value is None:
-					return IsNull.parse(attribute)
-				case _:
-					return Comparison.parse(attribute, operator, value)
-		except (TypeError, ValueError) as error:
-			raise ModelError(
-				f"{subject} has an invalid value for {text!r}: {error}"
-			) from error
+
+@dataclass
+class Key:
+	name: str
+	operator: Operator | Literal["in"]
+
+	@classmethod
+	def parse(cls, text: str) -> Key:
+		parts = text.split(" ")
+		if not 1 <= len(parts) <= 2 or not all(parts):
+			raise ValueError(MALFORMED)
+		elif len(parts) == 1:
+			return cls(parts[0], "=")
+		elif is_operator(parts[1]):
+			return cls(parts[0], parts[1])
+		else:
+			raise ValueError("has an unknown operator")
+
+	def condition(self, attribute: Attribute, value: object) -> Condition:
+		operator = self.operator
+		match operator:
+			case "in":
+				return Membership.parse(attribute, value)
+			case "=" if value is None:
+				return IsNull.parse(attribute)
+			case _:
+				return Comparison.parse(attribute, operator, value)
 
 
 type Condition = Comparison | IsNull | Membership
@@ -127,3 +136,7 @@ class Membership:
 			)
 		)
 		return cls(attribute.name, values, None in members)
+
+
+def is_operator(text: str) -> TypeIs[Operator | Literal["in"]]:
+	return text in OPERATORS
