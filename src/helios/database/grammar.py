@@ -11,6 +11,7 @@ from .statement import (
 	Direction,
 	Expression,
 	Insert,
+	Raw,
 	Select,
 	Statement,
 	Update,
@@ -28,6 +29,8 @@ class Grammar:
 				return self.update(statement)
 			case Delete():
 				return self.delete(statement)
+			case Raw(sql=sql, parameters=parameters):
+				return Fragment(sql, parameters)
 
 	def select(self, statement: Select) -> Fragment:
 		columns = ", ".join(self.expression(column) for column in statement.columns)

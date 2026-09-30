@@ -11,7 +11,7 @@ from .grammar import Grammar
 from .model import Model
 from .query import Query
 from .sqlite import Connection
-from .statement import Delete, Insert, Select, Statement, Update
+from .statement import Delete, Insert, Raw, Select, Statement, Update
 
 
 class Registry:
@@ -57,7 +57,7 @@ class Store:
 			name: attribute.encode(record._values[name], registered)
 			for name, attribute in registered.attributes.items()
 		}
-		self.execute(Insert(registered.table, encoded))
+		self.write(Insert(registered.table, encoded))
 		return record
 
 	def update(self, record: Model, **values: Any):
@@ -71,14 +71,14 @@ class Store:
 				raise ModelError(f"{model_type.__name__}.{name} is generated")
 			encoded[name] = attribute.encode(value, model_type)
 		statement = Update(model_type.table, encoded, self.identifying(record))
-		if self.execute(statement) == 0:
+		if self.write(statement) == 0:
 			raise NotFoundError(model_type, record.id)
 		record._values.update(values)
 
 	def delete(self, record: Model):
 		model_type = self.registry.get(type(record))
 		statement = Delete(model_type.table, self.identifying(record))
-		if self.execute(statement) == 0:
+		if self.write(statement) == 0:
 			raise NotFoundError(model_type, record.id)
 
 	def identifying(self, record: Model) -> tuple[Clause, ...]:
@@ -104,12 +104,21 @@ class Store:
 		self.registry.get(model_type)
 		return Query(self, model_type)
 
-	def records[T: Model](self, model_type: type[T], statement: Select) -> list[T]:
-		column_names, rows = self.run(statement)
+	def select[T: Model](
+		self,
+		model_type: type[T],
+		sql: str,
+		parameters: Iterable[Any],
+	) -> list[T]:
+		self.registry.get(model_type)
+		return self.records(model_type, Raw(sql, tuple(parameters)))
+
+	def records[T: Model](self, model_type: type[T], statement: Statement) -> list[T]:
+		column_names, rows = self.read(statement)
 		return [self.hydrate(model_type, column_names, row) for row in rows]
 
 	def counts(self, attribute: Attribute, statement: Select) -> dict[Any, int]:
-		_columns, rows = self.run(statement)
+		_columns, rows = self.read(statement)
 		try:
 			return {attribute.decode(key): cast(int, count) for key, count in rows}
 		except (TypeError, ValueError) as error:
@@ -118,42 +127,25 @@ class Store:
 			) from error
 
 	def has_rows(self, statement: Select) -> bool:
-		_columns, rows = self.run(statement)
+		_columns, rows = self.read(statement)
 		return len(rows) > 0
 
-	def execute(self, statement: Statement) -> int:
-		compiled = self.grammar.compile(statement)
-		cursor = self.connection.execute(compiled.sql, compiled.parameters)
-		try:
-			return cursor.changed_rows
-		finally:
-			cursor.close()
-
-	def run(
+	def read(
 		self,
 		statement: Statement,
 	) -> tuple[tuple[str, ...], list[tuple[Scalar | None, ...]]]:
 		compiled = self.grammar.compile(statement)
-		return self.fetch(compiled.sql, compiled.parameters)
-
-	def select[T: Model](
-		self,
-		model_type: type[T],
-		sql: str,
-		parameters: Iterable[Any],
-	) -> list[T]:
-		self.registry.get(model_type)
-		column_names, rows = self.fetch(sql, parameters)
-		return [self.hydrate(model_type, column_names, row) for row in rows]
-
-	def fetch(
-		self,
-		sql: str,
-		parameters: Iterable[Any],
-	) -> tuple[tuple[str, ...], list[tuple[Scalar | None, ...]]]:
-		cursor = self.connection.execute(sql, parameters)
+		cursor = self.connection.execute(compiled.sql, compiled.parameters)
 		try:
 			return cursor.columns, cursor.fetch_all()
+		finally:
+			cursor.close()
+
+	def write(self, statement: Statement) -> int:
+		compiled = self.grammar.compile(statement)
+		cursor = self.connection.execute(compiled.sql, compiled.parameters)
+		try:
+			return cursor.changed_rows
 		finally:
 			cursor.close()
 

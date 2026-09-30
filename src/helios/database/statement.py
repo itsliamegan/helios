@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from .clause import Clause
 from .codec import Scalar
 
-type Statement = Select | Insert | Update | Delete
+type Statement = Select | Insert | Update | Delete | Raw
 
 
 @dataclass
@@ -34,6 +34,12 @@ class Update:
 class Delete:
 	table: str
 	where: tuple[Clause, ...]
+
+
+@dataclass
+class Raw:
+	sql: str
+	parameters: tuple[Any, ...]
 
 
 type Expression = Column | Count
