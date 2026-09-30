@@ -61,10 +61,11 @@ class Attribute:
 			) from None
 
 	def check(self, value: object):
-		if value is None and self.nullable:
-			return
-		elif value is None:
-			raise ValueError("cannot be null")
+		if value is None:
+			if self.nullable:
+				return
+			else:
+				raise ValueError("cannot be null")
 		self.codec.check(value)
 
 	def encode(self, value: object, model_type: type) -> Scalar | None:
