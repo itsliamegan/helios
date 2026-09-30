@@ -375,7 +375,8 @@ def test_rejects_malformed_condition_keys():
 					store.query(Item).where({key: 1})
 				assert_eq(
 					str(raised.exception),
-					f"Query on Item has {key!r}, which is not a condition key",
+					f"Query on Item has {key!r}, "
+					"which is not of the form 'name' or 'name operator'",
 				)
 		finally:
 			connection.close()
@@ -467,13 +468,13 @@ def test_rejects_conditions_that_are_not_dictionaries():
 				store.query(Item).where([("rank", 1)])
 			assert_eq(
 				str(raised.exception),
-				"Query on Item takes a dictionary of conditions, got list",
+				"Query on Item takes a dict of conditions, got list",
 			)
 			with assert_raises(ModelError) as raised:
 				store.query(Item).where_any({"rank": 1}, [])
 			assert_eq(
 				str(raised.exception),
-				"Query on Item takes a dictionary of conditions, got list",
+				"Query on Item takes a dict of conditions, got list",
 			)
 		finally:
 			connection.close()

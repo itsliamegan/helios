@@ -2,8 +2,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from .clause import Clause, Group
-from .condition import Comparison, Condition, IsNull, Membership
+from .condition import Clause, Comparison, Condition, Group, IsNull, Membership
 from .query import Query
 from .sqlite import quote_identifier
 
@@ -72,7 +71,7 @@ class Grammar:
 
 	def group(self, group: Group) -> Fragment:
 		conditions = join(
-			(self.condition(condition) for condition in group),
+			(self.condition(condition) for condition in group.conditions),
 			" AND ",
 		)
 		return join([Fragment("("), conditions, Fragment(")")])

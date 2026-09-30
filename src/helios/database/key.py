@@ -7,9 +7,7 @@ class Key:
 	operator: str
 
 	@classmethod
-	def parse(cls, text: object) -> Key | None:
-		if not isinstance(text, str):
-			return None
+	def parse(cls, text: str) -> Key | None:
 		parts = text.split(" ")
 		if not 1 <= len(parts) <= 2 or not all(parts):
 			return None

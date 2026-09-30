@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Literal, TYPE_CHECKING
 
-from .clause import Clause
+from .condition import Clause, Group
 from .error import ModelError
 from .model import Model
-from .parser import parse
 
 if TYPE_CHECKING:
 	from .store import Store
@@ -23,11 +22,11 @@ class Query[T: Model]:
 		self.count: int | None = None
 
 	def where(self, conditions: dict[str, Any]) -> Query[T]:
-		self.clauses.append(Clause((parse(self.model_type, conditions),)))
+		self.clauses.append(Clause((Group.parse(self.model_type, conditions),)))
 		return self
 
 	def where_not(self, conditions: dict[str, Any]) -> Query[T]:
-		group = parse(self.model_type, conditions)
+		group = Group.parse(self.model_type, conditions)
 		self.clauses.append(Clause((group,), negated=True))
 		return self
 
@@ -36,7 +35,7 @@ class Query[T: Model]:
 			raise ModelError(
 				f"Query on {self.model_type.__name__} has where_any with no groups"
 			)
-		parsed = tuple(parse(self.model_type, group) for group in groups)
+		parsed = tuple(Group.parse(self.model_type, group) for group in groups)
 		self.clauses.append(Clause(parsed))
 		return self
 
