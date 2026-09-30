@@ -4,8 +4,8 @@ from typing import Any, cast
 from uuid import UUID
 
 from .attribute import Attribute
+from .clause import Clause, Group
 from .codec import Scalar
-from .condition import Clause, Group
 from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .model import Model
@@ -52,14 +52,12 @@ class Store:
 	) -> T:
 		registered = self.registry.get(cast(type[T], model_type))
 		record = model_type(*args, **values)
-		created_at = datetime.now(UTC)
-		attributes = {**record._values, "created_at": created_at}
+		record._values["created_at"] = datetime.now(UTC)
 		encoded = {
-			name: attribute.encode(attributes[name], registered)
+			name: attribute.encode(record._values[name], registered)
 			for name, attribute in registered.attributes.items()
 		}
 		self.execute(Insert(registered.table, encoded))
-		record._values["created_at"] = created_at
 		return record
 
 	def update(self, record: Model, **values: Any):
