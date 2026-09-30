@@ -17,22 +17,6 @@ from .statement import (
 )
 
 
-@dataclass
-class Fragment:
-	sql: str
-	parameters: tuple[Any, ...] = ()
-
-	@classmethod
-	def join(cls, fragments: Iterable[Fragment], separator: str = "") -> Fragment:
-		fragments = list(fragments)
-		return cls(
-			separator.join(fragment.sql for fragment in fragments),
-			tuple(
-				parameter for fragment in fragments for parameter in fragment.parameters
-			),
-		)
-
-
 class Grammar:
 	def compile(self, statement: Statement) -> Fragment:
 		match statement:
@@ -101,6 +85,27 @@ class Grammar:
 		compiled = Fragment.join((self.clause(clause) for clause in clauses), " AND ")
 		return Fragment.join([Fragment(" WHERE "), compiled])
 
+	def group_by(self, names: tuple[str, ...]) -> Fragment:
+		if not names:
+			return Fragment("")
+		return Fragment(
+			f" GROUP BY {", ".join(quote_identifier(name) for name in names)}"
+		)
+
+	def order(self, ordering: tuple[tuple[str, Direction], ...]) -> Fragment:
+		if not ordering:
+			return Fragment("")
+		keys = ", ".join(
+			f"{quote_identifier(name)} {direction.upper()}"
+			for name, direction in ordering
+		)
+		return Fragment(f" ORDER BY {keys}")
+
+	def limit(self, count: int | None) -> Fragment:
+		if count is None:
+			return Fragment("")
+		return Fragment(" LIMIT ?", (count,))
+
 	def clause(self, clause: Clause) -> Fragment:
 		groups = Fragment.join((self.group(group) for group in clause.groups), " OR ")
 		negation = " IS NOT 1" if clause.negated else ""
@@ -126,23 +131,18 @@ class Grammar:
 					sql = f"({sql} OR {quote_identifier(name)} IS NULL)"
 				return Fragment(sql, values)
 
-	def group_by(self, names: tuple[str, ...]) -> Fragment:
-		if not names:
-			return Fragment("")
-		return Fragment(
-			f" GROUP BY {", ".join(quote_identifier(name) for name in names)}"
-		)
 
-	def order(self, ordering: tuple[tuple[str, Direction], ...]) -> Fragment:
-		if not ordering:
-			return Fragment("")
-		keys = ", ".join(
-			f"{quote_identifier(name)} {direction.upper()}"
-			for name, direction in ordering
-		)
-		return Fragment(f" ORDER BY {keys}")
+@dataclass
+class Fragment:
+	sql: str
+	parameters: tuple[Any, ...] = ()
 
-	def limit(self, count: int | None) -> Fragment:
-		if count is None:
-			return Fragment("")
-		return Fragment(" LIMIT ?", (count,))
+	@classmethod
+	def join(cls, fragments: Iterable[Fragment], separator: str = "") -> Fragment:
+		fragments = list(fragments)
+		return cls(
+			separator.join(fragment.sql for fragment in fragments),
+			tuple(
+				parameter for fragment in fragments for parameter in fragment.parameters
+			),
+		)

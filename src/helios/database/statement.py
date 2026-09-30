@@ -4,20 +4,7 @@ from typing import Literal
 from .clause import Clause
 from .codec import Scalar
 
-type Direction = Literal["asc", "desc"]
-
-
-@dataclass
-class Column:
-	name: str
-
-
-@dataclass
-class Count:
-	pass
-
-
-type Expression = Column | Count
+type Statement = Select | Insert | Update | Delete
 
 
 @dataclass
@@ -49,4 +36,16 @@ class Delete:
 	where: tuple[Clause, ...]
 
 
-type Statement = Select | Insert | Update | Delete
+type Expression = Column | Count
+
+type Direction = Literal["asc", "desc"]
+
+
+@dataclass
+class Column:
+	name: str
+
+
+@dataclass
+class Count:
+	pass
