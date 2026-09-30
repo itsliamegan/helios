@@ -141,10 +141,7 @@ class Store:
 		statement = self.grammar.count_by(query, name)
 		_columns, rows = self.fetch(statement.sql, statement.parameters)
 		try:
-			return {
-				attribute.decode(key, model_type): cast(int, count)
-				for key, count in rows
-			}
+			return {attribute.decode(key): cast(int, count) for key, count in rows}
 		except (TypeError, ValueError) as error:
 			raise DatabaseError(
 				"database row contains an invalid model value"
@@ -202,7 +199,7 @@ class Store:
 		values: dict[str, Any] = {}
 		try:
 			for name, raw_value in zip(column_names, row, strict=True):
-				values[name] = model_type.attributes[name].decode(raw_value, model_type)
+				values[name] = model_type.attributes[name].decode(raw_value)
 		except (TypeError, ValueError) as error:
 			raise DatabaseError(
 				"database row contains an invalid model value"

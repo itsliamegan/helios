@@ -45,9 +45,10 @@ def parse_condition(model_type: type[Model], text: object, value: object) -> Con
 			)
 		members = list(value)
 		for member in members:
-			problem = attribute.problem(member)
-			if problem is not None:
-				raise invalid(problem)
+			try:
+				attribute.check(member)
+			except (TypeError, ValueError) as error:
+				raise invalid(str(error)) from error
 		values = tuple(
 			dict.fromkeys(
 				encode(attribute.codec, member)
@@ -58,10 +59,11 @@ def parse_condition(model_type: type[Model], text: object, value: object) -> Con
 		return Membership(key.name, values, None in members)
 	if value is None and key.operator in ORDERINGS:
 		raise invalid("cannot compare with None")
-	problem = attribute.problem(value)
-	if problem is not None:
-		raise invalid(problem)
-	elif value is None:
+	try:
+		attribute.check(value)
+	except (TypeError, ValueError) as error:
+		raise invalid(str(error)) from error
+	if value is None:
 		return IsNull(key.name)
 	else:
 		return Comparison(key.name, key.operator, encode(attribute.codec, value))

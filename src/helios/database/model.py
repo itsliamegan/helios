@@ -73,7 +73,10 @@ class Model:
 		values = {}
 		for name, definition in initialized.items():
 			value = raw_attributes.get(name, definition.default)
-			definition.check(value, cls)
+			try:
+				definition.check(value)
+			except (TypeError, ValueError) as error:
+				raise ModelError(f"{cls.__name__}.{name}: {error}") from error
 			values[name] = value
 		return values
 
