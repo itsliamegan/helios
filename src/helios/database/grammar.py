@@ -12,13 +12,15 @@ class Fragment:
 	sql: str
 	parameters: tuple[Any, ...] = ()
 
-
-def join(fragments: Iterable[Fragment], separator: str = "") -> Fragment:
-	fragments = list(fragments)
-	return Fragment(
-		separator.join(fragment.sql for fragment in fragments),
-		tuple(parameter for fragment in fragments for parameter in fragment.parameters),
-	)
+	@classmethod
+	def join(cls, fragments: Iterable[Fragment], separator: str = "") -> Fragment:
+		fragments = list(fragments)
+		return cls(
+			separator.join(fragment.sql for fragment in fragments),
+			tuple(
+				parameter for fragment in fragments for parameter in fragment.parameters
+			),
+		)
 
 
 class Grammar:
@@ -26,7 +28,7 @@ class Grammar:
 		columns = ", ".join(
 			quote_identifier(name) for name in query.model_type.attributes
 		)
-		return join(
+		return Fragment.join(
 			[
 				Fragment(f"SELECT {columns} FROM {self.table(query)}"),
 				self.where(query),
@@ -37,7 +39,7 @@ class Grammar:
 
 	def count_by(self, query: Query[Any], name: str) -> Fragment:
 		column = quote_identifier(name)
-		return join(
+		return Fragment.join(
 			[
 				Fragment(f"SELECT {column}, COUNT(*) FROM {self.table(query)}"),
 				self.where(query),
@@ -46,7 +48,7 @@ class Grammar:
 		)
 
 	def exists(self, query: Query[Any]) -> Fragment:
-		return join(
+		return Fragment.join(
 			[
 				Fragment(f"SELECT EXISTS (SELECT 1 FROM {self.table(query)}"),
 				self.where(query),
@@ -61,20 +63,22 @@ class Grammar:
 	def where(self, query: Query[Any]) -> Fragment:
 		if not query.clauses:
 			return Fragment("")
-		clauses = join((self.clause(clause) for clause in query.clauses), " AND ")
-		return join([Fragment(" WHERE "), clauses])
+		clauses = Fragment.join(
+			(self.clause(clause) for clause in query.clauses), " AND "
+		)
+		return Fragment.join([Fragment(" WHERE "), clauses])
 
 	def clause(self, clause: Clause) -> Fragment:
-		groups = join((self.group(group) for group in clause.groups), " OR ")
+		groups = Fragment.join((self.group(group) for group in clause.groups), " OR ")
 		negation = " IS NOT 1" if clause.negated else ""
-		return join([Fragment("("), groups, Fragment(f"){negation}")])
+		return Fragment.join([Fragment("("), groups, Fragment(f"){negation}")])
 
 	def group(self, group: Group) -> Fragment:
-		conditions = join(
+		conditions = Fragment.join(
 			(self.condition(condition) for condition in group.conditions),
 			" AND ",
 		)
-		return join([Fragment("("), conditions, Fragment(")")])
+		return Fragment.join([Fragment("("), conditions, Fragment(")")])
 
 	def condition(self, condition: Condition) -> Fragment:
 		match condition:
