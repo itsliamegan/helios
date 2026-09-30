@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
+from .codec import Scalar
 from .condition import Clause
 
 type Direction = Literal["asc", "desc"]
@@ -29,4 +30,23 @@ class Select:
 	limit: int | None = None
 
 
-type Statement = Select
+@dataclass
+class Insert:
+	table: str
+	values: dict[str, Scalar | None]
+
+
+@dataclass
+class Update:
+	table: str
+	values: dict[str, Scalar | None]
+	where: tuple[Clause, ...]
+
+
+@dataclass
+class Delete:
+	table: str
+	where: tuple[Clause, ...]
+
+
+type Statement = Select | Insert | Update | Delete

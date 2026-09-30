@@ -5,12 +5,13 @@ from uuid import UUID
 
 from .attribute import Attribute
 from .codec import Scalar
+from .condition import Clause, Group
 from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .model import Model
 from .query import Query
-from .sqlite import Connection, quote_identifier
-from .statement import Select, Statement
+from .sqlite import Connection
+from .statement import Delete, Insert, Select, Statement, Update
 
 
 class Registry:
@@ -53,18 +54,11 @@ class Store:
 		record = model_type(*args, **values)
 		created_at = datetime.now(UTC)
 		attributes = {**record._values, "created_at": created_at}
-		names = tuple(registered.attributes)
-		columns = ", ".join(quote_identifier(name) for name in names)
-		placeholders = ", ".join("?" for _ in names)
-		parameters = [
-			registered.attributes[name].encode(attributes[name], registered)
-			for name in names
-		]
-		sql = (
-			f"INSERT INTO {quote_identifier(registered.table)} ({columns}) "
-			f"VALUES ({placeholders})"
-		)
-		self.connection.execute(sql, parameters).close()
+		encoded = {
+			name: attribute.encode(attributes[name], registered)
+			for name, attribute in registered.attributes.items()
+		}
+		self.execute(Insert(registered.table, encoded))
 		record._values["created_at"] = created_at
 		return record
 
@@ -78,38 +72,19 @@ class Store:
 			if not attribute.init:
 				raise ModelError(f"{model_type.__name__}.{name} is generated")
 			encoded[name] = attribute.encode(value, model_type)
-		assignments = ", ".join(f"{quote_identifier(name)} = ?" for name in encoded)
-		parameters = [
-			*encoded.values(),
-			model_type.attributes["id"].encode(record.id, model_type),
-		]
-		sql = (
-			f"UPDATE {quote_identifier(model_type.table)} SET {assignments} "
-			f"WHERE {quote_identifier("id")} = ?"
-		)
-		cursor = self.connection.execute(sql, parameters)
-		try:
-			changed_rows = cursor.changed_rows
-		finally:
-			cursor.close()
-		if changed_rows == 0:
+		statement = Update(model_type.table, encoded, self.identifying(record))
+		if self.execute(statement) == 0:
 			raise NotFoundError(model_type, record.id)
 		record._values.update(values)
 
 	def delete(self, record: Model):
 		model_type = self.registry.get(type(record))
-		sql = (
-			f"DELETE FROM {quote_identifier(model_type.table)} "
-			f"WHERE {quote_identifier("id")} = ?"
-		)
-		identifier = model_type.attributes["id"].encode(record.id, model_type)
-		cursor = self.connection.execute(sql, (identifier,))
-		try:
-			changed_rows = cursor.changed_rows
-		finally:
-			cursor.close()
-		if changed_rows == 0:
+		statement = Delete(model_type.table, self.identifying(record))
+		if self.execute(statement) == 0:
 			raise NotFoundError(model_type, record.id)
+
+	def identifying(self, record: Model) -> tuple[Clause, ...]:
+		return (Clause((Group.parse(type(record), {"id": record.id}),)),)
 
 	def find_one[T: Model](self, model_type: type[T], id: UUID) -> T:
 		found = self.query(model_type).where({"id": id}).first()
@@ -147,6 +122,14 @@ class Store:
 	def has_rows(self, statement: Select) -> bool:
 		_columns, rows = self.run(statement)
 		return len(rows) > 0
+
+	def execute(self, statement: Statement) -> int:
+		compiled = self.grammar.compile(statement)
+		cursor = self.connection.execute(compiled.sql, compiled.parameters)
+		try:
+			return cursor.changed_rows
+		finally:
+			cursor.close()
 
 	def run(
 		self,

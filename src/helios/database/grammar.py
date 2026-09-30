@@ -4,7 +4,17 @@ from typing import Any
 
 from .condition import Clause, Comparison, Condition, Group, IsNull, Membership
 from .sqlite import quote_identifier
-from .statement import Column, Count, Direction, Expression, Select, Statement
+from .statement import (
+	Column,
+	Count,
+	Delete,
+	Direction,
+	Expression,
+	Insert,
+	Select,
+	Statement,
+	Update,
+)
 
 
 @dataclass
@@ -28,6 +38,12 @@ class Grammar:
 		match statement:
 			case Select():
 				return self.select(statement)
+			case Insert():
+				return self.insert(statement)
+			case Update():
+				return self.update(statement)
+			case Delete():
+				return self.delete(statement)
 
 	def select(self, statement: Select) -> Fragment:
 		columns = ", ".join(self.expression(column) for column in statement.columns)
@@ -38,6 +54,37 @@ class Grammar:
 				self.group_by(statement.group_by),
 				self.order(statement.ordering),
 				self.limit(statement.limit),
+			]
+		)
+
+	def insert(self, statement: Insert) -> Fragment:
+		columns = ", ".join(quote_identifier(name) for name in statement.values)
+		placeholders = ", ".join("?" for _ in statement.values)
+		return Fragment(
+			f"INSERT INTO {quote_identifier(statement.table)} ({columns}) "
+			f"VALUES ({placeholders})",
+			tuple(statement.values.values()),
+		)
+
+	def update(self, statement: Update) -> Fragment:
+		assignments = ", ".join(
+			f"{quote_identifier(name)} = ?" for name in statement.values
+		)
+		return Fragment.join(
+			[
+				Fragment(
+					f"UPDATE {quote_identifier(statement.table)} SET {assignments}",
+					tuple(statement.values.values()),
+				),
+				self.where(statement.where),
+			]
+		)
+
+	def delete(self, statement: Delete) -> Fragment:
+		return Fragment.join(
+			[
+				Fragment(f"DELETE FROM {quote_identifier(statement.table)}"),
+				self.where(statement.where),
 			]
 		)
 
