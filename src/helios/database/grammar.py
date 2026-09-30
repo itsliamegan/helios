@@ -2,7 +2,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from .condition import Clause, Comparison, Condition, Group, IsNull, Membership
+from .clause import Clause, Comparison, Condition, Group, IsNull, Membership
 from .sqlite import quote_identifier
 from .statement import (
 	Column,

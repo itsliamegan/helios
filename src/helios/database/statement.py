@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal
 
+from .clause import Clause
 from .codec import Scalar
-from .condition import Clause
 
 type Direction = Literal["asc", "desc"]
 

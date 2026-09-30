@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 
-from .condition import Clause, Group
+from .clause import Clause, Group
 from .error import ModelError
 from .model import Model
 from .statement import Column, Count, Direction, Select
