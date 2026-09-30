@@ -370,7 +370,7 @@ def test_rejects_malformed_condition_keys():
 	with TemporaryDirectory() as directory:
 		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
-			for key in ("rank  >", " rank", "rank > 1", "", 1):
+			for key in ("rank  >", " rank", "rank > 1", ""):
 				with assert_raises(ModelError) as raised:
 					store.query(Item).where({key: 1})
 				assert_eq(
@@ -455,26 +455,6 @@ def test_rejects_where_any_with_no_groups():
 			assert_eq(
 				str(raised.exception),
 				"Query on Item has where_any with no groups",
-			)
-		finally:
-			connection.close()
-
-
-def test_rejects_conditions_that_are_not_dictionaries():
-	with TemporaryDirectory() as directory:
-		connection, store = open_store(Path(directory, "app.sqlite"))
-		try:
-			with assert_raises(ModelError) as raised:
-				store.query(Item).where([("rank", 1)])
-			assert_eq(
-				str(raised.exception),
-				"Query on Item takes a dict of conditions, got list",
-			)
-			with assert_raises(ModelError) as raised:
-				store.query(Item).where_any({"rank": 1}, [])
-			assert_eq(
-				str(raised.exception),
-				"Query on Item takes a dict of conditions, got list",
 			)
 		finally:
 			connection.close()

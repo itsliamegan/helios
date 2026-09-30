@@ -7,8 +7,6 @@ from .codec import Scalar, encode
 from .error import ModelError
 from .model import Model
 
-MALFORMED = "is not of the form 'name' or 'name operator'"
-
 
 @dataclass
 class Clause:
@@ -23,17 +21,11 @@ class Group:
 	@classmethod
 	def parse(cls, model_type: type[Model], conditions: dict[str, Any]) -> Group:
 		subject = f"Query on {model_type.__name__}"
-		if not isinstance(conditions, dict):
-			raise ModelError(
-				f"{subject} takes a dict of conditions, got {type(conditions).__name__}"
-			)
 		if not conditions:
 			raise ModelError(f"{subject} has an empty condition group")
 
 		parsed: list[Condition] = []
 		for text, value in conditions.items():
-			if not isinstance(text, str):
-				raise ModelError(f"{subject} has {text!r}, which {MALFORMED}")
 			try:
 				key = Key.parse(text)
 			except ValueError as error:
@@ -58,7 +50,7 @@ class Key:
 	def parse(cls, text: str) -> Key:
 		parts = text.split(" ")
 		if not 1 <= len(parts) <= 2 or not all(parts):
-			raise ValueError(MALFORMED)
+			raise ValueError("is not of the form 'name' or 'name operator'")
 		elif len(parts) == 1:
 			return cls(parts[0], "=")
 		elif is_operator(parts[1]):
