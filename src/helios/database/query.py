@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Literal, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from .condition import Clause, Group
 from .error import ModelError
 from .model import Model
+from .statement import Column, Count, Direction, Select
 
 if TYPE_CHECKING:
 	from .store import Store
-
-
-type Direction = Literal["asc", "desc"]
 
 
 class Query[T: Model]:
@@ -53,19 +51,44 @@ class Query[T: Model]:
 		return self
 
 	def all(self) -> list[T]:
-		return self.store.execute(self, self.count)
+		return self.store.records(self.model_type, self.select(self.count))
 
 	def first(self) -> T | None:
-		found = self.store.execute(self, 0 if self.count == 0 else 1)
+		found = self.store.records(self.model_type, self.select(self.at_most_one))
 		return found[0] if found else None
 
 	def count_by(self, name: str) -> dict[Any, int]:
-		self.model_type.attribute(name)
+		attribute = self.model_type.attribute(name)
 		if self.count is not None:
 			raise ModelError(
 				f"Query on {self.model_type.__name__} cannot count_by with a limit"
 			)
-		return self.store.execute_count_by(self, name)
+		statement = Select(
+			table=self.model_type.table,
+			columns=(Column(name), Count()),
+			where=tuple(self.clauses),
+			group_by=(name,),
+		)
+		return self.store.counts(attribute, statement)
 
 	def exists(self) -> bool:
-		return self.store.execute_exists(self)
+		statement = Select(
+			table=self.model_type.table,
+			columns=(Column("id"),),
+			where=tuple(self.clauses),
+			limit=self.at_most_one,
+		)
+		return self.store.has_rows(statement)
+
+	@property
+	def at_most_one(self) -> int:
+		return 0 if self.count == 0 else 1
+
+	def select(self, limit: int | None) -> Select:
+		return Select(
+			table=self.model_type.table,
+			columns=tuple(Column(name) for name in self.model_type.attributes),
+			where=tuple(self.clauses),
+			ordering=tuple(self.ordering),
+			limit=limit,
+		)

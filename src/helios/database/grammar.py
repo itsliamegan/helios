@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from .condition import Clause, Comparison, Condition, Group, IsNull, Membership
-from .query import Query
 from .sqlite import quote_identifier
+from .statement import Column, Count, Direction, Expression, Select, Statement
 
 
 @dataclass
@@ -24,49 +24,35 @@ class Fragment:
 
 
 class Grammar:
-	def select(self, query: Query[Any], count: int | None) -> Fragment:
-		columns = ", ".join(
-			quote_identifier(name) for name in query.model_type.attributes
-		)
+	def compile(self, statement: Statement) -> Fragment:
+		match statement:
+			case Select():
+				return self.select(statement)
+
+	def select(self, statement: Select) -> Fragment:
+		columns = ", ".join(self.expression(column) for column in statement.columns)
 		return Fragment.join(
 			[
-				Fragment(f"SELECT {columns} FROM {self.table(query)}"),
-				self.where(query),
-				self.order(query),
-				self.limit(count),
+				Fragment(f"SELECT {columns} FROM {quote_identifier(statement.table)}"),
+				self.where(statement.where),
+				self.group_by(statement.group_by),
+				self.order(statement.ordering),
+				self.limit(statement.limit),
 			]
 		)
 
-	def count_by(self, query: Query[Any], name: str) -> Fragment:
-		column = quote_identifier(name)
-		return Fragment.join(
-			[
-				Fragment(f"SELECT {column}, COUNT(*) FROM {self.table(query)}"),
-				self.where(query),
-				Fragment(f" GROUP BY {column}"),
-			]
-		)
+	def expression(self, expression: Expression) -> str:
+		match expression:
+			case Column(name=name):
+				return quote_identifier(name)
+			case Count():
+				return "COUNT(*)"
 
-	def exists(self, query: Query[Any]) -> Fragment:
-		return Fragment.join(
-			[
-				Fragment(f"SELECT EXISTS (SELECT 1 FROM {self.table(query)}"),
-				self.where(query),
-				self.limit(query.count),
-				Fragment(")"),
-			]
-		)
-
-	def table(self, query: Query[Any]) -> str:
-		return quote_identifier(query.model_type.table)
-
-	def where(self, query: Query[Any]) -> Fragment:
-		if not query.clauses:
+	def where(self, clauses: tuple[Clause, ...]) -> Fragment:
+		if not clauses:
 			return Fragment("")
-		clauses = Fragment.join(
-			(self.clause(clause) for clause in query.clauses), " AND "
-		)
-		return Fragment.join([Fragment(" WHERE "), clauses])
+		compiled = Fragment.join((self.clause(clause) for clause in clauses), " AND ")
+		return Fragment.join([Fragment(" WHERE "), compiled])
 
 	def clause(self, clause: Clause) -> Fragment:
 		groups = Fragment.join((self.group(group) for group in clause.groups), " OR ")
@@ -93,12 +79,19 @@ class Grammar:
 					sql = f"({sql} OR {quote_identifier(name)} IS NULL)"
 				return Fragment(sql, values)
 
-	def order(self, query: Query[Any]) -> Fragment:
-		if not query.ordering:
+	def group_by(self, names: tuple[str, ...]) -> Fragment:
+		if not names:
+			return Fragment("")
+		return Fragment(
+			f" GROUP BY {", ".join(quote_identifier(name) for name in names)}"
+		)
+
+	def order(self, ordering: tuple[tuple[str, Direction], ...]) -> Fragment:
+		if not ordering:
 			return Fragment("")
 		keys = ", ".join(
 			f"{quote_identifier(name)} {direction.upper()}"
-			for name, direction in query.ordering
+			for name, direction in ordering
 		)
 		return Fragment(f" ORDER BY {keys}")
 

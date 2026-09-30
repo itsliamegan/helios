@@ -3,12 +3,14 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
+from .attribute import Attribute
 from .codec import Scalar
 from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .model import Model
 from .query import Query
 from .sqlite import Connection, quote_identifier
+from .statement import Select, Statement
 
 
 class Registry:
@@ -129,17 +131,12 @@ class Store:
 		self.registry.get(model_type)
 		return Query(self, model_type)
 
-	def execute[T: Model](self, query: Query[T], count: int | None) -> list[T]:
-		statement = self.grammar.select(query, count)
-		return self.execute_select(
-			query.model_type, statement.sql, statement.parameters
-		)
+	def records[T: Model](self, model_type: type[T], statement: Select) -> list[T]:
+		column_names, rows = self.run(statement)
+		return [self.hydrate(model_type, column_names, row) for row in rows]
 
-	def execute_count_by(self, query: Query[Any], name: str) -> dict[Any, int]:
-		model_type = query.model_type
-		attribute = model_type.attribute(name)
-		statement = self.grammar.count_by(query, name)
-		_columns, rows = self.fetch(statement.sql, statement.parameters)
+	def counts(self, attribute: Attribute, statement: Select) -> dict[Any, int]:
+		_columns, rows = self.run(statement)
 		try:
 			return {attribute.decode(key): cast(int, count) for key, count in rows}
 		except (TypeError, ValueError) as error:
@@ -147,10 +144,16 @@ class Store:
 				"database row contains an invalid model value"
 			) from error
 
-	def execute_exists(self, query: Query[Any]) -> bool:
-		statement = self.grammar.exists(query)
-		_columns, rows = self.fetch(statement.sql, statement.parameters)
-		return rows[0][0] == 1
+	def has_rows(self, statement: Select) -> bool:
+		_columns, rows = self.run(statement)
+		return len(rows) > 0
+
+	def run(
+		self,
+		statement: Statement,
+	) -> tuple[tuple[str, ...], list[tuple[Scalar | None, ...]]]:
+		compiled = self.grammar.compile(statement)
+		return self.fetch(compiled.sql, compiled.parameters)
 
 	def select[T: Model](
 		self,
@@ -159,14 +162,6 @@ class Store:
 		parameters: Iterable[Any],
 	) -> list[T]:
 		self.registry.get(model_type)
-		return self.execute_select(model_type, sql, parameters)
-
-	def execute_select[T: Model](
-		self,
-		model_type: type[T],
-		sql: str,
-		parameters: Iterable[Any],
-	) -> list[T]:
 		column_names, rows = self.fetch(sql, parameters)
 		return [self.hydrate(model_type, column_names, row) for row in rows]
 
