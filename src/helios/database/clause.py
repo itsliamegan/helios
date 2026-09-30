@@ -1,15 +1,11 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Literal, TypeIs
+from typing import Any, Literal, TypeIs
 
 from .attribute import Attribute
 from .codec import Scalar, encode
 from .error import ModelError
 from .model import Model
-
-type Operator = Literal["=", "<", "<=", ">", ">="]
-
-OPERATORS = ("=", "<", "<=", ">", ">=", "in")
 
 MALFORMED = "is not of the form 'name' or 'name operator'"
 
@@ -25,7 +21,7 @@ class Group:
 	conditions: tuple[Condition, ...]
 
 	@classmethod
-	def parse(cls, model_type: type[Model], conditions: object) -> Group:
+	def parse(cls, model_type: type[Model], conditions: dict[str, Any]) -> Group:
 		subject = f"Query on {model_type.__name__}"
 		if not isinstance(conditions, dict):
 			raise ModelError(
@@ -136,6 +132,10 @@ class Membership:
 			)
 		)
 		return cls(attribute.name, values, None in members)
+
+
+type Operator = Literal["=", "<", "<=", ">", ">="]
+OPERATORS = ("=", "<", "<=", ">", ">=", "in")
 
 
 def is_operator(text: str) -> TypeIs[Operator | Literal["in"]]:
