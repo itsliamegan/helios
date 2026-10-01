@@ -86,6 +86,10 @@ class Connection:
 	def in_transaction(self) -> bool:
 		return self.connection.in_transaction
 
+	@property
+	def parameter_limit(self) -> int:
+		return self.connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
+
 	def configure(self, config: Config):
 		self.control("PRAGMA foreign_keys = ON", "configuration")
 		self.control(
