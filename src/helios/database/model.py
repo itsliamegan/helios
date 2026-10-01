@@ -3,10 +3,16 @@ from datetime import datetime
 from typing import Any, ClassVar, dataclass_transform
 from uuid import UUID, uuid4
 
-from helios.declarative import check_init_keywords, check_single_base, declarations
+from helios.declarative import (
+	Declaration,
+	check_init_keywords,
+	check_single_base,
+	declarations,
+)
 
 from .column import Column, declare, generated
 from .error import ModelError
+from .relationship import BelongsTo, Relationship, belongs_to, has_many, has_one
 
 
 class ResolvedColumns:
@@ -19,12 +25,13 @@ class ResolvedColumns:
 @dataclass_transform(
 	kw_only_default=True,
 	eq_default=False,
-	field_specifiers=(generated,),
+	field_specifiers=(generated, belongs_to, has_many, has_one),
 )
 class Model:
 	table: ClassVar[str] = ""
 	_columns: ClassVar[dict[str, Column]] = {}
 	columns = ResolvedColumns()
+	relationships: ClassVar[dict[str, Relationship]] = {}
 
 	id: UUID = generated()
 	created_at: datetime = generated()
@@ -54,6 +61,8 @@ class Model:
 
 	@classmethod
 	def column(cls, name: str) -> Column:
+		if name in cls.relationships:
+			raise ModelError(f"{cls.__name__}.{name} is a relationship, not a column")
 		try:
 			return cls.columns[name]
 		except KeyError:
@@ -91,14 +100,23 @@ class Model:
 def declare_columns(model_type: type[Model], columns: dict[str, Column]):
 	name = model_type.__name__
 	own_columns = {}
-	for declaration in declarations(model_type, declare, ModelError):
+	relationships = {}
+	for declaration in declarations(model_type, settle, ModelError):
 		default = declaration.default
-		declared_column = default if isinstance(default, Column) else Column()
-		declared_column.bind(declaration)
-		own_columns[declaration.name] = declared_column
+		if isinstance(default, Relationship):
+			default.bind(declaration)
+			relationships[declaration.name] = default
+		else:
+			declared_column = default if isinstance(default, Column) else Column()
+			declared_column.bind(declaration)
+			own_columns[declaration.name] = declared_column
 
 	for column_name, value in vars(model_type).items():
-		if isinstance(value, Column) and column_name not in own_columns:
+		if (
+			isinstance(value, Column | Relationship)
+			and column_name not in own_columns
+			and column_name not in relationships
+		):
 			raise ModelError(f"'{name}.{column_name}' has no annotation")
 
 	for column_name in [*vars(model_type), *own_columns]:
@@ -109,8 +127,19 @@ def declare_columns(model_type: type[Model], columns: dict[str, Column]):
 		setattr(model_type, column_name, declared_column)
 		columns[column_name] = declared_column
 	model_type._columns = columns
+	model_type.relationships = relationships
+
+	for relationship in relationships.values():
+		if isinstance(relationship, BelongsTo):
+			relationship.check_id()
 
 
-METADATA = {"columns"}
+def settle(declaration: Declaration[object]) -> object:
+	if isinstance(declaration.default, Relationship):
+		return declaration.default.settle(declaration)
+	return declare(declaration)
+
+
+METADATA = {"columns", "relationships"}
 
 declare_columns(Model, {})

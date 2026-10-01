@@ -18,12 +18,12 @@ class Encoding:
 
 class Column:
 	name: str
-	declaration: Declaration[Encoding]
+	declaration: Declaration[object]
 
 	def __init__(self, init: bool = True):
 		self.init = init
 
-	def bind(self, declaration: Declaration[Encoding]):
+	def bind(self, declaration: Declaration[object]):
 		self.name = declaration.name
 		self.declaration = declaration
 
@@ -40,7 +40,9 @@ class Column:
 
 	@property
 	def encoding(self) -> Encoding:
-		return self.declaration.resolve()
+		encoding = self.declaration.resolve()
+		assert isinstance(encoding, Encoding)
+		return encoding
 
 	@property
 	def codec(self) -> Codec[object]:
@@ -92,7 +94,7 @@ def generated(init: bool = False) -> Any:
 	return Column(init)
 
 
-def declare(declaration: Declaration[Encoding]) -> Encoding:
+def declare(declaration: Declaration[object]) -> Encoding:
 	annotation, nullable = split_nullable(declaration.name, declaration.annotation)
 	codec = Codec.for_type(annotation)
 	if codec is None:
