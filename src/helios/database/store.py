@@ -65,7 +65,7 @@ class Store:
 			raise NotFoundError(model_type, model.id)
 
 	def identifying(self, model: Model) -> tuple[Clause, ...]:
-		return (Clause((Group.parse(type(model), {"id": model.id}),)),)
+		return (Clause((Group.parse(self.registry, type(model), {"id": model.id}),)),)
 
 	def find_one[T: Model](self, model_type: type[T], id: UUID) -> T:
 		found = self.query(model_type).where({"id": id}).first()

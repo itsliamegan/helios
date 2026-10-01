@@ -20,11 +20,13 @@ class Query[T: Model]:
 		self.count: int | None = None
 
 	def where(self, conditions: dict[str, Any]) -> Query[T]:
-		self.clauses.append(Clause((Group.parse(self.model_type, conditions),)))
+		self.clauses.append(
+			Clause((Group.parse(self.store.registry, self.model_type, conditions),))
+		)
 		return self
 
 	def where_not(self, conditions: dict[str, Any]) -> Query[T]:
-		group = Group.parse(self.model_type, conditions)
+		group = Group.parse(self.store.registry, self.model_type, conditions)
 		self.clauses.append(Clause((group,), negated=True))
 		return self
 
@@ -33,7 +35,9 @@ class Query[T: Model]:
 			raise ModelError(
 				f"Query on {self.model_type.__name__} has where_any with no groups"
 			)
-		parsed = tuple(Group.parse(self.model_type, group) for group in groups)
+		parsed = tuple(
+			Group.parse(self.store.registry, self.model_type, group) for group in groups
+		)
 		self.clauses.append(Clause(parsed))
 		return self
 
