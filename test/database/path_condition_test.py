@@ -7,8 +7,15 @@ from uuid import UUID
 
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.database import Config, Model, ModelError, Store
-from helios.database.relationship import belongs_to, has_many, has_one
+from helios.database import (
+	Config,
+	Model,
+	ModelError,
+	Store,
+	belongs_to,
+	has_many,
+	has_one,
+)
 from helios.database.sqlite import connect
 
 
