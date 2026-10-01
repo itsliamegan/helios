@@ -22,7 +22,7 @@ def test_constructs_model_with_table_defaults_and_nulls():
 	assert_that(isinstance(post.id, UUID))
 
 
-def test_constructed_record_has_no_created_at():
+def test_constructed_model_has_no_created_at():
 	class Post(Model):
 		title: str
 

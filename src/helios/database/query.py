@@ -51,10 +51,10 @@ class Query[T: Model]:
 		return self
 
 	def all(self) -> list[T]:
-		return self.store.records(self.model_type, self.select(self.count))
+		return self.store.models(self.model_type, self.select(self.count))
 
 	def first(self) -> T | None:
-		found = self.store.records(self.model_type, self.select(self.at_most_one))
+		found = self.store.models(self.model_type, self.select(self.at_most_one))
 		return found[0] if found else None
 
 	def count_by(self, name: str) -> dict[Any, int]:

@@ -149,10 +149,9 @@ def test_find_by_matches_the_equivalent_query():
 				for name in ("Alpha", "Beta", "Gamma")
 			]
 
-			found = {record.id for record in store.find_by(Record, name="Beta")}
+			found = {model.id for model in store.find_by(Record, name="Beta")}
 			queried = {
-				record.id
-				for record in store.query(Record).where({"name": "Beta"}).all()
+				model.id for model in store.query(Record).where({"name": "Beta"}).all()
 			}
 
 			assert_eq(found, {created[1].id})
@@ -193,7 +192,7 @@ def test_failed_create_leaves_no_row():
 			connection.close()
 
 
-def test_failed_update_leaves_record_unchanged():
+def test_failed_update_leaves_model_unchanged():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(
@@ -491,7 +490,7 @@ def open_record_store(directory: str):
 	return connection, Store(connection, [Record])
 
 
-def test_reads_return_distinct_records():
+def test_reads_return_distinct_models():
 	with TemporaryDirectory() as directory:
 		connection, store = open_record_store(directory)
 		try:
@@ -506,7 +505,7 @@ def test_reads_return_distinct_records():
 			connection.close()
 
 
-def test_create_returns_a_stored_record():
+def test_create_returns_a_stored_model():
 	with TemporaryDirectory() as directory:
 		connection, store = open_record_store(directory)
 		try:
@@ -522,7 +521,7 @@ def test_create_returns_a_stored_record():
 			connection.close()
 
 
-def test_update_sets_values_on_the_record():
+def test_update_sets_values_on_the_model():
 	with TemporaryDirectory() as directory:
 		connection, store = open_record_store(directory)
 		try:
@@ -540,7 +539,7 @@ def test_update_sets_values_on_the_record():
 			connection.close()
 
 
-def test_update_and_delete_on_a_constructed_record_raise_not_found():
+def test_update_and_delete_on_a_constructed_model_raise_not_found():
 	with TemporaryDirectory() as directory:
 		connection, store = open_record_store(directory)
 		try:

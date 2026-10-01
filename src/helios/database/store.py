@@ -51,17 +51,17 @@ class Store:
 		**values: P.kwargs,
 	) -> T:
 		registered = self.registry.get(cast(type[T], model_type))
-		record = model_type(*args, **values)
-		record._values["created_at"] = datetime.now(UTC)
+		model = model_type(*args, **values)
+		model._values["created_at"] = datetime.now(UTC)
 		encoded = {
-			name: attribute.encode(record._values[name], registered)
+			name: attribute.encode(model._values[name], registered)
 			for name, attribute in registered.attributes.items()
 		}
 		self.write(Insert(registered.table, encoded))
-		return record
+		return model
 
-	def update(self, record: Model, **values: Any):
-		model_type = self.registry.get(type(record))
+	def update(self, model: Model, **values: Any):
+		model_type = self.registry.get(type(model))
 		if not values:
 			raise ModelError(f"{model_type.__name__}.update requires values")
 		encoded: dict[str, Scalar | None] = {}
@@ -70,19 +70,19 @@ class Store:
 			if not attribute.init:
 				raise ModelError(f"{model_type.__name__}.{name} is generated")
 			encoded[name] = attribute.encode(value, model_type)
-		statement = Update(model_type.table, encoded, self.identifying(record))
+		statement = Update(model_type.table, encoded, self.identifying(model))
 		if self.write(statement) == 0:
-			raise NotFoundError(model_type, record.id)
-		record._values.update(values)
+			raise NotFoundError(model_type, model.id)
+		model._values.update(values)
 
-	def delete(self, record: Model):
-		model_type = self.registry.get(type(record))
-		statement = Delete(model_type.table, self.identifying(record))
+	def delete(self, model: Model):
+		model_type = self.registry.get(type(model))
+		statement = Delete(model_type.table, self.identifying(model))
 		if self.write(statement) == 0:
-			raise NotFoundError(model_type, record.id)
+			raise NotFoundError(model_type, model.id)
 
-	def identifying(self, record: Model) -> tuple[Clause, ...]:
-		return (Clause((Group.parse(type(record), {"id": record.id}),)),)
+	def identifying(self, model: Model) -> tuple[Clause, ...]:
+		return (Clause((Group.parse(type(model), {"id": model.id}),)),)
 
 	def find_one[T: Model](self, model_type: type[T], id: UUID) -> T:
 		found = self.query(model_type).where({"id": id}).first()
@@ -109,9 +109,9 @@ class Store:
 		parameters: Iterable[Any],
 	) -> list[T]:
 		self.registry.get(model_type)
-		return self.records(model_type, Raw(sql, tuple(parameters)))
+		return self.models(model_type, Raw(sql, tuple(parameters)))
 
-	def records[T: Model](self, model_type: type[T], statement: Statement) -> list[T]:
+	def models[T: Model](self, model_type: type[T], statement: Statement) -> list[T]:
 		column_names, rows = self.read(statement)
 		return [self.hydrate(model_type, column_names, row) for row in rows]
 
