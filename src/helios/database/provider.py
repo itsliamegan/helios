@@ -6,8 +6,9 @@ from helios.http import Request, Response
 
 from .config import Config
 from .model import Model
+from .registry import Registry
 from .sqlite import connect
-from .store import Registry, Store
+from .store import Store
 
 
 class Provider(ApplicationProvider):
