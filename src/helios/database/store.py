@@ -9,8 +9,10 @@ from .column import Column
 from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .model import Model
+from .preload import branches, load
 from .query import Query
 from .registry import Registry
+from .relationship import BelongsTo
 from .sqlite import Connection
 from .statement import Delete, Insert, Raw, Select, Statement, Update
 
@@ -41,6 +43,7 @@ class Store:
 			for name, column in registered.columns.items()
 		}
 		self.write(Insert(registered.table, encoded))
+		model._stored = True
 		return model
 
 	def update(self, model: Model, **values: Any):
@@ -53,16 +56,59 @@ class Store:
 			if not column.init:
 				raise ModelError(f"{model_type.__name__}.{name} is generated")
 			encoded[name] = column.encode(value, model_type)
+		moved = [
+			relationship.name
+			for relationship in model_type.relationships.values()
+			if isinstance(relationship, BelongsTo)
+			and relationship.id_name in values
+			and values[relationship.id_name] != model._values[relationship.id_name]
+		]
 		statement = Update(model_type.table, encoded, self.identifying(model))
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
 		model._values.update(values)
+		for name in moved:
+			model._loaded.pop(name, None)
 
 	def delete(self, model: Model):
 		model_type = self.registry.get(type(model))
 		statement = Delete(model_type.table, self.identifying(model))
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
+
+	def preload[T: Model](self, models: T | list[T], *paths: str):
+		if not paths:
+			raise ModelError("store.preload requires at least one path")
+		given = [models] if isinstance(models, Model) else models
+		if not isinstance(given, list):
+			raise ModelError(
+				"store.preload takes a model or a list of models, "
+				f"got {type(given).__name__}"
+			)
+		for model in given:
+			if not isinstance(model, Model):
+				raise ModelError(
+					"store.preload takes a model or a list of models, "
+					f"got {type(model).__name__}"
+				)
+		if not given:
+			return
+
+		model_types = list(dict.fromkeys(type(model) for model in given))
+		if len(model_types) > 1:
+			names = [model_type.__name__ for model_type in model_types]
+			raise ModelError(
+				"store.preload takes models of one model type, "
+				f"got {", ".join(names[:-1])} and {names[-1]}"
+			)
+		model_type = self.registry.get(model_types[0])
+		for model in given:
+			if not model._stored:
+				raise ModelError(
+					f"store.preload takes stored models, "
+					f"and {model!r} was built with the constructor"
+				)
+		load(self, list(given), branches(self.registry, model_type, paths))
 
 	def identifying(self, model: Model) -> tuple[Clause, ...]:
 		return (Clause((Group.parse(self.registry, type(model), {"id": model.id}),)),)
