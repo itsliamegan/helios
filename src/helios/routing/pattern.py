@@ -1,42 +1,57 @@
 from collections.abc import Mapping
+from dataclasses import dataclass
+from functools import cached_property
 import re
-from typing import Any
+from typing import Any, Self
 from urllib.parse import quote
 
 from helios.http import URL
 
 from .convert import Converter
 
-PARAMETER_REGEX = re.compile(r"{(\w+)(?::(\w+))?}")
-PARAMETER_VALUE_REGEX = r"[\w-]+"
 
-
+@dataclass
 class Pattern:
-	def __init__(self, raw: str):
-		self.converters: dict[str, Converter[Any]] = {}
-		expression = raw
-		for parameter in PARAMETER_REGEX.finditer(raw):
-			name, converter_name = parameter.groups()
-			converter_name = converter_name or "str"
-			converter = Converter.for_name(converter_name)
-			if converter is None:
-				raise ValueError(f"Unknown pattern converter: {converter_name}")
-			self.converters[name] = converter
-			expression = expression.replace(
-				parameter.group(), f"(?P<{name}>{PARAMETER_VALUE_REGEX})"
-			)
+	segments: tuple[Text | Parameter, ...]
+	trailing_slash: bool = False
 
-		if expression.endswith("/"):
-			expression += "?$"
+	@classmethod
+	def parse(cls, text: str) -> Self:
+		segments = []
+		for part in text.strip("/").split("/"):
+			if not part:
+				continue
+			parameter = Parameter.parse(part)
+			if parameter is not None:
+				segments.append(parameter)
+			elif "{" in part or "}" in part:
+				raise ValueError(f"route segment mixes text and a parameter: {part!r}")
+			else:
+				segments.append(Text(part))
+		return cls(tuple(segments), text.endswith("/"))
+
+	@cached_property
+	def parameters(self) -> dict[str, Parameter]:
+		parameters = {}
+		for segment in self.segments:
+			if isinstance(segment, Parameter):
+				parameters[segment.name] = segment
+		return parameters
+
+	@cached_property
+	def regex(self) -> re.Pattern[str]:
+		expression = "".join(f"/{segment.expression}" for segment in self.segments)
+		return re.compile(f"{expression}/?$")
+
+	@property
+	def is_empty(self) -> bool:
+		return not self.segments and not self.trailing_slash
+
+	def prefixed(self, prefix: Pattern) -> Self:
+		if self.is_empty:
+			return type(self)(prefix.segments, prefix.trailing_slash)
 		else:
-			expression += "/?$"
-		self.raw = raw
-		self.regex = re.compile(expression)
-
-	def prefixed(self, prefix: str) -> Pattern:
-		if not prefix:
-			return self
-		return Pattern(join(prefix, self.raw))
+			return type(self)((*prefix.segments, *self.segments), self.trailing_slash)
 
 	def match(self, url: URL) -> dict[str, Any] | None:
 		match = self.regex.match(url.path)
@@ -46,7 +61,7 @@ class Pattern:
 
 	def path(self, params: Mapping[str, Any] | None = None) -> str:
 		params = params or {}
-		expected = set(self.converters)
+		expected = set(self.parameters)
 		supplied = set(params)
 		missing = expected - supplied
 		unexpected = supplied - expected
@@ -57,32 +72,64 @@ class Pattern:
 				f"unexpected route parameters: {", ".join(sorted(unexpected))}"
 			)
 
-		def replace(match: re.Match[str]) -> str:
-			name = match.group(1)
-			value = self.converters[name].format(params[name])
-			encoded = quote(value, safe="")
-			if re.fullmatch(PARAMETER_VALUE_REGEX, encoded) is None:
-				raise ValueError(f"invalid route parameter: {name}")
-			return encoded
-
-		return PARAMETER_REGEX.sub(replace, self.raw)
+		parts = []
+		for segment in self.segments:
+			if isinstance(segment, Parameter):
+				parts.append(segment.format(params[segment.name]))
+			else:
+				parts.append(segment.text)
+		path = "/" + "/".join(parts)
+		if parts and self.trailing_slash:
+			path += "/"
+		return path
 
 	def convert(self, raw_params: Mapping[str, str]) -> dict[str, Any] | None:
 		try:
 			return {
-				name: self.converters[name].convert(value)
+				name: self.parameters[name].converter.convert(value)
 				for name, value in raw_params.items()
 			}
 		except ValueError:
 			return None
 
-	def __repr__(self) -> str:
-		return f"Pattern({self.raw!r})"
+
+@dataclass
+class Text:
+	text: str
+
+	@property
+	def expression(self) -> str:
+		return re.escape(self.text)
 
 
-def join(prefix: str, raw: str) -> str:
-	if not prefix:
-		return raw
-	if not raw:
-		return prefix
-	return f"{prefix.rstrip("/")}/{raw.lstrip("/")}"
+@dataclass
+class Parameter:
+	name: str
+	converter: Converter[Any]
+
+	@classmethod
+	def parse(cls, text: str) -> Self | None:
+		match = PARAMETER_REGEX.fullmatch(text)
+		if match is None:
+			return None
+
+		name, converter_name = match.groups()
+		converter_name = converter_name or "str"
+		converter = Converter.for_name(converter_name)
+		if converter is None:
+			raise ValueError(f"Unknown pattern converter: {converter_name}")
+		return cls(name, converter)
+
+	@property
+	def expression(self) -> str:
+		return f"(?P<{self.name}>{PARAMETER_VALUE_REGEX})"
+
+	def format(self, value: Any) -> str:
+		encoded = quote(self.converter.format(value), safe="")
+		if re.fullmatch(PARAMETER_VALUE_REGEX, encoded) is None:
+			raise ValueError(f"invalid route parameter: {self.name}")
+		return encoded
+
+
+PARAMETER_REGEX = re.compile(r"{(\w+)(?::(\w+))?}")
+PARAMETER_VALUE_REGEX = r"[\w-]+"

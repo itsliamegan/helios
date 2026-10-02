@@ -16,7 +16,7 @@ from helios.http import (
 	UnsupportedMethodError,
 )
 from helios.http.error import BadRequestError, ContentTooLargeError
-from helios.routing import Pattern, Route, Router
+from helios.routing import Route, Router
 from helios.wsgi import Application
 from helios.wsgi.adapt import RequestAdapter, ResponseAdapter
 from helios.wsgi.test import TestClient
@@ -283,7 +283,7 @@ def test_client_routes_get_and_exposes_response():
 		res.headers["X-Result"] = "found"
 		return res
 
-	client = make_client([Route(Method.GET, Pattern("/"), show)])
+	client = make_client([Route.get("/", show)])
 
 	res = client.get("/")
 
@@ -297,7 +297,7 @@ def test_client_sends_query_and_headers():
 	def search(req, ctx):
 		return Response.text(f"{req.url.query.first("q")}|{req.headers["X-Filter"]}")
 
-	client = make_client([Route(Method.GET, Pattern("/search"), search)])
+	client = make_client([Route.get("/search", search)])
 
 	res = client.get(
 		"/search",
@@ -313,7 +313,7 @@ def test_client_sends_scalar_and_repeated_form_values():
 		tag_ids = req.input.all("tag_id")
 		return Response.text(f"{req.input.first("title")}|{",".join(tag_ids)}")
 
-	client = make_client([Route(Method.POST, Pattern("/posts"), create)])
+	client = make_client([Route.post("/posts", create)])
 	form = {
 		"title": "Reading",
 		"tag_id": ["first", "second"],
@@ -332,7 +332,7 @@ def test_client_uploads_files():
 			f"{photo.content.decode()}"
 		)
 
-	client = make_client([Route(Method.POST, Pattern("/photos"), upload)])
+	client = make_client([Route.post("/photos", upload)])
 
 	res = client.post(
 		"/photos",
@@ -349,7 +349,7 @@ def test_client_downloads_files():
 	def download(req, ctx):
 		return Response.file(b"\x00\xff", "data.bin", "application/octet-stream")
 
-	client = make_client([Route(Method.GET, Pattern("/data"), download)])
+	client = make_client([Route.get("/data", download)])
 
 	res = client.get("/data")
 
@@ -372,8 +372,8 @@ def test_client_retains_response_cookies():
 
 	client = make_client(
 		[
-			Route(Method.GET, Pattern("/remember"), remember),
-			Route(Method.GET, Pattern("/recall"), recall),
+			Route.get("/remember", remember),
+			Route.get("/recall", recall),
 		]
 	)
 
@@ -407,8 +407,8 @@ def test_client_follows_redirects():
 
 	client = make_client(
 		[
-			Route(Method.GET, Pattern("/"), index),
-			Route(Method.POST, Pattern("/"), create),
+			Route.get("/", index),
+			Route.post("/", create),
 		]
 	)
 
@@ -429,7 +429,7 @@ def test_client_submits_method_override():
 	def delete(req, ctx, id):
 		return Response.text(f"{req.method.value}|{"_method" in req.input}")
 
-	client = make_client([Route(Method.DELETE, Pattern("/posts/{id}"), delete)])
+	client = make_client([Route.delete("/posts/{id}", delete)])
 
 	res = client.post("/posts/1234", form={"_method": "DELETE"})
 

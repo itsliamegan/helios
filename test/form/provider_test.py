@@ -9,7 +9,7 @@ import helios.flash
 import helios.form
 from helios.form import Errors, Submission, Submissions
 from helios.http import Input, Method, Request, Response, URL
-from helios.routing import Pattern, Route, Router
+from helios.routing import Route, Router
 from helios.session.store import Session
 import helios.view
 from helios.view import Component, Views
@@ -40,7 +40,7 @@ def test_flashes_errors_and_input():
 
 	handle(
 		session,
-		Route(Method.POST, Pattern("/"), update),
+		Route.post("/", update),
 		Request(
 			Method.POST,
 			URL("/"),
@@ -68,7 +68,7 @@ def test_flashes_errors_without_input():
 
 	handle(
 		session,
-		Route(Method.POST, Pattern("/"), create),
+		Route.post("/", create),
 		Request(Method.POST, URL("/"), input=Input({"recovery_code": "secret"})),
 	)
 
@@ -94,9 +94,7 @@ def test_resolves_flashed_submission():
 		submissions.append(context.get(Submission))
 		return Response.empty()
 
-	handle(
-		session, Route(Method.GET, Pattern("/"), edit), Request(Method.GET, URL("/"))
-	)
+	handle(session, Route.get("/", edit), Request(Method.GET, URL("/")))
 
 	assert_eq(submissions[0].value("title", "Old title"), "")
 	assert_eq(submissions[0].error("title"), "Title must be provided.")
@@ -110,9 +108,7 @@ def test_resolves_empty_submission_without_flashes():
 		submissions.append(context.get(Submission))
 		return Response.empty()
 
-	handle(
-		session, Route(Method.GET, Pattern("/"), edit), Request(Method.GET, URL("/"))
-	)
+	handle(session, Route.get("/", edit), Request(Method.GET, URL("/")))
 
 	assert_that(submissions[0].input is None)
 	assert_eq(submissions[0].value("title", "Old title"), "Old title")
@@ -142,7 +138,7 @@ def test_shares_submission_with_views():
 
 		response = handle(
 			session,
-			Route(Method.GET, Pattern("/"), edit),
+			Route.get("/", edit),
 			Request(Method.GET, URL("/")),
 			[helios.view.Provider(helios.view.Config(views_dir))],
 		)
@@ -167,7 +163,7 @@ def test_shares_submission_with_components():
 
 		response = handle(
 			session,
-			Route(Method.GET, Pattern("/"), edit),
+			Route.get("/", edit),
 			Request(Method.GET, URL("/")),
 			[
 				helios.view.Provider(

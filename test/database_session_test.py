@@ -10,7 +10,7 @@ import helios.auth
 import helios.database
 from helios.database import Model, Store
 from helios.http import Headers, Method, Request, Response, Status, URL
-from helios.routing import Pattern, Route, Router
+from helios.routing import Route, Router
 import helios.session
 from helios.session.file import Driver
 
@@ -31,7 +31,7 @@ def request(session_id: str | None = None) -> Request:
 def application(database_path: Path, session_path: Path, handler):
 	return helios.app.Application(
 		helios.app.Config(),
-		Router([Route(Method.GET, Pattern("/"), handler)]),
+		Router([Route.get("/", handler)]),
 		[
 			helios.session.Provider(
 				helios.session.Config(),

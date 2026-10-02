@@ -6,7 +6,7 @@ from luna.test.assertion import assert_eq
 
 from helios.app import Application, Config
 from helios.http import Method, Request, URL
-from helios.routing import Pattern, Route, Router
+from helios.routing import Route, Router
 import helios.view
 from helios.view import Views
 
@@ -25,10 +25,9 @@ def test_provider_shares_urls_with_templates():
 			Config(URL.parse("https://example.com")),
 			Router(
 				[
-					Route(Method.GET, Pattern("/"), index),
-					Route(
-						Method.GET,
-						Pattern("/posts/{id}"),
+					Route.get("/", index),
+					Route.get(
+						"/posts/{id}",
 						index,
 						name="posts.show",
 					),
@@ -76,7 +75,7 @@ def test_provider_registers_components():
 
 		app = Application(
 			Config(URL.parse("https://example.com")),
-			Router([Route(Method.GET, Pattern("/"), index)]),
+			Router([Route.get("/", index)]),
 			[
 				helios.view.Provider(
 					helios.view.Config(views_dir),

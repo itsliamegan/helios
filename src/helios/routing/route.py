@@ -1,9 +1,9 @@
 from collections.abc import Callable, Iterator, Sequence
-from typing import Any, Concatenate, TYPE_CHECKING
+from typing import Any, Concatenate, Self, TYPE_CHECKING
 
 from helios.http import Method, Request, Response, URL
 
-from .pattern import Pattern, join
+from .pattern import Pattern
 
 if TYPE_CHECKING:
 	from helios.app import Context
@@ -27,12 +27,63 @@ class Route:
 		self.guards = guards or []
 		self.name = name
 
-	def within(self, prefix: str, guards: Sequence[Guard[...]]) -> Route:
-		if not prefix and not guards:
+	@classmethod
+	def get(
+		cls,
+		pattern: str,
+		handler: Handler[...],
+		guards: Sequence[Guard[...]] | None = None,
+		name: str | None = None,
+	) -> Self:
+		return cls(Method.GET, Pattern.parse(pattern), handler, guards, name)
+
+	@classmethod
+	def post(
+		cls,
+		pattern: str,
+		handler: Handler[...],
+		guards: Sequence[Guard[...]] | None = None,
+		name: str | None = None,
+	) -> Self:
+		return cls(Method.POST, Pattern.parse(pattern), handler, guards, name)
+
+	@classmethod
+	def put(
+		cls,
+		pattern: str,
+		handler: Handler[...],
+		guards: Sequence[Guard[...]] | None = None,
+		name: str | None = None,
+	) -> Self:
+		return cls(Method.PUT, Pattern.parse(pattern), handler, guards, name)
+
+	@classmethod
+	def patch(
+		cls,
+		pattern: str,
+		handler: Handler[...],
+		guards: Sequence[Guard[...]] | None = None,
+		name: str | None = None,
+	) -> Self:
+		return cls(Method.PATCH, Pattern.parse(pattern), handler, guards, name)
+
+	@classmethod
+	def delete(
+		cls,
+		pattern: str,
+		handler: Handler[...],
+		guards: Sequence[Guard[...]] | None = None,
+		name: str | None = None,
+	) -> Self:
+		return cls(Method.DELETE, Pattern.parse(pattern), handler, guards, name)
+
+	def within(self, prefix: Pattern, guards: Sequence[Guard[...]]) -> Route:
+		pattern = self.pattern.prefixed(prefix)
+		if pattern == self.pattern and not guards:
 			return self
 		return Route(
 			self.method,
-			self.pattern.prefixed(prefix),
+			pattern,
 			self.handler,
 			[*guards, *self.guards],
 			self.name,
@@ -65,15 +116,17 @@ class Group:
 		guards: Sequence[Guard[...]] | None = None,
 	):
 		self.routes = list(routes)
-		self.prefix = prefix
+		self.prefix = Pattern.parse(prefix)
 		self.guards = guards or []
 
-	def within(self, prefix: str, guards: Sequence[Guard[...]]) -> Group:
-		return Group(self.routes, join(prefix, self.prefix), [*guards, *self.guards])
-
-	def __iter__(self) -> Iterator[Route]:
+	def within(self, prefix: Pattern, guards: Sequence[Guard[...]]) -> Iterator[Route]:
+		prefix = self.prefix.prefixed(prefix)
+		guards = [*guards, *self.guards]
 		for item in self.routes:
 			if isinstance(item, Group):
-				yield from item.within(self.prefix, self.guards)
+				yield from item.within(prefix, guards)
 			else:
-				yield item.within(self.prefix, self.guards)
+				yield item.within(prefix, guards)
+
+	def __iter__(self) -> Iterator[Route]:
+		return self.within(Pattern(()), [])

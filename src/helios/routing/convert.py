@@ -14,6 +14,9 @@ class Converter[T](ABC):
 	@abstractmethod
 	def format(self, value: T) -> str: ...
 
+	def __repr__(self) -> str:
+		return f"{type(self).__name__}()"
+
 
 class Str(Converter[str]):
 	def convert(self, value: str) -> str:

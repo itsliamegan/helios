@@ -10,7 +10,7 @@ from helios.database import Model
 from helios.http import Headers, Method, Request, Response, Status, URL
 import helios.limit
 from helios.limit.config import Config
-from helios.routing import Pattern, Route, Router
+from helios.routing import Route, Router
 from helios.session.store import Session
 
 
@@ -51,7 +51,7 @@ def application(signed_in: bool = False, limit_config: Config | None = None):
 
 	return Application(
 		AppConfig(),
-		Router([Route(Method.GET, Pattern("/"), index)]),
+		Router([Route.get("/", index)]),
 		[Authentication(signed_in)],
 		[helios.limit.Middleware(limit_config or config())],
 	)
