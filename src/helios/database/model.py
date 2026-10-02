@@ -1,4 +1,3 @@
-from annotationlib import Format, get_annotations
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any, ClassVar, Self, dataclass_transform
@@ -7,6 +6,7 @@ from uuid import UUID, uuid4
 from helios.declarative import (
 	Namespace,
 	check_init_keywords,
+	check_reserved_names,
 	check_single_base,
 	declarations,
 )
@@ -40,10 +40,7 @@ class Model:
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
 		check_single_base(cls, Model, ModelError)
-		annotations = get_annotations(cls, format=Format.FORWARDREF)
-		for name in METADATA:
-			if name in vars(cls) or name in annotations:
-				raise ModelError(f"{cls.__name__}.{name} is model metadata")
+		check_reserved_names(cls, Model, METADATA, ModelError)
 		declare_attributes(cls)
 
 	def __init__(self, **columns: Any):
@@ -134,10 +131,6 @@ def declare_attributes(model_type: type[Model]):
 			and name not in relationships
 		):
 			raise ModelError(f"'{model_type.__name__}.{name}' has no annotation")
-
-	for name in [*vars(model_type), *columns]:
-		if name in reserved:
-			raise ModelError(f"'{model_type.__name__}.{name}' is a reserved attribute")
 
 	for name, column in columns.items():
 		setattr(model_type, name, column)

@@ -74,7 +74,7 @@ class Declaration:
 def declarations(owner: type, error: type[Exception]) -> list[Declaration]:
 	found = []
 	for name, annotation in get_annotations(owner, format=Format.FORWARDREF).items():
-		if annotation is ClassVar or get_origin(annotation) is ClassVar:
+		if is_class_variable(annotation):
 			continue
 		if isinstance(annotation, str):
 			raise error(
@@ -153,3 +153,33 @@ def check_init_keywords(
 def check_single_base(owner: type, base: type, error: type[Exception]):
 	if owner.__bases__ != (base,):
 		raise error(f"{owner.__name__} must inherit only from {base.__name__}")
+
+
+def check_reserved_names(
+	owner: type,
+	base: type,
+	metadata: Collection[str],
+	error: type[Exception],
+):
+	base_annotations = get_annotations(base, format=Format.FORWARDREF)
+	reserved = {*vars(base), *base_annotations}
+	configuration = set()
+	for name, annotation in base_annotations.items():
+		if is_class_variable(annotation) and name not in metadata:
+			configuration.add(name)
+
+	annotations = get_annotations(owner, format=Format.FORWARDREF)
+	for name in [*annotations, *vars(owner)]:
+		if is_special(name) or name not in reserved:
+			continue
+		declared = name in annotations and not is_class_variable(annotations[name])
+		if declared or name not in configuration:
+			raise error(f"{owner.__name__}.{name} is reserved by {base.__name__}")
+
+
+def is_class_variable(annotation: object) -> bool:
+	return annotation is ClassVar or get_origin(annotation) is ClassVar
+
+
+def is_special(name: str) -> bool:
+	return name.startswith("__") and name.endswith("__")
