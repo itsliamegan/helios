@@ -15,7 +15,7 @@ class Connection:
 	def __init__(self, config: Config):
 		try:
 			self.connection = sqlite3.connect(
-				config.database_file,
+				config.path,
 				autocommit=True,
 			)
 		except sqlite3.Error as error:

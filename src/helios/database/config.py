@@ -5,5 +5,5 @@ from pathlib import Path
 
 @dataclass
 class Config:
-	database_file: Path
+	path: Path
 	busy_timeout: timedelta = timedelta(seconds=30)
