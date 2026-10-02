@@ -1,7 +1,9 @@
 from annotationlib import Format, ForwardRef, get_annotations
 from collections.abc import Collection
+from functools import reduce
+from operator import or_
 from types import NoneType
-from typing import ClassVar, Union, get_args, get_origin
+from typing import ClassVar, Protocol, Union, get_args, get_origin
 
 MISSING: object = object()
 
@@ -11,6 +13,10 @@ class DeclarationError(Exception):
 		super().__init__(f"{name}: {detail}")
 		self.name = name
 		self.detail = detail
+
+
+class Namespace(Protocol):
+	def find(self, name: str) -> type | None: ...
 
 
 class Declaration:
@@ -27,6 +33,7 @@ class Declaration:
 		self.annotation = annotation
 		self.default = default
 		self.error = error
+		self.fallback: Namespace | None = None
 
 	@property
 	def pending(self) -> bool:
@@ -41,13 +48,24 @@ class Declaration:
 		return self.annotation
 
 	def evaluate(self) -> object:
-		try:
-			return get_annotations(self.owner)[self.name]
-		except NameError as error:
-			raise DeclarationError(
-				self.name,
-				f"unresolved annotation: {error.name}",
-			) from error
+		supplied: dict[str, type] = {}
+		while True:
+			try:
+				return evaluate_annotation(self.annotation, self.owner, supplied)
+			except NameError as error:
+				missing = error.name
+				if missing is None or missing in supplied:
+					raise self.unresolved(missing) from error
+				supplied[missing] = self.lookup(missing)
+
+	def lookup(self, missing: str) -> type:
+		found = None if self.fallback is None else self.fallback.find(missing)
+		if found is None:
+			raise self.unresolved(missing)
+		return found
+
+	def unresolved(self, missing: str | None) -> DeclarationError:
+		return DeclarationError(self.name, f"unresolved annotation: {missing}")
 
 	def reject(self, error: DeclarationError) -> Exception:
 		return self.error(f"{self.owner.__name__}.{error}")
@@ -67,6 +85,26 @@ def declarations(owner: type, error: type[Exception]) -> list[Declaration]:
 		default = vars(owner).get(name, MISSING)
 		found.append(Declaration(owner, name, annotation, default, error))
 	return found
+
+
+def evaluate_annotation(
+	annotation: object,
+	owner: type,
+	supplied: dict[str, type],
+) -> object:
+	if isinstance(annotation, ForwardRef):
+		return annotation.evaluate(locals={**vars(owner), **supplied})
+	origin = get_origin(annotation)
+	if origin is None or forward_reference(annotation) is None:
+		return annotation
+
+	evaluated = tuple(
+		evaluate_annotation(argument, owner, supplied)
+		for argument in get_args(annotation)
+	)
+	if origin is Union:
+		return reduce(or_, evaluated)
+	return origin[evaluated]
 
 
 def forward_reference(annotation: object) -> ForwardRef | None:

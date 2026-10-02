@@ -4,6 +4,7 @@ from typing import Any, ClassVar, dataclass_transform
 from uuid import UUID, uuid4
 
 from helios.declarative import (
+	Namespace,
 	check_init_keywords,
 	check_single_base,
 	declarations,
@@ -91,6 +92,16 @@ class Model:
 				raise ModelError(f"{cls.__name__}.{name}: {error}") from error
 			values[name] = value
 		return values
+
+	@classmethod
+	def fall_back_to(cls, namespace: Namespace):
+		attributes = [
+			*cls.columns.declared.values(),
+			*cls.relationships.declared.values(),
+		]
+		for attribute in attributes:
+			if attribute.declaration.pending:
+				attribute.declaration.fallback = namespace
 
 	def __repr__(self) -> str:
 		return f"{type(self).__name__}({self.id!r})"
