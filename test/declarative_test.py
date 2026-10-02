@@ -100,13 +100,28 @@ def test_looks_up_unresolved_names_in_the_fallback():
 		editor: Editor
 
 	author, editor = declarations(Post, ExampleError)
-	author.fallback = editor.fallback = Lookup(biographer)
+	author.fallback = Lookup(biographer)
 
 	class Editor:
 		pass
 
 	assert_eq(author.resolve(), biographer | None)
 	assert_that(editor.resolve() is Editor)
+
+
+def test_resolves_each_annotation_on_its_own():
+	class Post:
+		author: Biographer  # noqa: F821  # ty: ignore[unresolved-reference]
+		editor: Editor
+
+	author, editor = declarations(Post, ExampleError)
+
+	class Editor:
+		pass
+
+	assert_that(editor.resolve() is Editor)
+	with assert_raises(ExampleError):
+		author.resolve()
 
 
 def test_rejects_names_the_fallback_does_not_hold():

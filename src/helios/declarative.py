@@ -1,11 +1,8 @@
-from annotationlib import (
-	Format,
-	ForwardRef,
-	get_annotate_from_class_namespace,
-	get_annotations,
-)
+from annotationlib import Format, ForwardRef, get_annotations
 from collections.abc import Collection
-from types import FunctionType, NoneType
+from functools import reduce
+from operator import or_
+from types import NoneType
 from typing import ClassVar, Protocol, Union, get_args, get_origin
 
 MISSING: object = object()
@@ -54,7 +51,7 @@ class Declaration:
 		supplied: dict[str, type] = {}
 		while True:
 			try:
-				return evaluate_annotations(self.owner, supplied)[self.name]
+				return evaluate_annotation(self.annotation, self.owner, supplied)
 			except NameError as error:
 				missing = error.name
 				if missing is None or missing in supplied:
@@ -90,14 +87,24 @@ def declarations(owner: type, error: type[Exception]) -> list[Declaration]:
 	return found
 
 
-def evaluate_annotations(owner: type, supplied: dict[str, type]) -> dict[str, object]:
-	annotate = get_annotate_from_class_namespace(vars(owner))
-	if not supplied or not isinstance(annotate, FunctionType):
-		return get_annotations(owner)
+def evaluate_annotation(
+	annotation: object,
+	owner: type,
+	supplied: dict[str, type],
+) -> object:
+	if isinstance(annotation, ForwardRef):
+		return annotation.evaluate(locals={**vars(owner), **supplied})
+	origin = get_origin(annotation)
+	if origin is None or forward_reference(annotation) is None:
+		return annotation
 
-	scope = {**supplied, **annotate.__globals__}
-	rebuilt = FunctionType(annotate.__code__, scope, closure=annotate.__closure__)
-	return rebuilt(Format.VALUE)
+	evaluated = tuple(
+		evaluate_annotation(argument, owner, supplied)
+		for argument in get_args(annotation)
+	)
+	if origin is Union:
+		return reduce(or_, evaluated)
+	return origin[evaluated]
 
 
 def forward_reference(annotation: object) -> ForwardRef | None:
