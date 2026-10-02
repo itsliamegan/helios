@@ -8,9 +8,9 @@ from .codec import Scalar
 from .column import Column
 from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
+from .load import Load
 from .model import Model
 from .parser import ConditionParser
-from .preload import Preload
 from .query import Query
 from .registry import Registry
 from .relationship import BelongsTo
@@ -76,7 +76,7 @@ class Store:
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
 
-	def preload[T: Model](self, models: T | list[T], *paths: str):
+	def load[T: Model](self, models: T | list[T], *paths: str):
 		if not isinstance(models, list):
 			models = [models]
 		if not models:
@@ -84,11 +84,11 @@ class Store:
 
 		model_types = {type(model) for model in models}
 		if len(model_types) > 1:
-			raise ModelError("store.preload takes models of one model type")
+			raise ModelError("store.load takes models of one model type")
 		model_type = self.registry.get(model_types.pop())
 		if not all(model._stored for model in models):
-			raise ModelError("store.preload can only be called with stored models")
-		Preload(self, model_type, paths).load(models)
+			raise ModelError("store.load can only be called with stored models")
+		Load(self, model_type, paths).load(models)
 
 	def identifying(self, model: Model) -> tuple[Clause, ...]:
 		return (

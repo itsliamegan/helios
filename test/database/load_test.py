@@ -193,8 +193,8 @@ def test_loads_belongs_to():
 		reviewed = store.create(Draft, reviewer_id=fixture.ada.id)
 		unreviewed = store.create(Draft)
 
-		store.preload([fixture.first, fixture.second], "tag")
-		store.preload([reviewed, unreviewed], "reviewer")
+		store.load([fixture.first, fixture.second], "tag")
+		store.load([reviewed, unreviewed], "reviewer")
 
 		assert_eq(fixture.first.tag.id, fixture.python.id)
 		assert_eq(fixture.second.tag.name, "Rust")
@@ -206,7 +206,7 @@ def test_loads_has_many():
 	with open_store() as store:
 		fixture = Fixture(store)
 
-		store.preload([fixture.ideas, fixture.empty], "taggings")
+		store.load([fixture.ideas, fixture.empty], "taggings")
 
 		assert_eq(by_position(fixture.ideas.taggings), [0, 1, 2])
 		assert_eq(fixture.empty.taggings, [])
@@ -216,7 +216,7 @@ def test_loads_has_one():
 	with open_store() as store:
 		fixture = Fixture(store)
 
-		store.preload([fixture.ada, fixture.bo], "profile")
+		store.load([fixture.ada, fixture.bo], "profile")
 
 		profile = fixture.ada.profile
 		assert profile is not None
@@ -230,7 +230,7 @@ def test_loads_nested_paths_and_runs_shared_prefixes_once():
 		post = store.find_one(Post, fixture.ideas.id)
 
 		with recording(store) as statements:
-			store.preload(post, "taggings.tag", "taggings.post")
+			store.load(post, "taggings.tag", "taggings.post")
 
 		assert_eq(selects(statements, "taggings"), 1)
 		assert_eq(
@@ -243,22 +243,20 @@ def test_loads_nested_paths_and_runs_shared_prefixes_once():
 		)
 
 
-def test_reuses_loaded_relationships():
+def test_reloads_loaded_relationships():
 	with open_store() as store:
 		fixture = Fixture(store)
 		post = store.find_one(Post, fixture.ideas.id)
-		store.preload(post, "taggings")
-		taggings = post.taggings
+		store.load(post, "taggings")
+		fixture.tag(store, fixture.rust, 3)
+		store.delete(fixture.first)
 
-		with recording(store) as statements:
-			store.preload(post, "taggings.tag")
+		store.load(post, "taggings.tag")
 
-		assert_that(post.taggings is taggings)
-		assert_eq(selects(statements, "taggings"), 0)
-		assert_eq(selects(statements, "tags"), 1)
+		assert_eq(by_position(post.taggings), [1, 2, 3])
 		assert_eq(
-			sorted(tagging.tag.name for tagging in taggings),
-			["Python", "Python", "Rust"],
+			sorted(tagging.tag.name for tagging in post.taggings),
+			["Python", "Rust", "Rust"],
 		)
 
 
@@ -267,7 +265,7 @@ def test_shares_one_object_per_row():
 		fixture = Fixture(store)
 		taggings = store.query(Tagging).where({"tag_id": fixture.python.id}).all()
 
-		store.preload(taggings, "tag")
+		store.load(taggings, "tag")
 
 		assert_eq(len(taggings), 2)
 		assert_that(taggings[0].tag is taggings[1].tag)
@@ -282,7 +280,7 @@ def test_splits_large_id_sets_into_batches():
 		store.connection.connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 2)
 
 		with recording(store) as statements:
-			store.preload(taggings, "tag")
+			store.load(taggings, "tag")
 
 		assert_eq(selects(statements, "tags"), 4)
 		assert_eq(
@@ -296,7 +294,7 @@ def test_runs_no_query_without_ids():
 		drafts = [store.create(Draft), store.create(Draft)]
 
 		with recording(store) as statements:
-			store.preload(drafts, "reviewer")
+			store.load(drafts, "reviewer")
 
 		assert_eq(statements, [])
 		assert_that(all(draft.reviewer is None for draft in drafts))
@@ -305,7 +303,7 @@ def test_runs_no_query_without_ids():
 def test_update_unloads_a_changed_belongs_to():
 	with open_store() as store:
 		fixture = Fixture(store)
-		store.preload([fixture.first, fixture.second], "tag")
+		store.load([fixture.first, fixture.second], "tag")
 
 		store.update(fixture.first, tag_id=fixture.rust.id)
 		store.update(fixture.second, tag_id=fixture.rust.id, position=4)
@@ -318,7 +316,7 @@ def test_update_unloads_a_changed_belongs_to():
 def test_loaded_lists_are_snapshots():
 	with open_store() as store:
 		fixture = Fixture(store)
-		store.preload([fixture.ideas, fixture.empty], "taggings")
+		store.load([fixture.ideas, fixture.empty], "taggings")
 
 		fixture.tag(store, fixture.rust, 3)
 		store.delete(fixture.second)
@@ -338,32 +336,32 @@ def test_rejects_invalid_arguments_before_any_query():
 		)
 		cases = [
 			(
-				lambda: store.preload(fixture.first, "tag.nam"),
+				lambda: store.load(fixture.first, "tag.nam"),
 				(
-					"store.preload on Tagging has 'tag.nam', "
+					"store.load on Tagging has 'tag.nam', "
 					"where Tag.nam is not a relationship"
 				),
 			),
 			(
-				lambda: store.preload(fixture.first, "tag."),
-				"store.preload on Tagging has 'tag.', which is not a relationship path",
+				lambda: store.load(fixture.first, "tag."),
+				"store.load on Tagging has 'tag.', which is not a relationship path",
 			),
 			(
-				lambda: store.preload([fixture.first, fixture.python], "tag"),
-				"store.preload takes models of one model type",
+				lambda: store.load([fixture.first, fixture.python], "tag"),
+				"store.load takes models of one model type",
 			),
 			(
-				lambda: store.preload([fixture.first, constructed], "tag"),
-				"store.preload can only be called with stored models",
+				lambda: store.load([fixture.first, constructed], "tag"),
+				"store.load can only be called with stored models",
 			),
 		]
 
 		with recording(store) as statements:
-			for preload, message in cases:
+			for load, message in cases:
 				with assert_raises(ModelError) as raised:
-					preload()
+					load()
 				assert_eq(str(raised.exception), message)
-			store.preload([], "tag")
+			store.load([], "tag")
 
 		assert_eq(statements, [])
 
@@ -374,7 +372,7 @@ def test_rejects_several_has_one_rows():
 		store.create(Profile, author_id=fixture.ada.id, bio="Reader")
 
 		with assert_raises(DatabaseError) as raised:
-			store.preload(fixture.ada, "profile")
+			store.load(fixture.ada, "profile")
 
 		assert_eq(
 			str(raised.exception),
@@ -395,7 +393,7 @@ def test_rejects_a_dangling_belongs_to():
 		tagging = store.find_one(Tagging, tagging_id)
 
 		with assert_raises(DatabaseError) as raised:
-			store.preload(tagging, "tag")
+			store.load(tagging, "tag")
 
 		assert_eq(
 			str(raised.exception),
@@ -409,4 +407,4 @@ def test_rejects_an_unregistered_target():
 		post = store.create(Post, title="Ideas", author_id=author.id)
 
 		with assert_raises(ModelError):
-			store.preload(post, "taggings.tag")
+			store.load(post, "taggings.tag")

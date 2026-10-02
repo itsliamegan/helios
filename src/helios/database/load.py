@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 	from .store import Store
 
 
-class Preload:
+class Load:
 	def __init__(self, store: Store, model_type: type[Model], paths: Iterable[str]):
 		self.store = store
 		self.model_type = model_type
@@ -18,7 +18,7 @@ class Preload:
 			self.add(path)
 
 	def add(self, path: str):
-		subject = f"store.preload on {self.model_type.__name__}"
+		subject = f"store.load on {self.model_type.__name__}"
 		segments = path.split(".")
 		if not all(segments):
 			raise ModelError(
@@ -43,9 +43,7 @@ class Preload:
 
 	def load_branches(self, models: Sequence[Model], branches: dict[str, Branch]):
 		for name, branch in branches.items():
-			pending = [model for model in models if name not in model._loaded]
-			if pending:
-				self.fill(branch.relationship, pending)
+			self.fill(branch.relationship, models)
 
 			children: dict[int, Model] = {}
 			for model in models:
@@ -56,7 +54,7 @@ class Preload:
 			if branch.branches and children:
 				self.load_branches(list(children.values()), branch.branches)
 
-	def fill(self, relationship: Relationship, models: list[Model]):
+	def fill(self, relationship: Relationship, models: Sequence[Model]):
 		owner_column = relationship.owner_column
 		target_column = relationship.target_column
 		values = list(
