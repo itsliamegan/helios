@@ -140,7 +140,7 @@ class URL(Text[http.URL]):
 		return str(value)
 
 	def decode(self, value: Scalar) -> http.URL:
-		return http.URL(self.text(value))
+		return http.URL.parse(self.text(value))
 
 
 CODECS: dict[object, Codec[Any]] = {

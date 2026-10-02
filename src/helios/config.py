@@ -57,7 +57,7 @@ class Config:
 	def url(self, name: str, default: URL | None = None) -> URL:
 		if self.value(name) is None and default is not None:
 			return default
-		return URL(self.require(name))
+		return URL.parse(self.require(name))
 
 	def boolean(self, name: str, default: bool | None = None) -> bool:
 		if self.value(name) is None and default is not None:

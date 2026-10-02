@@ -84,7 +84,7 @@ def record_values(name: str = "Intro"):
 		"count": 3,
 		"active": True,
 		"owner_id": uuid4(),
-		"link": http.URL("https://example.com/posts/intro"),
+		"link": http.URL.parse("https://example.com/posts/intro"),
 		"published_at": datetime(2025, 1, 2, 3, 4, 5, 6, tzinfo=UTC),
 		"token": Token("secret"),
 	}

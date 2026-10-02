@@ -22,7 +22,7 @@ def test_generates_absolute_route_with_query_explicitly():
 			)
 		]
 	)
-	urls = URLs(router, URL("https://cork.example:8443"))
+	urls = URLs(router, URL.parse("https://cork.example:8443"))
 
 	url = urls.route("redemptions.new", query={"token": "secret value"}, absolute=True)
 
@@ -43,7 +43,7 @@ def test_generates_route_with_query_object():
 			)
 		]
 	)
-	urls = URLs(router, URL("https://cork.example"))
+	urls = URLs(router, URL.parse("https://cork.example"))
 
 	url = urls.route("posts.index", query=Query({"tag": ["news", "politics"]}))
 
@@ -61,7 +61,7 @@ def test_generates_relative_route_by_default():
 			)
 		]
 	)
-	urls = URLs(router, URL("https://cork.example"))
+	urls = URLs(router, URL.parse("https://cork.example"))
 
 	url = urls.route("posts.index")
 
@@ -81,7 +81,7 @@ def matchable_urls():
 		lambda req, ctx, id: Response.empty(),
 		name="posts.update",
 	)
-	return URLs(Router([show, update]), URL("https://cork.example"))
+	return URLs(Router([show, update]), URL.parse("https://cork.example"))
 
 
 def test_matches_url_string_to_named_route():
@@ -117,6 +117,16 @@ def test_matches_only_the_path_of_absolute_urls():
 	assert_eq(match.params, {"id": id})
 
 
+def test_matches_url_string_with_url_in_query():
+	urls = matchable_urls()
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+
+	match = urls.match(f"/posts/{id}?return_to=https://elsewhere.example/")
+
+	assert_that(match is not None)
+	assert_eq(match.route.name, "posts.show")
+
+
 def test_matches_only_get_routes():
 	urls = matchable_urls()
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
@@ -132,7 +142,9 @@ def test_doesnt_match_missing_or_unknown_urls():
 	missing = urls.match(None)
 	unknown = urls.match("/posts/not-a-uuid")
 	unparseable = urls.match("http://[invalid/posts/")
+	hostless = urls.match("cork.example/posts/")
 
 	assert_that(missing is None)
 	assert_that(unknown is None)
 	assert_that(unparseable is None)
+	assert_that(hostless is None)

@@ -1,6 +1,5 @@
 from collections.abc import Iterable
-from urllib.parse import parse_qs as parse_query
-from urllib.parse import urlparse as parse_url
+from urllib.parse import urlsplit
 from wsgiref.types import StartResponse, WSGIEnvironment
 
 from werkzeug.datastructures import EnvironHeaders
@@ -56,9 +55,8 @@ class RequestAdapter:
 
 	def url(self) -> URL:
 		raw = get_current_url(self.environment)
-		parsed = parse_url(raw)
-		query = Query(parse_query(parsed.query, keep_blank_values=True))
-		return URL(parsed.path, query)
+		parts = urlsplit(raw)
+		return URL(parts.path, Query.parse(parts.query))
 
 	def headers(self) -> Headers:
 		return Headers(dict(EnvironHeaders(self.environment)))

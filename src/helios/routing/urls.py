@@ -1,6 +1,5 @@
 from collections.abc import Mapping
 from typing import Any
-from urllib.parse import urlsplit
 
 from helios.http import Method, Query, URL
 
@@ -37,11 +36,9 @@ class URLs:
 	def match(self, url: URL | str | None) -> Match | None:
 		if url is None:
 			return None
-		elif isinstance(url, URL):
-			path = url.path
-		else:
+		elif isinstance(url, str):
 			try:
-				path = urlsplit(url).path
+				url = URL.parse(url)
 			except ValueError:
 				return None
-		return self.router.match(Method.GET, URL(path))
+		return self.router.match(Method.GET, url)
