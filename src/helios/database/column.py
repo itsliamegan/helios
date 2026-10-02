@@ -1,3 +1,4 @@
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
@@ -88,6 +89,25 @@ class Column:
 		raise AttributeError(
 			f"{type(instance).__name__}.{self.name} is read-only; use store.update"
 		)
+
+
+class Columns(Mapping[str, Column]):
+	def __init__(self, declared: dict[str, Column]):
+		self.declared = declared
+
+	def __getitem__(self, name: str) -> Column:
+		column = self.declared[name]
+		column.declaration.resolve()
+		return column
+
+	def __contains__(self, name: object) -> bool:
+		return name in self.declared
+
+	def __iter__(self) -> Iterator[str]:
+		return iter(self.declared)
+
+	def __len__(self) -> int:
+		return len(self.declared)
 
 
 def generated(init: bool = False) -> Any:

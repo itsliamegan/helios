@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal, TYPE_CHECKING, TypeIs, cast, get_args, get_origin
 
@@ -8,7 +9,7 @@ from .codec import UUID
 from .error import DatabaseError, ModelError
 
 if TYPE_CHECKING:
-	from .column import Column
+	from .column import Column, Columns
 	from .model import Model
 
 
@@ -25,7 +26,6 @@ class Relationship(ABC):
 
 	def __init__(self, id_name: str):
 		self.id_name = id_name
-		self.checked = False
 
 	def bind(self, declaration: Declaration[object]):
 		self.name = declaration.name
@@ -47,14 +47,10 @@ class Relationship(ABC):
 
 	@property
 	def target(self) -> type[Model]:
-		resolved = self.resolved
-		if not self.checked:
-			self.check(resolved)
-			self.checked = True
-		return resolved.model_type
+		return self.resolved.model_type
 
 	@abstractmethod
-	def check(self, target: Target): ...
+	def check(self): ...
 
 	@property
 	@abstractmethod
@@ -105,8 +101,8 @@ class BelongsTo(Relationship):
 			)
 		return Target(annotation, nullable)
 
-	def check_id(self):
-		column = self.owner._columns.get(self.id_name)
+	def check_id(self, columns: Columns):
+		column = columns.get(self.id_name)
 		if column is None:
 			detail = "is not a column"
 		elif not holds_uuid(column):
@@ -117,9 +113,9 @@ class BelongsTo(Relationship):
 			f"{self.label}: belongs_to names {self.id_name!r}, which {detail}"
 		)
 
-	def check(self, target: Target):
+	def check(self):
 		column = self.owner.columns[self.id_name]
-		if target.nullable != column.nullable:
+		if self.resolved.nullable != column.nullable:
 			raise ModelError(
 				f"{self.label}: annotation must include None exactly when "
 				f"{self.owner.__name__}.{self.id_name} is nullable"
@@ -152,11 +148,11 @@ class BelongsTo(Relationship):
 
 
 class Inverse(Relationship):
-	def check(self, target: Target):
-		column = target.model_type.columns.get(self.id_name)
+	def check(self):
+		column = self.target.columns.get(self.id_name)
 		if column is None or not holds_uuid(column):
 			raise ModelError(
-				f"{self.label}: {target.model_type.__name__}.{self.id_name} "
+				f"{self.label}: {self.target.__name__}.{self.id_name} "
 				"does not hold a UUID"
 			)
 
@@ -209,6 +205,28 @@ class HasOne(Inverse):
 				f"for {self.owner.__name__} {parent.id}"
 			)
 		return matches[0] if matches else None
+
+
+class Relationships(Mapping[str, Relationship]):
+	def __init__(self, declared: dict[str, Relationship]):
+		self.declared = declared
+		self.checked: set[str] = set()
+
+	def __getitem__(self, name: str) -> Relationship:
+		relationship = self.declared[name]
+		if name not in self.checked:
+			relationship.check()
+			self.checked.add(name)
+		return relationship
+
+	def __contains__(self, name: object) -> bool:
+		return name in self.declared
+
+	def __iter__(self) -> Iterator[str]:
+		return iter(self.declared)
+
+	def __len__(self) -> int:
+		return len(self.declared)
 
 
 def is_model(annotation: object) -> TypeIs[type[Model]]:

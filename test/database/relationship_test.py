@@ -227,13 +227,26 @@ def test_checks_forward_referenced_annotations_on_first_use():
 		name: str
 
 	with assert_raises(ModelError):
-		_ = Note.relationships["author"].target
+		Note.relationships["author"]
 
 
 def test_resolves_targets_declared_after_the_model():
 	assert_that(Board.relationships["placements"].target is Placement)
 	assert_that(Board.relationships["shares"].target is Share)
 	assert_that(Pin.relationships["document"].target is Document)
+
+
+def test_checks_each_relationship_when_it_is_read():
+	class Note(Model):
+		author_id: UUID
+		author: User | None = belongs_to("author_id")
+		board_id: UUID
+		board: Board = belongs_to("board_id")
+
+	assert_that("author" in Note.relationships)
+	assert_that(Note.relationships["board"].target is Board)
+	with assert_raises(ModelError):
+		Note.relationships["author"]
 
 
 def test_rejects_a_nullability_mismatch_on_first_use():
@@ -246,9 +259,9 @@ def test_rejects_a_nullability_mismatch_on_first_use():
 		user: User = belongs_to("user_id")
 
 	with assert_raises(ModelError) as loose:
-		_ = Loose.relationships["user"].target
+		Loose.relationships["user"]
 	with assert_raises(ModelError) as strict:
-		_ = Strict.relationships["user"].target
+		Strict.relationships["user"]
 
 	assert_eq(
 		str(loose.exception),
@@ -276,7 +289,7 @@ def test_rejects_a_target_column_that_is_missing_or_not_a_uuid():
 	]
 	for name, message in cases:
 		with assert_raises(ModelError) as raised:
-			_ = Wall.relationships[name].target
+			Wall.relationships[name]
 		assert_eq(str(raised.exception), message)
 
 

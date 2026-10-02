@@ -10,16 +10,16 @@ from helios.declarative import (
 	declarations,
 )
 
-from .column import Column, declare, generated
+from .column import Column, Columns, declare, generated
 from .error import ModelError
-from .relationship import BelongsTo, Relationship, belongs_to, has_many, has_one
-
-
-class ResolvedColumns:
-	def __get__(self, instance: object, owner: type[Model]) -> dict[str, Column]:
-		for declared_column in owner._columns.values():
-			declared_column.declaration.resolve()
-		return owner._columns
+from .relationship import (
+	BelongsTo,
+	Relationship,
+	Relationships,
+	belongs_to,
+	has_many,
+	has_one,
+)
 
 
 @dataclass_transform(
@@ -29,9 +29,8 @@ class ResolvedColumns:
 )
 class Model:
 	table: ClassVar[str] = ""
-	_columns: ClassVar[dict[str, Column]] = {}
-	columns = ResolvedColumns()
-	relationships: ClassVar[dict[str, Relationship]] = {}
+	columns: ClassVar[Columns] = Columns({})
+	relationships: ClassVar[Relationships] = Relationships({})
 
 	id: UUID = generated()
 	created_at: datetime = generated()
@@ -43,7 +42,7 @@ class Model:
 		for name in METADATA:
 			if name in vars(cls) or name in annotations:
 				raise ModelError(f"{cls.__name__}.{name} is model metadata")
-		declare_columns(cls, dict(Model._columns))
+		declare_columns(cls, dict(Model.columns.declared))
 
 	def __init__(self, **columns: Any):
 		self._values = type(self).initialize(columns)
@@ -126,12 +125,12 @@ def declare_columns(model_type: type[Model], columns: dict[str, Column]):
 	for column_name, declared_column in own_columns.items():
 		setattr(model_type, column_name, declared_column)
 		columns[column_name] = declared_column
-	model_type._columns = columns
-	model_type.relationships = relationships
+	model_type.columns = Columns(columns)
+	model_type.relationships = Relationships(relationships)
 
 	for relationship in relationships.values():
 		if isinstance(relationship, BelongsTo):
-			relationship.check_id()
+			relationship.check_id(model_type.columns)
 
 
 def settle(declaration: Declaration[object]) -> object:
