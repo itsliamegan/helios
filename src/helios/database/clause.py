@@ -19,78 +19,83 @@ class Clause:
 class Group:
 	conditions: tuple[Condition, ...]
 
-	@classmethod
-	def parse(
-		cls,
-		registry: Registry,
-		model_type: type[Model],
-		conditions: dict[str, Any],
-	) -> Group:
-		subject = f"Query on {model_type.__name__}"
+
+class ConditionParser:
+	def __init__(self, registry: Registry, model_type: type[Model]):
+		self.registry = registry
+		self.model_type = model_type
+		self.subject = f"Query on {model_type.__name__}"
+
+	def parse(self, conditions: dict[str, Any]) -> Group:
 		if not conditions:
-			raise ModelError(f"{subject} has an empty condition group")
+			raise ModelError(f"{self.subject} has an empty condition group")
 
 		terms: list[Term] = []
 		for text, value in conditions.items():
 			try:
 				key = Key.parse(text)
 			except ValueError as error:
-				raise ModelError(f"{subject} has {text!r}, which {error}") from error
-			terms.append(Term(text, key, value))
-		return cls.build(registry, model_type, subject, terms, 0)
-
-	@classmethod
-	def build(
-		cls,
-		registry: Registry,
-		model_type: type[Model],
-		subject: str,
-		terms: list[Term],
-		depth: int,
-	) -> Group:
-		parsed: list[Condition | str] = []
-		nested: dict[str, list[Term]] = {}
-		for term in terms:
-			name = term.key.path[depth]
-			if depth < len(term.key.path) - 1:
-				if name not in model_type.relationships:
-					raise ModelError(
-						f"{subject} has {term.text!r}, "
-						f"where {model_type.__name__}.{name} is not a relationship"
-					)
-				if name not in nested:
-					nested[name] = []
-					parsed.append(name)
-				nested[name].append(term)
-				continue
-
-			column = model_type.columns.get(name)
-			if column is None:
 				raise ModelError(
-					f"{subject} has {term.text!r}, "
-					f"where {model_type.__name__}.{name} is not a column"
-				)
-			try:
-				parsed.append(term.key.condition(column, term.value))
-			except (TypeError, ValueError) as error:
-				raise ModelError(
-					f"{subject} has an invalid value for {term.text!r}: {error}"
+					f"{self.subject} has {text!r}, which {error}"
 				) from error
+			terms.append(Term(text, key, value))
+		return self.build(self.model_type, terms, 0)
 
+	def build(self, model_type: type[Model], terms: list[Term], depth: int) -> Group:
 		conditions: list[Condition] = []
-		for item in parsed:
-			if isinstance(item, str):
-				relationship = model_type.relationships[item]
-				target = registry.get(relationship.target)
-				group = cls.build(registry, target, subject, nested[item], depth + 1)
-				item = Exists(
-					target.table,
-					relationship.target_column,
-					relationship.owner_column,
-					group,
-				)
-			conditions.append(item)
-		return cls(tuple(conditions))
+		for item in split(terms, depth):
+			if isinstance(item, Term):
+				conditions.append(self.compare(model_type, item, depth))
+			else:
+				conditions.append(self.exists(model_type, item, depth))
+		return Group(tuple(conditions))
+
+	def compare(self, model_type: type[Model], term: Term, depth: int) -> Condition:
+		name = term.key.path[depth]
+		column = model_type.columns.get(name)
+		if column is None:
+			raise ModelError(
+				f"{self.subject} has {term.text!r}, "
+				f"where {model_type.__name__}.{name} is not a column"
+			)
+		try:
+			return term.key.condition(column, term.value)
+		except (TypeError, ValueError) as error:
+			raise ModelError(
+				f"{self.subject} has an invalid value for {term.text!r}: {error}"
+			) from error
+
+	def exists(self, model_type: type[Model], terms: list[Term], depth: int) -> Exists:
+		first = terms[0]
+		name = first.key.path[depth]
+		relationship = model_type.relationships.get(name)
+		if relationship is None:
+			raise ModelError(
+				f"{self.subject} has {first.text!r}, "
+				f"where {model_type.__name__}.{name} is not a relationship"
+			)
+		target = self.registry.get(relationship.target)
+		return Exists(
+			target.table,
+			relationship.target_column,
+			relationship.owner_column,
+			self.build(target, terms, depth + 1),
+		)
+
+
+def split(terms: list[Term], depth: int) -> list[Term | list[Term]]:
+	items: list[Term | list[Term]] = []
+	nested: dict[str, list[Term]] = {}
+	for term in terms:
+		if depth == len(term.key.path) - 1:
+			items.append(term)
+			continue
+		name = term.key.path[depth]
+		if name not in nested:
+			nested[name] = []
+			items.append(nested[name])
+		nested[name].append(term)
+	return items
 
 
 @dataclass

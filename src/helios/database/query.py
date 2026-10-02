@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 
-from .clause import Clause, Group
+from .clause import Clause, ConditionParser
 from .error import ModelError
 from .model import Model
 from .statement import ColumnReference, Count, Direction, Select
@@ -15,18 +15,17 @@ class Query[T: Model]:
 	def __init__(self, store: Store, model_type: type[T]):
 		self.store = store
 		self.model_type = model_type
+		self.parser = ConditionParser(store.registry, model_type)
 		self.clauses: list[Clause] = []
 		self.ordering: list[tuple[str, Direction]] = []
 		self.count: int | None = None
 
 	def where(self, conditions: dict[str, Any]) -> Query[T]:
-		self.clauses.append(
-			Clause((Group.parse(self.store.registry, self.model_type, conditions),))
-		)
+		self.clauses.append(Clause((self.parser.parse(conditions),)))
 		return self
 
 	def where_not(self, conditions: dict[str, Any]) -> Query[T]:
-		group = Group.parse(self.store.registry, self.model_type, conditions)
+		group = self.parser.parse(conditions)
 		self.clauses.append(Clause((group,), negated=True))
 		return self
 
@@ -35,9 +34,7 @@ class Query[T: Model]:
 			raise ModelError(
 				f"Query on {self.model_type.__name__} has where_any with no groups"
 			)
-		parsed = tuple(
-			Group.parse(self.store.registry, self.model_type, group) for group in groups
-		)
+		parsed = tuple(self.parser.parse(group) for group in groups)
 		self.clauses.append(Clause(parsed))
 		return self
 

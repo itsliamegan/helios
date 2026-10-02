@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from .clause import Clause, Group
+from .clause import Clause, ConditionParser
 from .codec import Scalar
 from .column import Column
 from .error import DatabaseError, ModelError, NotFoundError
@@ -90,7 +90,11 @@ class Store:
 		Preload(self, model_type, paths).load(models)
 
 	def identifying(self, model: Model) -> tuple[Clause, ...]:
-		return (Clause((Group.parse(self.registry, type(model), {"id": model.id}),)),)
+		return (
+			Clause(
+				(ConditionParser(self.registry, type(model)).parse({"id": model.id}),)
+			),
+		)
 
 	def find_one[T: Model](self, model_type: type[T], id: UUID) -> T:
 		found = self.query(model_type).where({"id": id}).first()
