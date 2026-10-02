@@ -30,10 +30,6 @@ class Kernel:
 		finally:
 			context.close()
 
-	@staticmethod
-	def reject(error: HTTPError) -> Response:
-		return Kernel.render(error)
-
 	def build(self, router: Router, middlewares: list[Middleware]) -> Next:
 		next: Next = self.render_http_errors(router)
 		for middleware in reversed(middlewares):
@@ -55,13 +51,9 @@ class Kernel:
 				return next(request, context)
 			except HTTPError as error:
 				context.aborted = error
-				return Kernel.render(error)
+				return Response.error(error)
 
 		return call
-
-	@staticmethod
-	def render(error: HTTPError) -> Response:
-		return Response.text(f"{error.status}", error.status)
 
 	@staticmethod
 	def adapt_artificial_method(

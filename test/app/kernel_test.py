@@ -52,16 +52,6 @@ def test_records_error_raised_by_inner_middleware_as_aborted():
 	assert_that(isinstance(seen[0], ContentTooLargeError))
 
 
-def test_rejects_error_like_the_pipeline_renders_it():
-	kernel = Kernel(Container(), Router([]), [])
-
-	handled = kernel.handle(request())
-	rejected = kernel.reject(NotFoundError())
-
-	assert_eq(rejected.status, handled.status)
-	assert_eq(str(rejected.body), str(handled.body))
-
-
 def test_unexpected_errors_skip_response_middleware_and_close_resources():
 	events = []
 

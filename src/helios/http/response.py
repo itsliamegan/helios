@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from .body import Body, Buffered, Stream
 from .cookie import Cookies
+from .error import HTTPError
 from .header import Headers
 from .status import Status
 from .url import URL
@@ -38,6 +39,10 @@ class Response:
 	@classmethod
 	def html(cls, html: str, status: Status = Status.OK) -> Response:
 		return cls(status, Headers({"Content-Type": "text/html"}), body=Buffered(html))
+
+	@classmethod
+	def error(cls, error: HTTPError) -> Response:
+		return cls.text(f"{error.status}", error.status)
 
 	@classmethod
 	def file(cls, content: bytes, filename: str, content_type: str) -> Response:
