@@ -3,7 +3,7 @@ from urllib.parse import quote
 from wsgiref.types import StartResponse, WSGIEnvironment
 
 from werkzeug.datastructures import EnvironHeaders
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.formparser import FormDataParser
 from werkzeug.http import parse_options_header
 from werkzeug.wsgi import get_host
@@ -20,6 +20,7 @@ from helios.http import (
 	Stream,
 	URL,
 )
+from helios.http.error import BadRequestError, ContentTooLargeError
 
 
 class ResponseAdapter:
@@ -57,7 +58,7 @@ class RequestAdapter:
 	def url(self) -> URL:
 		host = get_host(self.environment)
 		if not host:
-			raise BadRequest("invalid Host header")
+			raise BadRequestError("invalid Host header")
 
 		origin = URL.parse(f"{self.environment["wsgi.url_scheme"]}://{host}")
 		return URL(
@@ -96,7 +97,10 @@ class RequestAdapter:
 			max_form_memory_size=500_000,
 			max_form_parts=1_000,
 		)
-		_, form, uploads = parser.parse_from_environ(self.environment)
+		try:
+			_, form, uploads = parser.parse_from_environ(self.environment)
+		except RequestEntityTooLarge as error:
+			raise ContentTooLargeError("form data exceeds limits") from error
 		input_items = dict(form.lists())
 
 		file_items: dict[str, list[File]] = {}

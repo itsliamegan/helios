@@ -1,8 +1,6 @@
 from enum import Enum
 
-
-class UnsupportedMethodError(ValueError):
-	pass
+from .error import UnsupportedMethodError
 
 
 class Method(Enum):

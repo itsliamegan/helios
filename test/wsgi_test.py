@@ -2,8 +2,7 @@ from io import BytesIO
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 from werkzeug.datastructures import MultiDict
-from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
-from werkzeug.test import EnvironBuilder
+from werkzeug.test import Client, EnvironBuilder
 
 import helios.app
 from helios.http import (
@@ -16,6 +15,7 @@ from helios.http import (
 	URL,
 	UnsupportedMethodError,
 )
+from helios.http.error import BadRequestError, ContentTooLargeError
 from helios.routing import Pattern, Route, Router
 from helios.wsgi import Application
 from helios.wsgi.adapt import RequestAdapter, ResponseAdapter
@@ -73,7 +73,7 @@ def test_adapts_url_as_sent():
 def test_rejects_invalid_host():
 	env = EnvironBuilder(headers=[("Host", "exa mple.com")]).get_environ()
 
-	with assert_raises(BadRequest):
+	with assert_raises(BadRequestError):
 		RequestAdapter(env).adapt()
 
 
@@ -125,7 +125,7 @@ def test_adapts_form_input():
 def test_rejects_form_input_over_memory_limit():
 	env = EnvironBuilder(data={"content": "x" * 500_001}).get_environ()
 
-	with assert_raises(RequestEntityTooLarge):
+	with assert_raises(ContentTooLargeError):
 		RequestAdapter(env).adapt()
 
 
@@ -134,7 +134,7 @@ def test_rejects_multipart_input_over_part_limit():
 	builder = EnvironBuilder(data=data, content_type="multipart/form-data")
 	env = builder.get_environ()
 
-	with assert_raises(RequestEntityTooLarge):
+	with assert_raises(ContentTooLargeError):
 		RequestAdapter(env).adapt()
 
 
@@ -229,6 +229,25 @@ def test_adapts_multiple_cookies():
 		)
 
 	ResponseAdapter(res, start_response).adapt()
+
+
+def test_renders_adaptation_errors_like_the_kernel():
+	builders = [
+		(EnvironBuilder(method="OPTIONS"), Status.NOT_IMPLEMENTED),
+		(EnvironBuilder(headers=[("Host", "exa mple.com")]), Status.BAD_REQUEST),
+		(
+			EnvironBuilder(method="POST", data={"content": "x" * 500_001}),
+			Status.CONTENT_TOO_LARGE,
+		),
+	]
+	client = Client(Application(helios.app.Config(), Router([]), []))
+
+	for builder, status in builders:
+		res = client.open(builder)
+
+		assert_eq(res.status_code, status.code)
+		assert_eq(res.text, str(status))
+		assert_eq(res.headers["Content-Length"], str(len(str(status))))
 
 
 def test_client_routes_get_and_exposes_response():

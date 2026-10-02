@@ -1,8 +1,8 @@
 from contextlib import contextmanager
 
-from luna.test.assertion import assert_eq, assert_raises
+from luna.test.assertion import assert_eq
 
-from helios.app import Container, Context, Kernel
+from helios.app import Container, Kernel
 from helios.http import (
 	Buffered,
 	Cookies,
@@ -13,7 +13,6 @@ from helios.http import (
 	Response,
 	Status,
 	URL,
-	UnsupportedMethodError,
 )
 from helios.http.error import NotFoundError
 from helios.routing import Pattern, Route, Router
@@ -37,6 +36,20 @@ def test_records_handled_errors_for_outer_middleware():
 	assert_eq(response.status, Status.NOT_FOUND)
 	assert isinstance(seen[0], NotFoundError)
 	assert_eq(str(response.headers["Content-Length"]), "13")
+
+
+def test_rejects_error_like_the_pipeline_renders_it():
+	kernel = Kernel(Container(), Router([]), [])
+
+	handled = kernel.handle(request())
+	rejected = kernel.reject(NotFoundError())
+
+	assert_eq(rejected.status, handled.status)
+	assert_eq(str(rejected.body), str(handled.body))
+	assert_eq(
+		str(rejected.headers["Content-Length"]),
+		str(handled.headers["Content-Length"]),
+	)
 
 
 def test_content_length_uses_encoded_body_size():
@@ -123,12 +136,17 @@ def test_overrides_method_from_input():
 	assert_eq(str(response.body), "False")
 
 
-def test_rejects_unknown_method_override():
-	request = Request(Method.POST, URL("/"), input=Input({"_method": "delete"}))
+def test_rejects_unknown_method_override_as_bad_request():
+	def destroy(request, context):
+		return Response.empty()
 
-	with assert_raises(UnsupportedMethodError):
-		Kernel.adapt_artificial_method(
-			request,
-			Context(Container(), request),
-			lambda req, ctx: Response.empty(),
-		)
+	kernel = Kernel(
+		Container(),
+		Router([Route(Method.DELETE, Pattern("/"), destroy)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(Method.POST, URL("/"), input=Input({"_method": "delete"}))
+	)
+
+	assert_eq(response.status, Status.BAD_REQUEST)

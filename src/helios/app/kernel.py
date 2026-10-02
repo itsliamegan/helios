@@ -3,7 +3,7 @@ import sys
 import traceback
 
 from helios.http import Buffered, Method, Request, Response, Status
-from helios.http.error import HTTPError
+from helios.http.error import BadRequestError, HTTPError, UnsupportedMethodError
 from helios.routing import Router
 
 from .container import Container
@@ -30,11 +30,17 @@ class Kernel:
 		finally:
 			context.close()
 
+	@staticmethod
+	def reject(error: HTTPError) -> Response:
+		response = Kernel.render(error)
+		Kernel.set_content_length(response)
+		return response
+
 	def build(self, router: Router, middlewares: list[Middleware]) -> Next:
 		next: Next = self.render_http_errors(router)
 		for middleware in reversed(middlewares):
 			next = self.render_http_errors(self.bind(middleware, next))
-		next = self.bind(self.adapt_artificial_method, next)
+		next = self.render_http_errors(self.bind(self.adapt_artificial_method, next))
 		next = self.bind(self.capture_errors, next)
 		return self.bind(self.ensure_content_length, next)
 
@@ -52,9 +58,13 @@ class Kernel:
 				return next(request, context)
 			except HTTPError as error:
 				context.error = error
-				return Response.text(f"{error.status}", error.status)
+				return Kernel.render(error)
 
 		return call
+
+	@staticmethod
+	def render(error: HTTPError) -> Response:
+		return Response.text(f"{error.status}", error.status)
 
 	@staticmethod
 	def ensure_content_length(
@@ -63,12 +73,16 @@ class Kernel:
 		next: Next,
 	) -> Response:
 		response = next(request, context)
+		Kernel.set_content_length(response)
+		return response
+
+	@staticmethod
+	def set_content_length(response: Response):
 		if (
 			isinstance(response.body, Buffered)
 			and "Content-Length" not in response.headers
 		):
 			response.headers["Content-Length"] = str(len(response.body.to_bytes()))
-		return response
 
 	@staticmethod
 	def adapt_artificial_method(
@@ -79,7 +93,12 @@ class Kernel:
 		raw_method = request.input.first("_method")
 		if raw_method is not None:
 			del request.input["_method"]
-			request.method = Method.parse(raw_method)
+			try:
+				request.method = Method.parse(raw_method)
+			except UnsupportedMethodError as error:
+				raise BadRequestError(
+					f"invalid method override {raw_method!r}"
+				) from error
 		return next(request, context)
 
 	@staticmethod
