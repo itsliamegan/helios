@@ -57,7 +57,7 @@ class Column:
 		if instance is None:
 			return self
 		try:
-			return instance._values[self.name]
+			return instance._state.values[self.name]
 		except KeyError:
 			raise AttributeError(
 				f"{owner.__name__}.{self.name} has not been initialized"

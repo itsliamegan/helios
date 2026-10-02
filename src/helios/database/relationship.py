@@ -67,9 +67,9 @@ class Relationship(ABC):
 		if instance is None:
 			return self
 		try:
-			return instance._loaded[self.name]
+			return instance._state.loaded[self.name]
 		except KeyError:
-			if instance._stored:
+			if instance._state.stored:
 				message = (
 					f"{self.label} is not loaded; "
 					f"load it with store.preload(models, {self.name!r})"
@@ -130,7 +130,7 @@ class BelongsTo(Relationship):
 		return "id"
 
 	def collect(self, parent: Model, matches: list[Model]) -> object:
-		id = parent._values[self.id_name]
+		id = parent._state.values[self.id_name]
 		if id is None:
 			return None
 		if not matches:

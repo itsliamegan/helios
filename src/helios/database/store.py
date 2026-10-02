@@ -37,13 +37,13 @@ class Store:
 	) -> T:
 		registered = self.registry.get(cast(type[T], model_type))
 		model = model_type(*args, **values)
-		model._values["created_at"] = datetime.now(UTC)
+		model._state.values["created_at"] = datetime.now(UTC)
 		encoded = {
-			name: column.encode(model._values[name], registered)
+			name: column.encode(model._state.values[name], registered)
 			for name, column in registered.columns.items()
 		}
 		self.write(Insert(registered.table, encoded))
-		model._stored = True
+		model._state.stored = True
 		return model
 
 	def update(self, model: Model, **values: Any):
@@ -61,14 +61,15 @@ class Store:
 			for relationship in model_type.relationships.values()
 			if isinstance(relationship, BelongsTo)
 			and relationship.id_name in values
-			and values[relationship.id_name] != model._values[relationship.id_name]
+			and values[relationship.id_name]
+			!= model._state.values[relationship.id_name]
 		]
 		statement = Update(model_type.table, encoded, self.identifying(model))
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
-		model._values.update(values)
+		model._state.values.update(values)
 		for name in moved:
-			model._loaded.pop(name, None)
+			model._state.loaded.pop(name, None)
 
 	def delete(self, model: Model):
 		model_type = self.registry.get(type(model))
@@ -103,7 +104,7 @@ class Store:
 			)
 		model_type = self.registry.get(model_types[0])
 		for model in given:
-			if not model._stored:
+			if not model._state.stored:
 				raise ModelError(
 					f"store.preload takes stored models, "
 					f"and {model!r} was built with the constructor"

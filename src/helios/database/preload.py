@@ -48,13 +48,13 @@ def branches(
 def load(store: Store, models: list[Model], branches: dict[str, Branch]):
 	for name, branch in branches.items():
 		relationship = branch.relationship
-		pending = [model for model in models if name not in model._loaded]
+		pending = [model for model in models if name not in model._state.loaded]
 		if pending:
 			fill(store, relationship, pending)
 
 		children: dict[int, Model] = {}
 		for model in models:
-			for child in held(model._loaded[name]):
+			for child in held(model._state.loaded[name]):
 				children[id(child)] = child
 		if branch.branches and children:
 			load(store, list(children.values()), branch.branches)
@@ -65,9 +65,9 @@ def fill(store: Store, relationship: Relationship, models: list[Model]):
 	target_column = relationship.target_column
 	values = list(
 		dict.fromkeys(
-			model._values[owner_column]
+			model._state.values[owner_column]
 			for model in models
-			if model._values[owner_column] is not None
+			if model._state.values[owner_column] is not None
 		)
 	)
 
@@ -77,11 +77,11 @@ def fill(store: Store, relationship: Relationship, models: list[Model]):
 		batch = values[start : start + size]
 		query = store.query(relationship.target)
 		for row in query.where({f"{target_column} in": batch}).all():
-			matches.setdefault(row._values[target_column], []).append(row)
+			matches.setdefault(row._state.values[target_column], []).append(row)
 
 	for model in models:
-		found = matches.get(model._values[owner_column], [])
-		model._loaded[relationship.name] = relationship.collect(model, found)
+		found = matches.get(model._state.values[owner_column], [])
+		model._state.loaded[relationship.name] = relationship.collect(model, found)
 
 
 def held(value: object) -> list[Model]:
