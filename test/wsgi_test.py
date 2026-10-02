@@ -2,7 +2,7 @@ from io import BytesIO
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 from werkzeug.datastructures import MultiDict
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 from werkzeug.test import EnvironBuilder
 
 import helios.app
@@ -44,6 +44,37 @@ def test_adapts_url():
 
 	assert_eq(req.url.path, "/search")
 	assert_eq(req.url.query.all("q"), ["Intro"])
+
+
+def test_adapts_absolute_url():
+	env = EnvironBuilder(
+		path="/posts/",
+		base_url="https://example.com:8443/blog/",
+	).get_environ()
+
+	req = RequestAdapter(env).adapt()
+
+	assert_eq(str(req.url), "https://example.com:8443/blog/posts/")
+
+
+def test_adapts_url_as_sent():
+	env = EnvironBuilder(
+		path="/posts/caf%C3%A9%20intro",
+		query_string="q=a%20b+c&flag&check=%E2%9C%93",
+	).get_environ()
+
+	req = RequestAdapter(env).adapt()
+
+	assert_eq(req.url.path, "/posts/caf%C3%A9%20intro")
+	assert_eq(str(req.url.query), "q=a%20b+c&flag&check=%E2%9C%93")
+	assert_eq(req.url.query.first("check"), "\u2713")
+
+
+def test_rejects_invalid_host():
+	env = EnvironBuilder(headers=[("Host", "exa mple.com")]).get_environ()
+
+	with assert_raises(BadRequest):
+		RequestAdapter(env).adapt()
 
 
 def test_adapts_repeated_query_values():
