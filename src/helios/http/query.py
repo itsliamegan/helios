@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Self
 from urllib.parse import parse_qs, urlencode
@@ -9,7 +9,7 @@ class Query:
 	text: str
 	parameters: dict[str, list[str]]
 
-	def __init__(self, parameters: Mapping[str, str | list[str]] | None = None):
+	def __init__(self, parameters: Mapping[str, str | Sequence[str]] | None = None):
 		parameters = parameters or {}
 		self.text = urlencode(parameters, doseq=True)
 		self.parameters = parse_qs(self.text, keep_blank_values=True)

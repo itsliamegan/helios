@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 
@@ -13,10 +13,10 @@ class File:
 class Files:
 	items: dict[str, list[File]]
 
-	def __init__(self, items: Mapping[str, File | list[File]] | None = None):
+	def __init__(self, items: Mapping[str, File | Sequence[File]] | None = None):
 		self.items = {}
 		for name, value in (items or {}).items():
-			self.items[name] = list(value) if isinstance(value, list) else [value]
+			self.items[name] = [value] if isinstance(value, File) else list(value)
 
 	def first(self, name: str) -> File | None:
 		files = self.items.get(name)

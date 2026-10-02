@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, overload
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
@@ -50,7 +50,7 @@ class Engine:
 
 	@overload
 	def render(
-		self, renderable: View, assigns: dict[str, Any] | None = None
+		self, renderable: View, assigns: Mapping[str, Any] | None = None
 	) -> str: ...
 
 	@overload
@@ -59,7 +59,7 @@ class Engine:
 	def render(
 		self,
 		renderable: View | Component,
-		assigns: dict[str, Any] | None = None,
+		assigns: Mapping[str, Any] | None = None,
 	) -> str:
 		if isinstance(renderable, Component):
 			component = renderable
@@ -104,9 +104,9 @@ class Loader(BaseLoader):
 
 def check_registration(
 	component: type[Component],
-	registered: dict[str, Any],
+	registered: Mapping[str, Any],
 	helpers: Helpers,
-	templates: list[str],
+	templates: Sequence[str],
 ):
 	name = component.__name__
 	if name in registered:

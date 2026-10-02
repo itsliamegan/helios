@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from helios.http import Method, Query, URL
@@ -16,8 +16,8 @@ class URLs:
 	def route(
 		self,
 		name: str,
-		params: dict[str, Any] | None = None,
-		query: Query | Mapping[str, str | list[str]] | None = None,
+		params: Mapping[str, Any] | None = None,
+		query: Query | Mapping[str, str | Sequence[str]] | None = None,
 		absolute: bool = False,
 	) -> URL:
 		path = self.router.path(name, params)

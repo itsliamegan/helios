@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
@@ -7,11 +8,12 @@ class Session:
 	def __init__(
 		self,
 		id: UUID,
-		items: dict[str, Any] | None = None,
+		items: Mapping[str, Any] | None = None,
 		last_active_at: datetime | None = None,
 	):
 		self.id = id
-		self.items = items if items is not None else {}
+		items = items or {}
+		self.items = dict(items)
 		self.last_active_at = last_active_at
 		self.dirty = False
 		self.invalidated = False
@@ -65,8 +67,9 @@ class Session:
 
 
 class Store:
-	def __init__(self, sessions: dict[UUID, Session] | None = None):
-		self.sessions = sessions if sessions is not None else {}
+	def __init__(self, sessions: Mapping[UUID, Session] | None = None):
+		sessions = sessions or {}
+		self.sessions = dict(sessions)
 		for session in self.sessions.values():
 			session.store = self
 		self.dirty = False

@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Any, Self, TYPE_CHECKING
 
 from .clause import Clause
@@ -19,16 +20,16 @@ class Query[T: Model]:
 		self.ordering: list[tuple[str, Direction]] = []
 		self.count: int | None = None
 
-	def where(self, conditions: dict[str, Any]) -> Self:
+	def where(self, conditions: Mapping[str, Any]) -> Self:
 		self.clauses.append(Clause((self.parser.parse(conditions),)))
 		return self
 
-	def where_not(self, conditions: dict[str, Any]) -> Self:
+	def where_not(self, conditions: Mapping[str, Any]) -> Self:
 		group = self.parser.parse(conditions)
 		self.clauses.append(Clause((group,), negated=True))
 		return self
 
-	def where_any(self, *groups: dict[str, Any]) -> Self:
+	def where_any(self, *groups: Mapping[str, Any]) -> Self:
 		if not groups:
 			raise ModelError(
 				f"Query on {self.model_type.__name__} has where_any with no groups"

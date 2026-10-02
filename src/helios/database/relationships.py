@@ -4,7 +4,7 @@ from .relationship import Relationship
 
 
 class Relationships(Mapping[str, Relationship]):
-	def __init__(self, declared: dict[str, Relationship]):
+	def __init__(self, declared: Mapping[str, Relationship]):
 		self.declared = declared
 		self.checked: set[str] = set()
 

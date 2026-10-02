@@ -1,8 +1,10 @@
+from collections.abc import Mapping
+
 from .source import Driver, Source
 
 
 class Driver(Driver):
-	def __init__(self, templates: dict[str, str]):
+	def __init__(self, templates: Mapping[str, str]):
 		self.templates = templates
 
 	def names(self) -> list[str]:

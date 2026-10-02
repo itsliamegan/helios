@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from itertools import count
 
 from jinja2 import nodes
@@ -30,7 +31,7 @@ class RenderExtension(Extension):
 		return nodes.Scope(statements).set_lineno(lineno)
 
 
-def blank(body: list[nodes.Node]) -> bool:
+def blank(body: Sequence[nodes.Node]) -> bool:
 	return all(
 		isinstance(node, nodes.Output)
 		and all(

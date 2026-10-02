@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any
 
 from .field import Field
@@ -15,7 +16,7 @@ class Rules(Steps[Rule[Any]]):
 		run(self.field.get(field.name, []), field.name, False, value)
 
 
-def run(rules: list[Rule[Any]], name: str, item: bool, value: Any):
+def run(rules: Sequence[Rule[Any]], name: str, item: bool, value: Any):
 	for rule in rules:
 		try:
 			rule.check(value)

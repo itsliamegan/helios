@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
 from .error import DatabaseError, ModelError
@@ -41,7 +41,7 @@ class Load:
 	def load(self, models: Sequence[Model]):
 		self.load_branches(models, self.branches)
 
-	def load_branches(self, models: Sequence[Model], branches: dict[str, Branch]):
+	def load_branches(self, models: Sequence[Model], branches: Mapping[str, Branch]):
 		for name, branch in branches.items():
 			self.fill(branch.relationship, models)
 

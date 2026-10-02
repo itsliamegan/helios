@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
@@ -32,7 +32,7 @@ class Router:
 				raise ValueError(f"duplicate route name: {route.name}")
 			self.named[route.name] = route
 
-	def path(self, name: str, params: dict[str, Any] | None = None) -> str:
+	def path(self, name: str, params: Mapping[str, Any] | None = None) -> str:
 		if name not in self.named:
 			raise RouteNotFoundError(f"route not found: {name}")
 		return self.named[name].pattern.path(params)

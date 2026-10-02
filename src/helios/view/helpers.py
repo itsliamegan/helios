@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Self
@@ -11,11 +11,13 @@ class Helpers:
 
 	def __init__(
 		self,
-		filters: dict[str, Callable[..., Any]] | None = None,
-		globals: dict[str, Any] | None = None,
+		filters: Mapping[str, Callable[..., Any]] | None = None,
+		globals: Mapping[str, Any] | None = None,
 	):
-		self.filters = filters or {}
-		self.globals = globals or {}
+		filters = filters or {}
+		globals = globals or {}
+		self.filters = dict(filters)
+		self.globals = dict(globals)
 
 	@classmethod
 	def defaults(cls) -> Self:

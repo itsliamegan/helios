@@ -4,7 +4,7 @@ from .column import Column
 
 
 class Columns(Mapping[str, Column]):
-	def __init__(self, declared: dict[str, Column]):
+	def __init__(self, declared: Mapping[str, Column]):
 		self.declared = declared
 
 	def __getitem__(self, name: str) -> Column:

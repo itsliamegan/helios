@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any
 
 from .field import Field
@@ -16,14 +17,14 @@ class Filters(Steps[Filter[Any]]):
 			return chain(trimmed(field, field_filters), value)
 
 
-def trimmed(field: Field, filters: list[Filter[Any]]) -> list[Filter[Any]]:
+def trimmed(field: Field, filters: Sequence[Filter[Any]]) -> Sequence[Filter[Any]]:
 	if field.trimmed:
 		return [Trim(), *filters]
 	else:
 		return filters
 
 
-def chain(filters: list[Filter[Any]], value: Any) -> Any:
+def chain(filters: Sequence[Filter[Any]], value: Any) -> Any:
 	for step in filters:
 		value = step.apply(value)
 	return value

@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Self
 
@@ -8,12 +8,12 @@ class Header:
 	name: str
 	values: list[str]
 
-	def __init__(self, name: str, values: str | list[str]):
+	def __init__(self, name: str, values: str | Sequence[str]):
 		self.name = name
 		self.set(values)
 
-	def set(self, value: str | list[str]):
-		values = value if isinstance(value, list) else [value]
+	def set(self, value: str | Sequence[str]):
+		values = [value] if isinstance(value, str) else list(value)
 		for item in values:
 			validate(item)
 		self.values = values
@@ -34,7 +34,7 @@ class Header:
 class Headers:
 	headers: dict[str, Header]
 
-	def __init__(self, pairs: dict[str, str | list[str]] | None = None):
+	def __init__(self, pairs: Mapping[str, str | Sequence[str]] | None = None):
 		pairs = pairs or {}
 		headers = {}
 		for raw_name in pairs:
@@ -45,7 +45,7 @@ class Headers:
 	def __getitem__(self, name: str) -> Header:
 		return self.headers[normalize(name)]
 
-	def __setitem__(self, raw_name: str, value: str | list[str] | Header):
+	def __setitem__(self, raw_name: str, value: str | Sequence[str] | Header):
 		name = normalize(raw_name)
 		if isinstance(value, Header):
 			if self.headers.get(name) is value:

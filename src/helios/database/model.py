@@ -1,4 +1,5 @@
 from annotationlib import Format, get_annotations
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any, ClassVar, Self, dataclass_transform
 from uuid import UUID, uuid4
@@ -52,7 +53,7 @@ class Model:
 		self._stored = False
 
 	@classmethod
-	def hydrate(cls, values: dict[str, Any]) -> Self:
+	def hydrate(cls, values: Mapping[str, Any]) -> Self:
 		model = cls.__new__(cls)
 		model._values = {name: values[name] for name in cls.columns}
 		model._loaded = {}
@@ -69,7 +70,7 @@ class Model:
 			raise ModelError(f"{cls.__name__} has no column {name!r}") from None
 
 	@classmethod
-	def initialize(cls, raw_columns: dict[str, Any]) -> dict[str, Any]:
+	def initialize(cls, raw_columns: Mapping[str, Any]) -> dict[str, Any]:
 		initialized = {
 			name: definition
 			for name, definition in cls.columns.items()

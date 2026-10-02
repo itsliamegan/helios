@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 
@@ -5,7 +6,7 @@ from dataclasses import dataclass
 class Errors:
 	messages: dict[str, list[str]]
 
-	def __init__(self, messages: dict[str, list[str]] | None = None):
+	def __init__(self, messages: Mapping[str, Sequence[str]] | None = None):
 		self.messages = {}
 		for name, field_messages in (messages or {}).items():
 			self.messages[name] = list(field_messages)

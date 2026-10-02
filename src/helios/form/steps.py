@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -13,7 +14,7 @@ class Steps[T]:
 	item: dict[str, list[T]]
 	field: dict[str, list[T]]
 
-	def __init__(self, declared: dict[str, list[T]] | None = None):
+	def __init__(self, declared: Mapping[str, Sequence[T]] | None = None):
 		self.item = {}
 		self.field = {}
 		for text, steps in (declared or {}).items():
@@ -24,9 +25,9 @@ class Steps[T]:
 					f"'{key.name}' nor '{key.name}.{ITEM}'"
 				)
 			elif key.item:
-				self.item[key.name] = steps
+				self.item[key.name] = list(steps)
 			else:
-				self.field[key.name] = steps
+				self.field[key.name] = list(steps)
 
 	def verify(self, form: type[Form]):
 		kind = type(self).__name__.lower()

@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Self, TypeIs
 
@@ -14,7 +15,7 @@ class ConditionParser:
 		self.model_type = model_type
 		self.subject = f"Query on {model_type.__name__}"
 
-	def parse(self, conditions: dict[str, Any]) -> Group:
+	def parse(self, conditions: Mapping[str, Any]) -> Group:
 		if not conditions:
 			raise ModelError(f"{self.subject} has an empty condition group")
 
@@ -29,7 +30,9 @@ class ConditionParser:
 			terms.append(Term(text, key, value))
 		return self.build(self.model_type, terms, 0)
 
-	def build(self, model_type: type[Model], terms: list[Term], depth: int) -> Group:
+	def build(
+		self, model_type: type[Model], terms: Sequence[Term], depth: int
+	) -> Group:
 		conditions: list[Condition] = []
 		for item in split(terms, depth):
 			if isinstance(item, Term):
@@ -53,7 +56,9 @@ class ConditionParser:
 				f"{self.subject} has an invalid value for {term.text!r}: {error}"
 			) from error
 
-	def exists(self, model_type: type[Model], terms: list[Term], depth: int) -> Exists:
+	def exists(
+		self, model_type: type[Model], terms: Sequence[Term], depth: int
+	) -> Exists:
 		first = terms[0]
 		name = first.key.path[depth]
 		relationship = model_type.relationships.get(name)
@@ -71,7 +76,7 @@ class ConditionParser:
 		)
 
 
-def split(terms: list[Term], depth: int) -> list[Term | list[Term]]:
+def split(terms: Sequence[Term], depth: int) -> list[Term | list[Term]]:
 	items: list[Term | list[Term]] = []
 	nested: dict[str, list[Term]] = {}
 	for term in terms:

@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 import re
 from typing import Any
 from urllib.parse import quote
@@ -43,7 +44,7 @@ class Pattern:
 			return None
 		return self.convert(match.groupdict())
 
-	def path(self, params: dict[str, Any] | None = None) -> str:
+	def path(self, params: Mapping[str, Any] | None = None) -> str:
 		params = params or {}
 		expected = set(self.converters)
 		supplied = set(params)
@@ -66,7 +67,7 @@ class Pattern:
 
 		return PARAMETER_REGEX.sub(replace, self.raw)
 
-	def convert(self, raw_params: dict[str, str]) -> dict[str, Any] | None:
+	def convert(self, raw_params: Mapping[str, str]) -> dict[str, Any] | None:
 		try:
 			return {
 				name: self.converters[name].convert(value)
