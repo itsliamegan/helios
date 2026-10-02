@@ -90,21 +90,29 @@ def test_normal_and_redirect_responses_commit():
 		assert_eq(titles(path), ["Intro"])
 
 
-def test_handled_and_returned_error_responses_commit():
+def test_raised_http_error_rolls_back():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_schema(path)
 
-		def handled(request, context):
-			context.get(Store).create(Post, title="Handled")
+		def missing(request, context):
+			context.get(Store).create(Post, title="Rolled back")
 			raise NotFoundError()
 
-		app = application(path, handled)
+		app = application(path, missing)
 		try:
 			response = app.handle(request())
 		finally:
 			app.close()
+
 		assert_eq(response.status, Status.NOT_FOUND)
+		assert_eq(titles(path), [])
+
+
+def test_returned_error_response_commits():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_schema(path)
 
 		def returned(request, context):
 			context.get(Store).create(Post, title="Returned")
@@ -117,7 +125,7 @@ def test_handled_and_returned_error_responses_commit():
 			app.close()
 
 		assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
-		assert_eq(titles(path), ["Handled", "Returned"])
+		assert_eq(titles(path), ["Returned"])
 
 
 def test_unexpected_exception_rolls_back_and_next_request_can_use_database():

@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-from luna.test.assertion import assert_eq
+from luna.test.assertion import assert_eq, assert_that
 
 from helios.app import Container, Kernel
 from helios.http import (
@@ -14,7 +14,7 @@ from helios.http import (
 	Status,
 	URL,
 )
-from helios.http.error import NotFoundError
+from helios.http.error import ContentTooLargeError, NotFoundError
 from helios.routing import Pattern, Route, Router
 
 
@@ -22,20 +22,38 @@ def request() -> Request:
 	return Request(Method.GET, URL("/"))
 
 
-def test_records_handled_errors_for_outer_middleware():
+def test_records_raised_error_as_aborted_for_outer_middleware():
 	seen = []
 
 	def observe(request, context, next):
 		response = next(request, context)
-		seen.append(context.error)
+		seen.append(context.aborted)
 		return response
 
 	kernel = Kernel(Container(), Router([]), [observe])
 	response = kernel.handle(request())
 
 	assert_eq(response.status, Status.NOT_FOUND)
-	assert isinstance(seen[0], NotFoundError)
+	assert_that(isinstance(seen[0], NotFoundError))
 	assert_eq(str(response.headers["Content-Length"]), "13")
+
+
+def test_records_error_raised_by_inner_middleware_as_aborted():
+	seen = []
+
+	def observe(request, context, next):
+		response = next(request, context)
+		seen.append(context.aborted)
+		return response
+
+	def refuse(request, context, next):
+		raise ContentTooLargeError()
+
+	kernel = Kernel(Container(), Router([]), [observe, refuse])
+	response = kernel.handle(request())
+
+	assert_eq(response.status, Status.CONTENT_TOO_LARGE)
+	assert_that(isinstance(seen[0], ContentTooLargeError))
 
 
 def test_rejects_error_like_the_pipeline_renders_it():
@@ -98,12 +116,12 @@ def test_unexpected_errors_skip_response_middleware_and_close_resources():
 	assert_eq(events, ["closed"])
 
 
-def test_returned_error_response_has_no_context_error():
+def test_returned_error_response_is_not_aborted():
 	seen = []
 
 	def observe(request, context, next):
 		response = next(request, context)
-		seen.append(context.error)
+		seen.append(context.aborted)
 		return response
 
 	def index(request, context):

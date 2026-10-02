@@ -31,8 +31,13 @@ class Provider(ApplicationProvider):
 		try:
 			response = next(request, context)
 			store = context.resolved(Store)
-			if store is not None:
+			if store is None:
+				return response
+
+			if context.aborted is None:
 				store.connection.commit()
+			else:
+				store.connection.rollback()
 			return response
 		except BaseException:
 			store = context.resolved(Store)

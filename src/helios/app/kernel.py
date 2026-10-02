@@ -57,7 +57,7 @@ class Kernel:
 			try:
 				return next(request, context)
 			except HTTPError as error:
-				context.error = error
+				context.aborted = error
 				return Kernel.render(error)
 
 		return call
@@ -106,7 +106,6 @@ class Kernel:
 		try:
 			return next(request, context)
 		except Exception as error:
-			context.error = error
 			traceback.print_exception(error, file=sys.stderr)
 			return Response.text(
 				"500 Internal Server Error",

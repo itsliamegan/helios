@@ -3,6 +3,7 @@ from contextlib import AbstractContextManager, ExitStack
 from typing import Any, cast
 
 from helios.http import Request
+from helios.http.error import HTTPError
 
 from .container import Container, DependencyError, Scoped, unparameterized
 
@@ -13,7 +14,7 @@ class Context:
 		self.request = request
 		self.scoped: dict[type[Any], Any] = {}
 		self.resources = ExitStack()
-		self.error: Exception | None = None
+		self.aborted: HTTPError | None = None
 
 	def get[T](self, key: type[T]) -> T:
 		key = unparameterized(key)

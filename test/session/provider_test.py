@@ -229,18 +229,49 @@ def test_unexpected_exception_does_not_save_and_releases_lock():
 			assert_eq(store.get(id)["message"], "Before")
 
 
-def test_handled_http_error_saves_mutation():
+def test_raised_http_error_discards_mutation():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "sessions.json")
-		write_sessions(path)
+		id = uuid4()
+		initial = {str(id): session_data({"message": "Before"})}
+		write_sessions(path, initial)
 
-		def fail(request, context):
-			context.get(Session)["message"] = "Saved"
+		def missing(request, context):
+			context.get(Session)["message"] = "After"
 			raise NotFoundError()
 
 		app = Application(
 			AppConfig(),
-			Router([Route(Method.GET, Pattern("/"), fail)]),
+			Router([Route(Method.GET, Pattern("/"), missing)]),
+			[
+				helios.session.Provider(
+					helios.session.Config(),
+					Driver(path, path.with_suffix(".lock")),
+				)
+			],
+		)
+		try:
+			response = app.handle(request(str(id)))
+		finally:
+			app.close()
+
+		assert_eq(response.status, Status.NOT_FOUND)
+		assert_eq(read_sessions(path), initial)
+		assert_that("session_id" not in response.cookies)
+
+
+def test_returned_error_response_saves_mutation():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		write_sessions(path)
+
+		def failed(request, context):
+			context.get(Session)["message"] = "Saved"
+			return Response.text("failed", Status.INTERNAL_SERVER_ERROR)
+
+		app = Application(
+			AppConfig(),
+			Router([Route(Method.GET, Pattern("/"), failed)]),
 			[
 				helios.session.Provider(
 					helios.session.Config(),
@@ -253,7 +284,7 @@ def test_handled_http_error_saves_mutation():
 		finally:
 			app.close()
 
-		assert_eq(response.status, Status.NOT_FOUND)
+		assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
 		assert_eq(
 			next(iter(read_sessions(path).values()))["items"], {"message": "Saved"}
 		)
