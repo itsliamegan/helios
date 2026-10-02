@@ -4,7 +4,7 @@ from typing import Any, Self
 
 from .codec import Scalar
 from .config import Config
-from .error import DatabaseBusy, DatabaseError
+from .error import DatabaseBusyError, DatabaseError
 
 
 def connect(config: Config) -> Connection:
@@ -147,7 +147,7 @@ def translate(error: sqlite3.Error, operation: str) -> DatabaseError:
 		sqlite3.SQLITE_BUSY,
 		sqlite3.SQLITE_LOCKED,
 	):
-		return DatabaseBusy(f"database {operation} could not acquire a lock")
+		return DatabaseBusyError(f"database {operation} could not acquire a lock")
 	return DatabaseError(f"database {operation} failed")
 
 

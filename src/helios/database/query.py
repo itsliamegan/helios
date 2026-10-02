@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Any, TYPE_CHECKING
+from typing import Any, Self, TYPE_CHECKING
 
 from .clause import Clause
 from .error import ModelError
@@ -21,16 +19,16 @@ class Query[T: Model]:
 		self.ordering: list[tuple[str, Direction]] = []
 		self.count: int | None = None
 
-	def where(self, conditions: dict[str, Any]) -> Query[T]:
+	def where(self, conditions: dict[str, Any]) -> Self:
 		self.clauses.append(Clause((self.parser.parse(conditions),)))
 		return self
 
-	def where_not(self, conditions: dict[str, Any]) -> Query[T]:
+	def where_not(self, conditions: dict[str, Any]) -> Self:
 		group = self.parser.parse(conditions)
 		self.clauses.append(Clause((group,), negated=True))
 		return self
 
-	def where_any(self, *groups: dict[str, Any]) -> Query[T]:
+	def where_any(self, *groups: dict[str, Any]) -> Self:
 		if not groups:
 			raise ModelError(
 				f"Query on {self.model_type.__name__} has where_any with no groups"
@@ -39,14 +37,14 @@ class Query[T: Model]:
 		self.clauses.append(Clause(parsed))
 		return self
 
-	def order_by(self, name: str, direction: Direction = "asc") -> Query[T]:
+	def order_by(self, name: str, direction: Direction = "asc") -> Self:
 		self.model_type.column(name)
 		if direction not in ("asc", "desc"):
 			raise ValueError("direction must be 'asc' or 'desc'")
 		self.ordering.append((name, direction))
 		return self
 
-	def limit(self, count: int) -> Query[T]:
+	def limit(self, count: int) -> Self:
 		if not isinstance(count, int) or isinstance(count, bool) or count < 0:
 			raise ValueError("limit must be a non-negative integer")
 		self.count = count

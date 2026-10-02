@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
@@ -21,7 +22,7 @@ class Match:
 
 
 class Router:
-	def __init__(self, routes: list[Route | Group]):
+	def __init__(self, routes: Sequence[Route | Group]):
 		self.routes = list(Group(routes))
 		self.named: dict[str, Route] = {}
 		for route in self.routes:
@@ -43,8 +44,8 @@ class Router:
 				return Match(route, params)
 		return None
 
-	def __call__(self, req: Request, ctx: Context) -> Response:
-		match = self.match(req.method, req.url)
+	def __call__(self, request: Request, context: Context) -> Response:
+		match = self.match(request.method, request.url)
 		if match is None:
 			raise NotFoundError()
-		return match.route(req, ctx, **match.params)
+		return match.route(request, context, **match.params)

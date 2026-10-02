@@ -1,6 +1,6 @@
 from copy import copy
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import Any, Self, TYPE_CHECKING
 
 from helios.declarative import (
 	Declaration,
@@ -25,7 +25,7 @@ class Field:
 	trimmed: bool = False
 
 	@classmethod
-	def from_declaration(cls, declaration: Declaration) -> Field:
+	def from_declaration(cls, declaration: Declaration) -> Self:
 		try:
 			annotation, _ = split_nullable(declaration.name, declaration.resolve())
 			parser = Parser.for_type(annotation)

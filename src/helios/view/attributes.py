@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 from luna.inflect import dash
 from markupsafe import Markup
@@ -17,7 +17,7 @@ class Attributes:
 		)
 
 	@classmethod
-	def from_html_names(cls, values: dict[str, Any]) -> Attributes:
+	def from_html_names(cls, values: dict[str, Any]) -> Self:
 		attributes = cls()
 		attributes.values = split_class_names(values)
 		return attributes

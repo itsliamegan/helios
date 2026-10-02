@@ -1,7 +1,6 @@
 from collections.abc import Iterable
 
-from helios.app import Application, Container, Context, Next
-from helios.app import Provider as ApplicationProvider
+from helios.app import Application, Container, Context, Next, Provider
 from helios.http import Request, Response
 
 from .config import Config
@@ -11,7 +10,7 @@ from .sqlite import connect
 from .store import Store
 
 
-class Provider(ApplicationProvider):
+class Provider(Provider):
 	def __init__(self, config: Config, model_types: Iterable[type[Model]]):
 		self.config = config
 		self.registry = Registry(model_types)

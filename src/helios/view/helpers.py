@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Self
 
 
 @dataclass(init=False)
@@ -18,7 +18,7 @@ class Helpers:
 		self.globals = globals or {}
 
 	@classmethod
-	def defaults(cls) -> Helpers:
+	def defaults(cls) -> Self:
 		return cls(filters={"date": date, "elapsed": elapsed})
 
 	def update(self, other: Helpers):
@@ -35,12 +35,12 @@ def elapsed(then: datetime, now: datetime | None = None) -> str:
 		now = datetime.now(UTC)
 	diff = now - then
 	if diff.days == 0:
-		mins = diff.seconds / 60
+		minutes = diff.seconds / 60
 		hours = diff.seconds / (60 * 60)
-		if mins < 1:
+		if minutes < 1:
 			return "less than a minute ago"
 		elif hours < 1:
-			return f"{round(mins)} {pluralize("minute", round(mins))} ago"
+			return f"{round(minutes)} {pluralize("minute", round(minutes))} ago"
 		else:
 			return f"{round(hours)} {pluralize("hour", round(hours))} ago"
 	elif diff.days < 7:

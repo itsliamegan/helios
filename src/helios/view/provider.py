@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from helios.app import Application, Container, Context, Provider
 from helios.routing import URLs
 
@@ -14,9 +16,9 @@ class Provider(Provider):
 		self,
 		config: Config,
 		helpers: Helpers | None = None,
-		components: list[type[Component]] | None = None,
+		components: Sequence[type[Component]] | None = None,
 	):
-		self.dir = config.dir
+		self.directory = config.directory
 		self.reload = config.reload
 		self.helpers = helpers
 		self.components = components
@@ -33,7 +35,7 @@ class Provider(Provider):
 		if container.bound(URLs):
 			helpers.globals["urls"] = container.get(URLs)
 		helpers.update(self.helpers or Helpers())
-		return Engine(Driver(self.dir), helpers, self.reload, self.components)
+		return Engine(Driver(self.directory), helpers, self.reload, self.components)
 
 	def views(self, context: Context) -> Views:
 		return Views(context.get(Engine), context)

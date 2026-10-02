@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from helios.http import Request, Response, URL
 from helios.routing import Router, URLs
 
@@ -23,8 +25,8 @@ class Application:
 		self,
 		config: Config,
 		router: Router,
-		providers: list[Provider],
-		middlewares: list[Middleware] | None = None,
+		providers: Sequence[Provider],
+		middlewares: Sequence[Middleware] | None = None,
 	):
 		self.container = Container()
 		self.providers = list(providers)

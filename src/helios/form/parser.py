@@ -59,8 +59,8 @@ class UUID(Scalar[uuid.UUID]):
 		raw = self.single(values).strip()
 		try:
 			return uuid.UUID(raw)
-		except ValueError as err:
-			raise ParseError("must be a valid UUID") from err
+		except ValueError as error:
+			raise ParseError("must be a valid UUID") from error
 
 
 class URL(Scalar[http.URL]):
@@ -68,8 +68,8 @@ class URL(Scalar[http.URL]):
 		raw = self.single(values).strip()
 		try:
 			return http.URL.parse(raw)
-		except ValueError as err:
-			raise ParseError("must be a valid URL") from err
+		except ValueError as error:
+			raise ParseError("must be a valid URL") from error
 
 
 class Bool(Parser[bool]):

@@ -1,6 +1,6 @@
 from annotationlib import Format, get_annotations
 from datetime import datetime
-from typing import Any, ClassVar, dataclass_transform
+from typing import Any, ClassVar, Self, dataclass_transform
 from uuid import UUID, uuid4
 
 from helios.declarative import (
@@ -52,7 +52,7 @@ class Model:
 		self._stored = False
 
 	@classmethod
-	def hydrate(cls, values: dict[str, Any]) -> Model:
+	def hydrate(cls, values: dict[str, Any]) -> Self:
 		model = cls.__new__(cls)
 		model._values = {name: values[name] for name in cls.columns}
 		model._loaded = {}

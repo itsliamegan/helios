@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 from .clause import Clause, Comparison, Condition, Exists, Group, IsNull, Membership
 from .sqlite import quote_identifier
@@ -165,7 +165,7 @@ class Scope:
 		self.aliases = aliases
 
 	@classmethod
-	def of(cls, table: str) -> Scope:
+	def of(cls, table: str) -> Self:
 		return cls(quote_identifier(table), Aliases(table))
 
 	def alias(self) -> str:
@@ -193,7 +193,7 @@ class Fragment:
 	parameters: tuple[Any, ...] = ()
 
 	@classmethod
-	def join(cls, fragments: Iterable[Fragment], separator: str = "") -> Fragment:
+	def join(cls, fragments: Iterable[Fragment], separator: str = "") -> Self:
 		fragments = list(fragments)
 		return cls(
 			separator.join(fragment.sql for fragment in fragments),

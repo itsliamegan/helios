@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Self
 
 from werkzeug.http import dump_cookie, parse_cookie
 
@@ -49,7 +49,7 @@ class Cookies:
 		self.cookies = cookies
 
 	@classmethod
-	def from_headers(cls, headers: Headers) -> Cookies:
+	def from_headers(cls, headers: Headers) -> Self:
 		cookies = cls()
 		if "Cookie" not in headers:
 			return cookies

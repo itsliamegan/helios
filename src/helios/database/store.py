@@ -184,4 +184,4 @@ class Store:
 				"database row contains an invalid model value"
 			) from error
 
-		return cast(T, model_type.hydrate(values))
+		return model_type.hydrate(values)

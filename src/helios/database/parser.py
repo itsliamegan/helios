@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Literal, TypeIs
+from typing import Any, Literal, Self, TypeIs
 
 from .clause import Comparison, Condition, Exists, Group, IsNull, Membership, Operator
 from .column import Column
@@ -99,7 +99,7 @@ class Key:
 	operator: Operator | Literal["in"]
 
 	@classmethod
-	def parse(cls, text: str) -> Key:
+	def parse(cls, text: str) -> Self:
 		parts = text.split(" ")
 		if not 1 <= len(parts) <= 2 or not all(parts):
 			raise ValueError("is not of the form 'name' or 'name operator'")

@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, overload
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
@@ -18,7 +18,7 @@ class Engine:
 		driver: Driver,
 		helpers: Helpers | None = None,
 		reload: bool = False,
-		components: list[type[Component]] | None = None,
+		components: Sequence[type[Component]] | None = None,
 	):
 		self.jinja = Environment(
 			loader=Loader(driver),
