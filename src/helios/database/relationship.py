@@ -34,19 +34,8 @@ class Relationship(ABC):
 	def label(self) -> str:
 		return f"{self.owner.__name__}.{self.name}"
 
-	def resolve(self):
-		if self.resolved:
-			return
-		try:
-			target, nullable = self.interpret(self.declaration.resolve())
-		except DeclarationError as error:
-			raise self.declaration.reject(error) from error
-		self._target = target
-		self._nullable = nullable
-		self.resolved = True
-
 	@abstractmethod
-	def interpret(self, annotation: object) -> tuple[type[Model], bool]: ...
+	def resolve(self): ...
 
 	@property
 	def target(self) -> type[Model]:
@@ -82,17 +71,21 @@ class Relationship(ABC):
 
 
 class BelongsTo(Relationship):
-	def interpret(self, annotation: object) -> tuple[type[Model], bool]:
+	def resolve(self):
+		if self.resolved:
+			return
+		annotation = self.declaration.resolve()
 		try:
 			target, nullable = split_nullable(self.name, annotation)
 		except DeclarationError:
 			target, nullable = None, False
 		if not is_model(target):
-			raise DeclarationError(
-				self.name,
-				f"expected a model, got {annotation!r}",
+			raise self.declaration.reject(
+				DeclarationError(self.name, f"expected a model, got {annotation!r}")
 			)
-		return target, nullable
+		self._target = target
+		self._nullable = nullable
+		self.resolved = True
 
 	def check_id(self, columns: Columns):
 		column = columns.get(self.id_name)
@@ -144,30 +137,44 @@ class Inverse(Relationship):
 class HasMany(Inverse):
 	plural = True
 
-	def interpret(self, annotation: object) -> tuple[type[Model], bool]:
+	def resolve(self):
+		if self.resolved:
+			return
+		annotation = self.declaration.resolve()
 		members = get_args(annotation)
 		if get_origin(annotation) is not list or len(members) != 1:
 			members = (None,)
 		if not is_model(members[0]):
-			raise DeclarationError(
-				self.name,
-				f"expected list[<model>], got {annotation!r}",
+			raise self.declaration.reject(
+				DeclarationError(
+					self.name,
+					f"expected list[<model>], got {annotation!r}",
+				)
 			)
-		return members[0], False
+		self._target = members[0]
+		self._nullable = False
+		self.resolved = True
 
 
 class HasOne(Inverse):
-	def interpret(self, annotation: object) -> tuple[type[Model], bool]:
+	def resolve(self):
+		if self.resolved:
+			return
+		annotation = self.declaration.resolve()
 		try:
 			target, nullable = split_nullable(self.name, annotation)
 		except DeclarationError:
 			target, nullable = None, False
 		if not nullable or not is_model(target):
-			raise DeclarationError(
-				self.name,
-				f"expected <model> | None, got {annotation!r}",
+			raise self.declaration.reject(
+				DeclarationError(
+					self.name,
+					f"expected <model> | None, got {annotation!r}",
+				)
 			)
-		return target, nullable
+		self._target = target
+		self._nullable = nullable
+		self.resolved = True
 
 
 class Relationships(Mapping[str, Relationship]):

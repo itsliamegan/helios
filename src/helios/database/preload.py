@@ -44,10 +44,10 @@ class Preload:
 			branch = level.setdefault(segment, Branch(relationship))
 			level = branch.branches
 
-	def run(self, models: Sequence[Model]):
-		self.load(models, self.branches)
+	def load(self, models: Sequence[Model]):
+		self.load_branches(models, self.branches)
 
-	def load(self, models: Sequence[Model], branches: dict[str, Branch]):
+	def load_branches(self, models: Sequence[Model], branches: dict[str, Branch]):
 		for name, branch in branches.items():
 			pending = [model for model in models if name not in model._loaded]
 			if pending:
@@ -60,7 +60,7 @@ class Preload:
 					if isinstance(child, Model):
 						children[id(child)] = child
 			if branch.branches and children:
-				self.load(list(children.values()), branch.branches)
+				self.load_branches(list(children.values()), branch.branches)
 
 	def fill(self, relationship: Relationship, models: list[Model]):
 		owner_column = relationship.owner_column

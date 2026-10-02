@@ -46,7 +46,7 @@ class Model:
 	def __init__(self, **columns: Any):
 		self._values = type(self).initialize(columns)
 		self._values["id"] = uuid4()
-		self._loaded: dict[str, object] = {}
+		self._loaded: dict[str, Model | list[Model] | None] = {}
 		self._stored = False
 
 	@classmethod

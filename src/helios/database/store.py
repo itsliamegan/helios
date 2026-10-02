@@ -87,7 +87,7 @@ class Store:
 		model_type = self.registry.get(model_types.pop())
 		if not all(model._stored for model in models):
 			raise ModelError("store.preload can only be called with stored models")
-		Preload(self, model_type, paths).run(models)
+		Preload(self, model_type, paths).load(models)
 
 	def identifying(self, model: Model) -> tuple[Clause, ...]:
 		return (Clause((Group.parse(self.registry, type(model), {"id": model.id}),)),)
