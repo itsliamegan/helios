@@ -9,7 +9,7 @@ from helios.app import Application
 from helios.database import Config, Model, Provider, Store
 from helios.http import Method, Request, Response, Status, URL
 from helios.http.error import NotFoundError
-from helios.routing import Pattern, Route, Router
+from helios.routing import Route, Router
 
 
 class Post(Model):
@@ -31,7 +31,7 @@ def request() -> Request:
 def application(path: Path, handler, model_types=None) -> Application:
 	return Application(
 		helios.app.Config(),
-		Router([Route(Method.GET, Pattern("/"), handler)]),
+		Router([Route.get("/", handler)]),
 		[Provider(Config(path), model_types or [Post])],
 	)
 

@@ -18,7 +18,7 @@ class RouteNotFoundError(LookupError):
 @dataclass
 class Match:
 	route: Route
-	params: dict[str, Any]
+	parameters: dict[str, Any]
 
 
 class Router:
@@ -32,20 +32,20 @@ class Router:
 				raise ValueError(f"duplicate route name: {route.name}")
 			self.named[route.name] = route
 
-	def path(self, name: str, params: Mapping[str, Any] | None = None) -> str:
+	def path(self, name: str, parameters: Mapping[str, Any] | None = None) -> str:
 		if name not in self.named:
 			raise RouteNotFoundError(f"route not found: {name}")
-		return self.named[name].pattern.path(params)
+		return self.named[name].pattern.path(parameters)
 
 	def match(self, method: Method, url: URL) -> Match | None:
 		for route in self.routes:
-			params = route.match(method, url)
-			if params is not None:
-				return Match(route, params)
+			parameters = route.match(method, url)
+			if parameters is not None:
+				return Match(route, parameters)
 		return None
 
 	def __call__(self, request: Request, context: Context) -> Response:
 		match = self.match(request.method, request.url)
 		if match is None:
 			raise NotFoundError()
-		return match.route(request, context, **match.params)
+		return match.route(request, context, **match.parameters)

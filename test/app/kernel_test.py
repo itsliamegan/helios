@@ -12,7 +12,7 @@ from helios.http import (
 	URL,
 )
 from helios.http.error import ContentTooLargeError, NotFoundError
-from helios.routing import Pattern, Route, Router
+from helios.routing import Route, Router
 
 
 def request() -> Request:
@@ -73,7 +73,7 @@ def test_unexpected_errors_skip_response_middleware_and_close_resources():
 
 	kernel = Kernel(
 		Container(),
-		Router([Route(Method.GET, Pattern("/"), index)]),
+		Router([Route.get("/", index)]),
 		[observe],
 	)
 	response = kernel.handle(request())
@@ -95,7 +95,7 @@ def test_returned_error_response_is_not_aborted():
 
 	kernel = Kernel(
 		Container(),
-		Router([Route(Method.GET, Pattern("/"), index)]),
+		Router([Route.get("/", index)]),
 		[observe],
 	)
 	kernel.handle(request())
@@ -109,7 +109,7 @@ def test_overrides_method_from_input():
 
 	kernel = Kernel(
 		Container(),
-		Router([Route(Method.DELETE, Pattern("/"), destroy)]),
+		Router([Route.delete("/", destroy)]),
 		[],
 	)
 	response = kernel.handle(
@@ -126,7 +126,7 @@ def test_rejects_unknown_method_override_as_bad_request():
 
 	kernel = Kernel(
 		Container(),
-		Router([Route(Method.DELETE, Pattern("/"), destroy)]),
+		Router([Route.delete("/", destroy)]),
 		[],
 	)
 	response = kernel.handle(

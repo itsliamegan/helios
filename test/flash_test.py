@@ -8,7 +8,7 @@ from helios.app import Application, Config, Container, Provider
 import helios.flash
 from helios.flash import Flashes
 from helios.http import Method, Request, Response, URL
-from helios.routing import Pattern, Route, Router
+from helios.routing import Route, Router
 from helios.session.store import Session
 import helios.view
 from helios.view import Component, Views
@@ -53,7 +53,7 @@ def test_shares_flash_with_views():
 
 		app = Application(
 			Config(),
-			Router([Route(Method.GET, Pattern("/"), index)]),
+			Router([Route.get("/", index)]),
 			[
 				Values(session),
 				helios.flash.Provider(),
@@ -82,7 +82,7 @@ def test_shares_flash_with_components():
 
 		app = Application(
 			Config(),
-			Router([Route(Method.GET, Pattern("/"), index)]),
+			Router([Route.get("/", index)]),
 			[
 				Values(session),
 				helios.flash.Provider(),
@@ -110,7 +110,7 @@ def test_boots_without_views():
 
 	app = Application(
 		Config(),
-		Router([Route(Method.GET, Pattern("/"), index)]),
+		Router([Route.get("/", index)]),
 		[Values(session), helios.flash.Provider()],
 	)
 	try:

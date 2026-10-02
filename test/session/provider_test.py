@@ -13,7 +13,7 @@ from helios.app import Application
 from helios.app import Config as AppConfig
 from helios.http import Headers, Method, Request, Response, Status, URL
 from helios.http.error import NotFoundError
-from helios.routing import Pattern, Route, Router
+from helios.routing import Route, Router
 import helios.session
 from helios.session.file import Driver
 from helios.session.store import Session
@@ -56,7 +56,7 @@ def exercise(
 
 	app = Application(
 		AppConfig(),
-		Router([Route(Method.GET, Pattern("/"), index)]),
+		Router([Route.get("/", index)]),
 		[
 			helios.session.Provider(
 				helios.session.Config(secure=secure, maximum_age=maximum_age),
@@ -215,7 +215,7 @@ def test_unexpected_exception_does_not_save_and_releases_lock():
 		driver = Driver(path, path.with_suffix(".lock"))
 		app = Application(
 			AppConfig(),
-			Router([Route(Method.GET, Pattern("/"), fail)]),
+			Router([Route.get("/", fail)]),
 			[helios.session.Provider(helios.session.Config(), driver)],
 		)
 		try:
@@ -242,7 +242,7 @@ def test_raised_http_error_discards_mutation():
 
 		app = Application(
 			AppConfig(),
-			Router([Route(Method.GET, Pattern("/"), missing)]),
+			Router([Route.get("/", missing)]),
 			[
 				helios.session.Provider(
 					helios.session.Config(),
@@ -271,7 +271,7 @@ def test_returned_error_response_saves_mutation():
 
 		app = Application(
 			AppConfig(),
-			Router([Route(Method.GET, Pattern("/"), failed)]),
+			Router([Route.get("/", failed)]),
 			[
 				helios.session.Provider(
 					helios.session.Config(),

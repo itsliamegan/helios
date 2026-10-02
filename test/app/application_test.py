@@ -4,7 +4,7 @@ from luna.test.assertion import assert_eq
 
 from helios.app import Application, Config, Provider
 from helios.http import Method, Request, Response, Status, URL
-from helios.routing import Pattern, Route, Router, URLs
+from helios.routing import Route, Router, URLs
 
 
 def request(path: str = "/") -> Request:
@@ -69,9 +69,7 @@ def test_closes_request_and_application_resources_in_reverse_order():
 		context.get(str)
 		return Response.empty(Status.OK)
 
-	app = Application(
-		Config(), Router([Route(Method.GET, Pattern("/"), index)]), [Resources()]
-	)
+	app = Application(Config(), Router([Route.get("/", index)]), [Resources()])
 	app.handle(request())
 	app.close()
 	app.close()
@@ -119,7 +117,7 @@ def test_runs_provider_then_standalone_middleware_in_order():
 
 	app = Application(
 		Config(),
-		Router([Route(Method.GET, Pattern("/"), index)]),
+		Router([Route.get("/", index)]),
 		[Middlewares("one"), Middlewares("two")],
 		[standalone],
 	)
@@ -144,7 +142,7 @@ def test_provides_framework_bindings():
 		urls = context.get(URLs)
 		return Response.text(str(urls.route("home", absolute=True)))
 
-	router = Router([Route(Method.GET, Pattern("/"), index, name="home")])
+	router = Router([Route.get("/", index, name="home")])
 	app = Application(Config(URL.parse("https://example.com:8443")), router, [])
 
 	assert_eq(str(app.handle(request()).body), "https://example.com:8443/")

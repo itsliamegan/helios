@@ -30,7 +30,7 @@ def test_calling_route_runs_guards_before_handler():
 		calls.append(("handler", id))
 		return Response.empty(Status.OK)
 
-	route = Route(Method.GET, Pattern("/{id}"), handler, [guard])
+	route = Route.get("/{id}", handler, [guard])
 	request = Request(Method.GET, URL("/1"))
 	res = route(request, context(request), id="1")
 
@@ -39,13 +39,13 @@ def test_calling_route_runs_guards_before_handler():
 
 
 def test_group_without_prefix_or_guards_preserves_route_configuration():
-	route = Route(Method.GET, Pattern("/articles"), handle)
+	route = Route.get("/articles", handle)
 
 	effective = Router([Group(routes=[route])]).routes[0]
 
 	assert_that(effective is route)
 	assert_that(effective.method is Method.GET)
-	assert_eq(effective.pattern.raw, "/articles")
+	assert_eq(effective.pattern, Pattern.parse("/articles"))
 	assert_that(effective.handler is handle)
 	assert_eq(effective.guards, [])
 
@@ -56,18 +56,18 @@ def test_applies_group_prefix_to_direct_routes():
 			Group(
 				prefix="/articles",
 				routes=[
-					Route(Method.GET, Pattern("/"), handle),
-					Route(Method.GET, Pattern("/new"), handle),
+					Route.get("/", handle),
+					Route.get("/new", handle),
 				],
 			)
 		]
 	)
 
 	assert_eq(
-		[route.pattern.raw for route in router.routes],
+		[route.pattern for route in router.routes],
 		[
-			"/articles/",
-			"/articles/new",
+			Pattern.parse("/articles/"),
+			Pattern.parse("/articles/new"),
 		],
 	)
 
@@ -81,8 +81,8 @@ def test_composes_nested_group_prefixes_and_trailing_slashes():
 					Group(
 						prefix="/comments",
 						routes=[
-							Route(Method.GET, Pattern("/"), handle),
-							Route(Method.GET, Pattern("/{id:uuid}/"), handle),
+							Route.get("/", handle),
+							Route.get("/{id:uuid}/", handle),
 						],
 					),
 				],
@@ -91,15 +91,15 @@ def test_composes_nested_group_prefixes_and_trailing_slashes():
 	)
 
 	assert_eq(
-		[route.pattern.raw for route in router.routes],
+		[route.pattern for route in router.routes],
 		[
-			"/articles/comments/",
-			"/articles/comments/{id:uuid}/",
+			Pattern.parse("/articles/comments/"),
+			Pattern.parse("/articles/comments/{id:uuid}/"),
 		],
 	)
 
 
-def test_converts_params_in_grouped_patterns():
+def test_converts_parameters_in_grouped_patterns():
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
 	called_with = []
 
@@ -112,7 +112,7 @@ def test_converts_params_in_grouped_patterns():
 			Group(
 				prefix="/articles",
 				routes=[
-					Route(Method.GET, Pattern("/{id:uuid}"), handler),
+					Route.get("/{id:uuid}", handler),
 				],
 			)
 		]
@@ -132,8 +132,8 @@ def test_inherits_group_guards_into_every_descendant():
 			Group(
 				guards=[guard],
 				routes=[
-					Route(Method.GET, Pattern("/one"), handle),
-					Group(routes=[Route(Method.GET, Pattern("/two"), handle)]),
+					Route.get("/one", handle),
+					Group(routes=[Route.get("/two", handle)]),
 				],
 			)
 		]
@@ -167,9 +167,7 @@ def test_runs_nested_and_route_guards_outermost_first():
 					Group(
 						guards=[inner],
 						routes=[
-							Route(
-								Method.GET, Pattern("/"), handler, guards=[route_guard]
-							),
+							Route.get("/", handler, guards=[route_guard]),
 						],
 					),
 				],
@@ -201,7 +199,7 @@ def test_inherited_guard_response_stops_dispatch():
 			Group(
 				guards=[outer],
 				routes=[
-					Route(Method.GET, Pattern("/"), handler, guards=[inner]),
+					Route.get("/", handler, guards=[inner]),
 				],
 			)
 		]
@@ -227,11 +225,11 @@ def test_group_flattening_preserves_declaration_and_matching_order():
 		[
 			Group(
 				routes=[
-					Route(Method.GET, Pattern("/{slug}"), first),
-					Route(Method.GET, Pattern("/new"), second),
+					Route.get("/{slug}", first),
+					Route.get("/new", second),
 				]
 			),
-			Route(Method.GET, Pattern("/{slug}"), third),
+			Route.get("/{slug}", third),
 		]
 	)
 
@@ -247,7 +245,7 @@ def test_reusing_group_configuration_doesnt_mutate_sources():
 	def route_guard(req, ctx):
 		pass
 
-	route = Route(Method.GET, Pattern("/{id:uuid}/"), handle, guards=[route_guard])
+	route = Route.get("/{id:uuid}/", handle, guards=[route_guard])
 	shared = Group(prefix="/items", guards=[group_guard], routes=[route])
 	router = Router(
 		[
@@ -256,16 +254,16 @@ def test_reusing_group_configuration_doesnt_mutate_sources():
 		]
 	)
 
-	assert_eq(route.pattern.raw, "/{id:uuid}/")
+	assert_eq(route.pattern, Pattern.parse("/{id:uuid}/"))
 	assert_eq(route.guards, [route_guard])
-	assert_eq(shared.prefix, "/items")
+	assert_eq(shared.prefix, Pattern.parse("/items"))
 	assert_eq(shared.guards, [group_guard])
 	assert_eq(shared.routes, [route])
 	assert_eq(
-		[effective.pattern.raw for effective in router.routes],
+		[effective.pattern for effective in router.routes],
 		[
-			"/one/items/{id:uuid}/",
-			"/two/items/{id:uuid}/",
+			Pattern.parse("/one/items/{id:uuid}/"),
+			Pattern.parse("/two/items/{id:uuid}/"),
 		],
 	)
 	assert_eq(router.routes[0].guards, [group_guard, route_guard])

@@ -2,9 +2,8 @@ from uuid import UUID
 
 from luna.test.assertion import assert_eq, assert_that
 
-from helios.http import Method, Query, Response, URL
+from helios.http import Query, Response, URL
 from helios.routing import (
-	Pattern,
 	Route,
 	Router,
 	URLs,
@@ -14,9 +13,8 @@ from helios.routing import (
 def test_generates_absolute_route_with_query_explicitly():
 	router = Router(
 		[
-			Route(
-				Method.GET,
-				Pattern("/redemptions/new"),
+			Route.get(
+				"/redemptions/new",
 				lambda req, ctx: Response.empty(),
 				name="redemptions.new",
 			)
@@ -35,9 +33,8 @@ def test_generates_absolute_route_with_query_explicitly():
 def test_generates_route_with_query_object():
 	router = Router(
 		[
-			Route(
-				Method.GET,
-				Pattern("/posts/"),
+			Route.get(
+				"/posts/",
 				lambda req, ctx: Response.empty(),
 				name="posts.index",
 			)
@@ -53,9 +50,8 @@ def test_generates_route_with_query_object():
 def test_generates_relative_route_by_default():
 	router = Router(
 		[
-			Route(
-				Method.GET,
-				Pattern("/posts/"),
+			Route.get(
+				"/posts/",
 				lambda req, ctx: Response.empty(),
 				name="posts.index",
 			)
@@ -69,15 +65,13 @@ def test_generates_relative_route_by_default():
 
 
 def matchable_urls():
-	show = Route(
-		Method.GET,
-		Pattern("/posts/{id:uuid}"),
+	show = Route.get(
+		"/posts/{id:uuid}",
 		lambda req, ctx, id: Response.empty(),
 		name="posts.show",
 	)
-	update = Route(
-		Method.POST,
-		Pattern("/posts/{id:uuid}/title"),
+	update = Route.post(
+		"/posts/{id:uuid}/title",
 		lambda req, ctx, id: Response.empty(),
 		name="posts.update",
 	)
@@ -92,7 +86,7 @@ def test_matches_url_string_to_named_route():
 
 	assert_that(match is not None)
 	assert_eq(match.route.name, "posts.show")
-	assert_eq(match.params, {"id": id})
+	assert_eq(match.parameters, {"id": id})
 
 
 def test_matches_url_object_to_named_route():
@@ -103,7 +97,7 @@ def test_matches_url_object_to_named_route():
 
 	assert_that(match is not None)
 	assert_eq(match.route.name, "posts.show")
-	assert_eq(match.params, {"id": id})
+	assert_eq(match.parameters, {"id": id})
 
 
 def test_matches_only_the_path_of_absolute_urls():
@@ -114,7 +108,7 @@ def test_matches_only_the_path_of_absolute_urls():
 
 	assert_that(match is not None)
 	assert_eq(match.route.name, "posts.show")
-	assert_eq(match.params, {"id": id})
+	assert_eq(match.parameters, {"id": id})
 
 
 def test_matches_url_string_with_url_in_query():

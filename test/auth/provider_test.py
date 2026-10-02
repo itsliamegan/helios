@@ -12,7 +12,7 @@ from helios.database import Config as DatabaseConfig
 from helios.database import Model, Store
 from helios.database.sqlite import connect
 from helios.http import Method, Request, Response, URL
-from helios.routing import Pattern, Route, Router
+from helios.routing import Route, Router
 from helios.session.store import Session
 import helios.view
 from helios.view import Component, Views
@@ -66,7 +66,7 @@ def resolve(store: Store, session: Session) -> Authenticator[User]:
 
 	app = Application(
 		Config(),
-		Router([Route(Method.GET, Pattern("/"), index)]),
+		Router([Route.get("/", index)]),
 		[Values(store, session), helios.auth.Provider(User)],
 	)
 	try:
@@ -144,7 +144,7 @@ def render_signed_in_user(store: Store, session: Session) -> str:
 
 		app = Application(
 			Config(),
-			Router([Route(Method.GET, Pattern("/"), index)]),
+			Router([Route.get("/", index)]),
 			[
 				Values(store, session),
 				helios.auth.Provider(User),
@@ -203,7 +203,7 @@ def test_shares_authenticator_with_components():
 
 			app = Application(
 				Config(),
-				Router([Route(Method.GET, Pattern("/"), index)]),
+				Router([Route.get("/", index)]),
 				[
 					Values(store, session),
 					helios.auth.Provider(User),
