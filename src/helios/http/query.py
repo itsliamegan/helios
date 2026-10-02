@@ -8,9 +8,9 @@ class Query:
 	text: str
 	parameters: dict[str, list[str]]
 
-	def __init__(self, items: Mapping[str, str | list[str]] | None = None):
-		items = items or {}
-		self.text = urlencode(items, doseq=True)
+	def __init__(self, parameters: Mapping[str, str | list[str]] | None = None):
+		parameters = parameters or {}
+		self.text = urlencode(parameters, doseq=True)
 		self.parameters = parse_qs(self.text, keep_blank_values=True)
 
 	@classmethod
