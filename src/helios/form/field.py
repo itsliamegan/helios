@@ -24,6 +24,25 @@ class Field:
 	default: object = MISSING
 	trimmed: bool = False
 
+	@classmethod
+	def from_declaration(cls, declaration: Declaration) -> Field:
+		try:
+			annotation, _ = split_nullable(declaration.name, declaration.resolve())
+			parser = Parser.for_type(annotation)
+			if parser is None:
+				raise DeclarationError(
+					declaration.name,
+					f"unsupported field type: {annotation!r}",
+				)
+		except DeclarationError as error:
+			raise declaration.reject(error) from error
+		return cls(
+			declaration.name,
+			parser,
+			declaration.default,
+			is_trimmed(annotation),
+		)
+
 	@property
 	def required(self) -> bool:
 		return self.default is MISSING
@@ -60,19 +79,3 @@ class Field:
 
 	def __set__(self, form: Form, value: object):
 		form.values[self.name] = value
-
-
-def declare(declaration: Declaration[Field]) -> Field:
-	annotation, _ = split_nullable(declaration.name, declaration.annotation)
-	parser = Parser.for_type(annotation)
-	if parser is None:
-		raise DeclarationError(
-			declaration.name,
-			f"unsupported field type: {annotation!r}",
-		)
-	return Field(
-		declaration.name,
-		parser,
-		declaration.default,
-		is_trimmed(annotation),
-	)

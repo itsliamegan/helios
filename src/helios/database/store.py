@@ -3,33 +3,19 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from .clause import Clause, Group
+from .clause import Clause
 from .codec import Scalar
 from .column import Column
 from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .model import Model
+from .parser import ConditionParser
+from .preload import Preload
 from .query import Query
+from .registry import Registry
+from .relationship import BelongsTo
 from .sqlite import Connection
 from .statement import Delete, Insert, Raw, Select, Statement, Update
-
-
-class Registry:
-	def __init__(self, model_types: Iterable[type[Model]]):
-		self.model_types: set[type[Model]] = set()
-		for model_type in model_types:
-			if not isinstance(model_type, type) or not issubclass(model_type, Model):
-				raise ModelError("registered model must be a Model subclass")
-			if not isinstance(model_type.table, str) or not model_type.table:
-				raise ModelError(
-					f"{model_type.__name__} must declare a non-empty table"
-				)
-			self.model_types.add(model_type)
-
-	def get[T: Model](self, model_type: type[T]) -> type[T]:
-		if model_type not in self.model_types:
-			raise ModelError(f"{model_type.__name__} is not a registered model")
-		return model_type
 
 
 class Store:
@@ -58,6 +44,7 @@ class Store:
 			for name, column in registered.columns.items()
 		}
 		self.write(Insert(registered.table, encoded))
+		model._stored = True
 		return model
 
 	def update(self, model: Model, **values: Any):
@@ -70,10 +57,18 @@ class Store:
 			if not column.init:
 				raise ModelError(f"{model_type.__name__}.{name} is generated")
 			encoded[name] = column.encode(value, model_type)
+		moved = [
+			relationship.name
+			for relationship in model_type.relationships.of_kind(BelongsTo)
+			if relationship.id_name in values
+			and values[relationship.id_name] != model._values[relationship.id_name]
+		]
 		statement = Update(model_type.table, encoded, self.identifying(model))
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
 		model._values.update(values)
+		for name in moved:
+			model._loaded.pop(name, None)
 
 	def delete(self, model: Model):
 		model_type = self.registry.get(type(model))
@@ -81,8 +76,26 @@ class Store:
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
 
+	def preload[T: Model](self, models: T | list[T], *paths: str):
+		if not isinstance(models, list):
+			models = [models]
+		if not models:
+			return
+
+		model_types = {type(model) for model in models}
+		if len(model_types) > 1:
+			raise ModelError("store.preload takes models of one model type")
+		model_type = self.registry.get(model_types.pop())
+		if not all(model._stored for model in models):
+			raise ModelError("store.preload can only be called with stored models")
+		Preload(self, model_type, paths).load(models)
+
 	def identifying(self, model: Model) -> tuple[Clause, ...]:
-		return (Clause((Group.parse(type(model), {"id": model.id}),)),)
+		return (
+			Clause(
+				(ConditionParser(self.registry, type(model)).parse({"id": model.id}),)
+			),
+		)
 
 	def find_one[T: Model](self, model_type: type[T], id: UUID) -> T:
 		found = self.query(model_type).where({"id": id}).first()

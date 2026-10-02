@@ -144,3 +144,17 @@ def test_cursor_reports_changed_rows():
 				matching_none.close()
 		finally:
 			connection.close()
+
+
+def test_reports_the_bound_parameter_limit():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		connection = connect(Config(path))
+		try:
+			default = connection.parameter_limit
+			connection.connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 3)
+
+			assert_that(default > 3)
+			assert_eq(connection.parameter_limit, 3)
+		finally:
+			connection.close()

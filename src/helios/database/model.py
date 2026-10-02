@@ -3,28 +3,34 @@ from datetime import datetime
 from typing import Any, ClassVar, dataclass_transform
 from uuid import UUID, uuid4
 
-from helios.declarative import check_init_keywords, check_single_base, declarations
+from helios.declarative import (
+	check_init_keywords,
+	check_single_base,
+	declarations,
+)
 
-from .column import Column, declare, generated
+from .column import Column, generated
+from .columns import Columns
 from .error import ModelError
-
-
-class ResolvedColumns:
-	def __get__(self, instance: object, owner: type[Model]) -> dict[str, Column]:
-		for declared_column in owner._columns.values():
-			declared_column.declaration.resolve()
-		return owner._columns
+from .relationship import (
+	BelongsTo,
+	Relationship,
+	belongs_to,
+	has_many,
+	has_one,
+)
+from .relationships import Relationships
 
 
 @dataclass_transform(
 	kw_only_default=True,
 	eq_default=False,
-	field_specifiers=(generated,),
+	field_specifiers=(generated, belongs_to, has_many, has_one),
 )
 class Model:
 	table: ClassVar[str] = ""
-	_columns: ClassVar[dict[str, Column]] = {}
-	columns = ResolvedColumns()
+	columns: ClassVar[Columns] = Columns({})
+	relationships: ClassVar[Relationships] = Relationships({})
 
 	id: UUID = generated()
 	created_at: datetime = generated()
@@ -36,20 +42,26 @@ class Model:
 		for name in METADATA:
 			if name in vars(cls) or name in annotations:
 				raise ModelError(f"{cls.__name__}.{name} is model metadata")
-		declare_columns(cls, dict(Model._columns))
+		declare_attributes(cls)
 
 	def __init__(self, **columns: Any):
 		self._values = type(self).initialize(columns)
 		self._values["id"] = uuid4()
+		self._loaded: dict[str, Model | list[Model] | None] = {}
+		self._stored = False
 
 	@classmethod
 	def hydrate(cls, values: dict[str, Any]) -> Model:
 		model = cls.__new__(cls)
 		model._values = {name: values[name] for name in cls.columns}
+		model._loaded = {}
+		model._stored = True
 		return model
 
 	@classmethod
 	def column(cls, name: str) -> Column:
+		if name in cls.relationships:
+			raise ModelError(f"{cls.__name__}.{name} is a relationship, not a column")
 		try:
 			return cls.columns[name]
 		except KeyError:
@@ -84,29 +96,47 @@ class Model:
 		return f"{type(self).__name__}({self.id!r})"
 
 
-def declare_columns(model_type: type[Model], columns: dict[str, Column]):
-	name = model_type.__name__
-	own_columns = {}
-	for declaration in declarations(model_type, declare, ModelError):
+def declare_attributes(model_type: type[Model]):
+	reserved = Model.columns.declared
+	columns = {}
+	relationships = {}
+	for declaration in declarations(model_type, ModelError):
 		default = declaration.default
-		declared_column = default if isinstance(default, Column) else Column()
-		declared_column.bind(declaration)
-		own_columns[declaration.name] = declared_column
+		if isinstance(default, Relationship):
+			relationship = default
+			relationship.bind(declaration)
+			relationships[declaration.name] = relationship
+		else:
+			column = default if isinstance(default, Column) else Column()
+			column.bind(declaration)
+			columns[declaration.name] = column
 
-	for column_name, value in vars(model_type).items():
-		if isinstance(value, Column) and column_name not in own_columns:
-			raise ModelError(f"'{name}.{column_name}' has no annotation")
+	for attribute in [*columns.values(), *relationships.values()]:
+		if not attribute.declaration.pending:
+			attribute.resolve()
 
-	for column_name in [*vars(model_type), *own_columns]:
-		if column_name in columns:
-			raise ModelError(f"'{name}.{column_name}' is a reserved attribute")
+	for name, value in vars(model_type).items():
+		if (
+			isinstance(value, Column | Relationship)
+			and name not in columns
+			and name not in relationships
+		):
+			raise ModelError(f"'{model_type.__name__}.{name}' has no annotation")
 
-	for column_name, declared_column in own_columns.items():
-		setattr(model_type, column_name, declared_column)
-		columns[column_name] = declared_column
-	model_type._columns = columns
+	for name in [*vars(model_type), *columns]:
+		if name in reserved:
+			raise ModelError(f"'{model_type.__name__}.{name}' is a reserved attribute")
+
+	for name, column in columns.items():
+		setattr(model_type, name, column)
+	model_type.columns = Columns({**reserved, **columns})
+	model_type.relationships = Relationships(relationships)
+
+	for relationship in relationships.values():
+		if isinstance(relationship, BelongsTo):
+			relationship.check_id(model_type.columns)
 
 
-METADATA = {"columns"}
+METADATA = {"columns", "relationships"}
 
-declare_columns(Model, {})
+declare_attributes(Model)

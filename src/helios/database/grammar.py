@@ -2,7 +2,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from .clause import Clause, Comparison, Condition, Group, IsNull, Membership
+from .clause import Clause, Comparison, Condition, Exists, Group, IsNull, Membership
 from .sqlite import quote_identifier
 from .statement import (
 	ColumnReference,
@@ -37,7 +37,7 @@ class Grammar:
 		return Fragment.join(
 			[
 				Fragment(f"SELECT {columns} FROM {quote_identifier(statement.table)}"),
-				self.where(statement.where),
+				self.where(statement.where, Scope.of(statement.table)),
 				self.group_by(statement.group_by),
 				self.order(statement.ordering),
 				self.limit(statement.limit),
@@ -63,7 +63,7 @@ class Grammar:
 					f"UPDATE {quote_identifier(statement.table)} SET {assignments}",
 					tuple(statement.values.values()),
 				),
-				self.where(statement.where),
+				self.where(statement.where, Scope.of(statement.table)),
 			]
 		)
 
@@ -71,7 +71,7 @@ class Grammar:
 		return Fragment.join(
 			[
 				Fragment(f"DELETE FROM {quote_identifier(statement.table)}"),
-				self.where(statement.where),
+				self.where(statement.where, Scope.of(statement.table)),
 			]
 		)
 
@@ -82,10 +82,13 @@ class Grammar:
 			case Count():
 				return "COUNT(*)"
 
-	def where(self, clauses: tuple[Clause, ...]) -> Fragment:
+	def where(self, clauses: tuple[Clause, ...], scope: Scope) -> Fragment:
 		if not clauses:
 			return Fragment("")
-		compiled = Fragment.join((self.clause(clause) for clause in clauses), " AND ")
+		compiled = Fragment.join(
+			(self.clause(clause, scope) for clause in clauses),
+			" AND ",
+		)
 		return Fragment.join([Fragment(" WHERE "), compiled])
 
 	def group_by(self, names: tuple[str, ...]) -> Fragment:
@@ -109,19 +112,22 @@ class Grammar:
 			return Fragment("")
 		return Fragment(" LIMIT ?", (count,))
 
-	def clause(self, clause: Clause) -> Fragment:
-		groups = Fragment.join((self.group(group) for group in clause.groups), " OR ")
+	def clause(self, clause: Clause, scope: Scope) -> Fragment:
+		groups = Fragment.join(
+			(self.group(group, scope) for group in clause.groups),
+			" OR ",
+		)
 		negation = " IS NOT 1" if clause.negated else ""
 		return Fragment.join([Fragment("("), groups, Fragment(f"){negation}")])
 
-	def group(self, group: Group) -> Fragment:
+	def group(self, group: Group, scope: Scope) -> Fragment:
 		conditions = Fragment.join(
-			(self.condition(condition) for condition in group.conditions),
+			(self.condition(condition, scope) for condition in group.conditions),
 			" AND ",
 		)
 		return Fragment.join([Fragment("("), conditions, Fragment(")")])
 
-	def condition(self, condition: Condition) -> Fragment:
+	def condition(self, condition: Condition, scope: Scope) -> Fragment:
 		match condition:
 			case Comparison(name=name, operator=operator, value=value):
 				return Fragment(f"{quote_identifier(name)} {operator} ?", (value,))
@@ -133,6 +139,52 @@ class Grammar:
 				if includes_null:
 					sql = f"({sql} OR {quote_identifier(name)} IS NULL)"
 				return Fragment(sql, values)
+			case Exists():
+				return self.exists(condition, scope)
+
+	def exists(self, condition: Exists, scope: Scope) -> Fragment:
+		alias = quote_identifier(scope.alias())
+		column = quote_identifier(condition.column)
+		outer_column = quote_identifier(condition.outer_column)
+		return Fragment.join(
+			[
+				Fragment(
+					f"EXISTS (SELECT 1 FROM {quote_identifier(condition.table)} "
+					f"AS {alias} WHERE {alias}.{column} = "
+					f"{scope.reference}.{outer_column} AND "
+				),
+				self.group(condition.group, scope.inside(alias)),
+				Fragment(")"),
+			]
+		)
+
+
+class Scope:
+	def __init__(self, reference: str, aliases: Aliases):
+		self.reference = reference
+		self.aliases = aliases
+
+	@classmethod
+	def of(cls, table: str) -> Scope:
+		return cls(quote_identifier(table), Aliases(table))
+
+	def alias(self) -> str:
+		return self.aliases.next()
+
+	def inside(self, reference: str) -> Scope:
+		return Scope(reference, self.aliases)
+
+
+class Aliases:
+	def __init__(self, table: str):
+		self.table = table
+		self.count = 0
+
+	def next(self) -> str:
+		self.count += 1
+		if f"r{self.count}" == self.table:
+			self.count += 1
+		return f"r{self.count}"
 
 
 @dataclass

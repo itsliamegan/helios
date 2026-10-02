@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 from helios.declarative import Declaration, DeclarationError, MISSING, split_nullable
@@ -10,22 +9,43 @@ if TYPE_CHECKING:
 	from .model import Model
 
 
-@dataclass
-class Encoding:
-	codec: Codec[object]
-	nullable: bool
+def generated(init: bool = False) -> Any:
+	return Column(init)
 
 
 class Column:
 	name: str
-	declaration: Declaration[Encoding]
+	declaration: Declaration
+	_codec: Codec[object]
+	_nullable: bool
 
 	def __init__(self, init: bool = True):
 		self.init = init
+		self.resolved = False
 
-	def bind(self, declaration: Declaration[Encoding]):
+	def bind(self, declaration: Declaration):
 		self.name = declaration.name
 		self.declaration = declaration
+
+	def resolve(self):
+		if self.resolved:
+			return
+		try:
+			annotation, nullable = split_nullable(
+				self.name,
+				self.declaration.resolve(),
+			)
+			codec = Codec.for_type(annotation)
+			if codec is None:
+				raise DeclarationError(
+					self.name,
+					f"unsupported column type: {annotation!r}",
+				)
+		except DeclarationError as error:
+			raise self.declaration.reject(error) from error
+		self._codec = codec
+		self._nullable = nullable
+		self.resolved = True
 
 	@property
 	def default(self) -> object:
@@ -39,16 +59,14 @@ class Column:
 		return self.default is MISSING
 
 	@property
-	def encoding(self) -> Encoding:
-		return self.declaration.resolve()
-
-	@property
 	def codec(self) -> Codec[object]:
-		return self.encoding.codec
+		self.resolve()
+		return self._codec
 
 	@property
 	def nullable(self) -> bool:
-		return self.encoding.nullable
+		self.resolve()
+		return self._nullable
 
 	def __get__(self, instance: Model | None, owner: type) -> object:
 		if instance is None:
@@ -86,18 +104,3 @@ class Column:
 		raise AttributeError(
 			f"{type(instance).__name__}.{self.name} is read-only; use store.update"
 		)
-
-
-def generated(init: bool = False) -> Any:
-	return Column(init)
-
-
-def declare(declaration: Declaration[Encoding]) -> Encoding:
-	annotation, nullable = split_nullable(declaration.name, declaration.annotation)
-	codec = Codec.for_type(annotation)
-	if codec is None:
-		raise DeclarationError(
-			declaration.name,
-			f"unsupported column type: {annotation!r}",
-		)
-	return Encoding(codec, nullable)

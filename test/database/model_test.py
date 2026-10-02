@@ -176,6 +176,17 @@ def test_rejects_unresolved_annotations_on_construction():
 		Post(author=None)
 
 
+def test_resolves_each_column_when_it_is_read():
+	class Post(Model):
+		title: str
+		author: Author  # noqa: F821  # ty: ignore[unresolved-reference]
+
+	assert_that("author" in Post.columns)
+	assert_eq(Post.column("title").name, "title")
+	with assert_raises(ModelError):
+		Post.columns["author"]
+
+
 def test_rejects_columns_without_supported_annotations():
 	with assert_raises(ModelError):
 
@@ -224,7 +235,7 @@ def test_rejects_attributes_named_like_model_metadata():
 	with assert_raises(ModelError):
 
 		class Annotated(Model):
-			columns: str
+			columns: str  # ty: ignore[invalid-attribute-override]
 
 	with assert_raises(ModelError):
 
