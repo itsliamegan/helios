@@ -1,8 +1,11 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
+from importlib import import_module
 from pathlib import Path
 import sqlite3
+import sys
 from tempfile import TemporaryDirectory
+from textwrap import dedent
 from uuid import UUID, uuid4
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
@@ -11,6 +14,7 @@ from helios.database import (
 	Config,
 	Model,
 	ModelError,
+	Provider,
 	Store,
 	belongs_to,
 	has_many,
@@ -135,6 +139,24 @@ def open_store() -> Iterator[Store]:
 			yield Store(connection, MODELS)
 
 
+@contextmanager
+def importable_package(name: str, files: dict[str, str]) -> Iterator[None]:
+	with TemporaryDirectory() as directory:
+		package = Path(directory, name)
+		package.mkdir()
+		Path(package, "__init__.py").touch()
+		for file_name, source in files.items():
+			Path(package, file_name).write_text(dedent(source))
+		sys.path.insert(0, directory)
+		try:
+			yield
+		finally:
+			sys.path.remove(directory)
+			for module in [*sys.modules]:
+				if module == name or module.startswith(f"{name}."):
+					del sys.modules[module]
+
+
 def test_relationships_are_not_constructor_parameters():
 	author = Author(name="Ada")
 	post = Post(title="Ideas", author_id=author.id)
@@ -230,6 +252,56 @@ def test_checks_forward_referenced_annotations_on_first_use():
 
 	with assert_raises(ModelError):
 		Note.relationships["writer"]
+
+
+def test_resolves_targets_imported_only_for_type_checking():
+	files = {
+		"memoirist.py": """
+			from typing import TYPE_CHECKING
+
+			from helios.database import Model, has_many
+
+			if TYPE_CHECKING:
+				from .memoir import Memoir
+
+			class Memoirist(Model):
+				table = "memoirists"
+
+				memoirs: list[Memoir] = has_many("memoirist_id")
+		""",
+		"memoir.py": """
+			from typing import TYPE_CHECKING
+			from uuid import UUID
+
+			from helios.database import Model, belongs_to
+
+			if TYPE_CHECKING:
+				from .memoirist import Memoirist
+
+			class Memoir(Model):
+				table = "memoirs"
+
+				memoirist_id: UUID
+				memoirist: Memoirist = belongs_to("memoirist_id")
+		""",
+	}
+
+	with importable_package("memoirs", files):
+		memoirist = import_module("memoirs.memoirist").Memoirist
+		memoir = import_module("memoirs.memoir").Memoir
+
+		with assert_raises(ModelError) as unregistered:
+			memoir.relationships["memoirist"]
+		Provider(Config(Path("app.sqlite")), [memoirist, memoir])
+		memoirs = memoirist.relationships["memoirs"].target
+		author = memoir.relationships["memoirist"].target
+
+	assert_eq(
+		str(unregistered.exception),
+		"Memoir.memoirist: unresolved annotation: Memoirist",
+	)
+	assert_that(memoirs is memoir)
+	assert_that(author is memoirist)
 
 
 def test_resolves_targets_declared_after_the_model():

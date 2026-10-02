@@ -15,8 +15,10 @@ from helios.database import (
 	Model,
 	ModelError,
 	NotFoundError,
+	Provider,
 	Scalar,
 	Store,
+	belongs_to,
 )
 from helios.database.sqlite import connect
 
@@ -480,6 +482,44 @@ def test_validates_registry_and_rejects_unregistered_models():
 				store.create(Other)
 		finally:
 			connection.close()
+
+
+def test_rejects_registered_models_that_share_a_name():
+	first = model_named("Twin", "first")
+	second = model_named("Twin", "second")
+
+	with assert_raises(ModelError) as raised:
+		Provider(Config(Path("app.sqlite")), [first, second])
+
+	assert_eq(
+		str(raised.exception),
+		"registered models share the name Twin: first.Twin, second.Twin",
+	)
+
+
+def test_rejects_registering_a_model_against_a_different_name_lookup():
+	first = model_named("Twin", "first")
+	second = model_named("Twin", "second")
+
+	class Pairing(Model):
+		table = "pairings"
+
+		twin_id: UUID
+		twin: Twin = belongs_to("twin_id")  # noqa: F821  # ty: ignore[unresolved-reference]
+
+	Provider(Config(Path("app.sqlite")), [Pairing, first])
+	with assert_raises(ModelError) as raised:
+		Provider(Config(Path("app.sqlite")), [Pairing, second])
+
+	assert_that(Pairing.relationships["twin"].target is first)
+	assert_eq(
+		str(raised.exception),
+		"Pairing is already registered with first.Twin as Twin, not second.Twin",
+	)
+
+
+def model_named(name: str, module: str) -> type[Model]:
+	return type(name, (Model,), {"__module__": module, "table": f"{name.lower()}s"})
 
 
 def open_record_store(directory: str):

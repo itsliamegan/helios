@@ -16,6 +16,14 @@ class ExampleError(TypeError):
 	pass
 
 
+class Lookup:
+	def __init__(self, *held: type):
+		self.held = {each.__name__: each for each in held}
+
+	def find(self, name: str) -> type | None:
+		return self.held.get(name)
+
+
 def test_reads_annotations_with_defaults():
 	class Post:
 		limit: ClassVar[int] = 10
@@ -82,6 +90,36 @@ def test_rejects_annotations_that_never_resolve():
 		declaration.resolve()
 
 	assert_eq(str(raised.exception), "Post.author: unresolved annotation: Author")
+
+
+def test_looks_up_unresolved_names_in_the_fallback():
+	biographer = type("Biographer", (), {})
+
+	class Post:
+		author: Biographer | None  # noqa: F821  # ty: ignore[unresolved-reference]
+		editor: Editor
+
+	author, editor = declarations(Post, ExampleError)
+	author.fallback = editor.fallback = Lookup(biographer)
+
+	class Editor:
+		pass
+
+	assert_eq(author.resolve(), biographer | None)
+	assert_that(editor.resolve() is Editor)
+
+
+def test_rejects_names_the_fallback_does_not_hold():
+	class Post:
+		author: Biographer  # noqa: F821  # ty: ignore[unresolved-reference]
+
+	(declaration,) = declarations(Post, ExampleError)
+	declaration.fallback = Lookup()
+
+	with assert_raises(ExampleError) as raised:
+		declaration.resolve()
+
+	assert_eq(str(raised.exception), "Post.author: unresolved annotation: Biographer")
 
 
 def test_splits_nullable_annotations():
