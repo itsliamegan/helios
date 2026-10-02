@@ -9,6 +9,7 @@ from werkzeug.http import parse_options_header
 from werkzeug.wsgi import get_host
 
 from helios.http import (
+	Buffered,
 	File,
 	Files,
 	Headers,
@@ -30,6 +31,12 @@ class ResponseAdapter:
 
 	def adapt(self) -> Iterable[bytes]:
 		headers = list(self.response.headers)
+		if (
+			isinstance(self.response.body, Buffered)
+			and "Content-Length" not in self.response.headers
+		):
+			length = len(self.response.body.to_bytes())
+			headers.append(("Content-Length", str(length)))
 		headers += list(self.response.cookies.to_headers())
 		self.start_response(str(self.response.status), headers)
 		if isinstance(self.response.body, Stream):

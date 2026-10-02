@@ -4,9 +4,6 @@ from luna.test.assertion import assert_eq, assert_that
 
 from helios.app import Container, Kernel
 from helios.http import (
-	Buffered,
-	Cookies,
-	Headers,
 	Input,
 	Method,
 	Request,
@@ -35,7 +32,6 @@ def test_records_raised_error_as_aborted_for_outer_middleware():
 
 	assert_eq(response.status, Status.NOT_FOUND)
 	assert_that(isinstance(seen[0], NotFoundError))
-	assert_eq(str(response.headers["Content-Length"]), "13")
 
 
 def test_records_error_raised_by_inner_middleware_as_aborted():
@@ -64,25 +60,6 @@ def test_rejects_error_like_the_pipeline_renders_it():
 
 	assert_eq(rejected.status, handled.status)
 	assert_eq(str(rejected.body), str(handled.body))
-	assert_eq(
-		str(rejected.headers["Content-Length"]),
-		str(handled.headers["Content-Length"]),
-	)
-
-
-def test_content_length_uses_encoded_body_size():
-	def index(request, context):
-		return Response(Status.OK, Headers(), Cookies(), Buffered(b"\x00\xff"))
-
-	kernel = Kernel(
-		Container(),
-		Router([Route(Method.GET, Pattern("/"), index)]),
-		[],
-	)
-
-	response = kernel.handle(request())
-
-	assert_eq(str(response.headers["Content-Length"]), "2")
 
 
 def test_unexpected_errors_skip_response_middleware_and_close_resources():
@@ -112,7 +89,6 @@ def test_unexpected_errors_skip_response_middleware_and_close_resources():
 	response = kernel.handle(request())
 
 	assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
-	assert_eq(str(response.headers["Content-Length"]), "25")
 	assert_eq(events, ["closed"])
 
 

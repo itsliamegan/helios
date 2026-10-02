@@ -2,7 +2,7 @@ from collections.abc import Callable
 import sys
 import traceback
 
-from helios.http import Buffered, Method, Request, Response, Status
+from helios.http import Method, Request, Response, Status
 from helios.http.error import BadRequestError, HTTPError, UnsupportedMethodError
 from helios.routing import Router
 
@@ -32,17 +32,14 @@ class Kernel:
 
 	@staticmethod
 	def reject(error: HTTPError) -> Response:
-		response = Kernel.render(error)
-		Kernel.set_content_length(response)
-		return response
+		return Kernel.render(error)
 
 	def build(self, router: Router, middlewares: list[Middleware]) -> Next:
 		next: Next = self.render_http_errors(router)
 		for middleware in reversed(middlewares):
 			next = self.render_http_errors(self.bind(middleware, next))
 		next = self.render_http_errors(self.bind(self.adapt_artificial_method, next))
-		next = self.bind(self.capture_errors, next)
-		return self.bind(self.ensure_content_length, next)
+		return self.bind(self.capture_errors, next)
 
 	@staticmethod
 	def bind(middleware: Middleware, next: Next) -> Next:
@@ -65,24 +62,6 @@ class Kernel:
 	@staticmethod
 	def render(error: HTTPError) -> Response:
 		return Response.text(f"{error.status}", error.status)
-
-	@staticmethod
-	def ensure_content_length(
-		request: Request,
-		context: Context,
-		next: Next,
-	) -> Response:
-		response = next(request, context)
-		Kernel.set_content_length(response)
-		return response
-
-	@staticmethod
-	def set_content_length(response: Response):
-		if (
-			isinstance(response.body, Buffered)
-			and "Content-Length" not in response.headers
-		):
-			response.headers["Content-Length"] = str(len(response.body.to_bytes()))
 
 	@staticmethod
 	def adapt_artificial_method(

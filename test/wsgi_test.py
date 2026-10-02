@@ -188,6 +188,7 @@ def test_adapts_res():
 			pairs,
 			[
 				("Content-Type", "text/html"),
+				("Content-Length", "14"),
 				(
 					"Set-Cookie",
 					"session_id=51d0d53a-11dd-47a5-b438-5eb1b84e1432; Path=/",
@@ -198,6 +199,31 @@ def test_adapts_res():
 	body = ResponseAdapter(res, start_response).adapt()
 
 	assert_eq(list(body), [b"<h1>Index</h1>"])
+
+
+def test_adapts_content_length_from_encoded_body():
+	seen = []
+	res = Response.text("café")
+
+	def start_response(status, pairs, exc_info=None):
+		seen.extend(pairs)
+
+	body = ResponseAdapter(res, start_response).adapt()
+
+	assert_eq(dict(seen)["Content-Length"], "5")
+	assert_eq(list(body), ["café".encode()])
+
+
+def test_adapts_stream_without_content_length():
+	seen = []
+	res = Response.stream([b"data: first\n\n"])
+
+	def start_response(status, pairs, exc_info=None):
+		seen.extend(pairs)
+
+	ResponseAdapter(res, start_response).adapt()
+
+	assert_that("Content-Length" not in dict(seen))
 
 
 def test_adapts_binary_res():
@@ -220,6 +246,7 @@ def test_adapts_multiple_cookies():
 		assert_eq(
 			pairs,
 			[
+				("Content-Length", "0"),
 				(
 					"Set-Cookie",
 					"session_id=51d0d53a-11dd-47a5-b438-5eb1b84e1432; Path=/",
