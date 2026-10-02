@@ -5,7 +5,7 @@ from typing import Any
 from .clause import Clause, Comparison, Condition, Group, IsNull, Membership
 from .sqlite import quote_identifier
 from .statement import (
-	Column,
+	ColumnReference,
 	Count,
 	Delete,
 	Direction,
@@ -77,7 +77,7 @@ class Grammar:
 
 	def expression(self, expression: Expression) -> str:
 		match expression:
-			case Column(name=name):
+			case ColumnReference(name=name):
 				return quote_identifier(name)
 			case Count():
 				return "COUNT(*)"

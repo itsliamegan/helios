@@ -474,7 +474,7 @@ def test_rejects_count_by_with_a_limit():
 			connection.close()
 
 
-def test_rejects_unknown_attributes():
+def test_rejects_unknown_columns():
 	with TemporaryDirectory() as directory:
 		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:

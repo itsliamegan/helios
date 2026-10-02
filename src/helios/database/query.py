@@ -5,7 +5,7 @@ from typing import Any, TYPE_CHECKING
 from .clause import Clause, Group
 from .error import ModelError
 from .model import Model
-from .statement import Column, Count, Direction, Select
+from .statement import ColumnReference, Count, Direction, Select
 
 if TYPE_CHECKING:
 	from .store import Store
@@ -38,7 +38,7 @@ class Query[T: Model]:
 		return self
 
 	def order_by(self, name: str, direction: Direction = "asc") -> Query[T]:
-		self.model_type.attribute(name)
+		self.model_type.column(name)
 		if direction not in ("asc", "desc"):
 			raise ValueError("direction must be 'asc' or 'desc'")
 		self.ordering.append((name, direction))
@@ -58,23 +58,23 @@ class Query[T: Model]:
 		return found[0] if found else None
 
 	def count_by(self, name: str) -> dict[Any, int]:
-		attribute = self.model_type.attribute(name)
+		column = self.model_type.column(name)
 		if self.count is not None:
 			raise ModelError(
 				f"Query on {self.model_type.__name__} cannot count_by with a limit"
 			)
 		statement = Select(
 			table=self.model_type.table,
-			columns=(Column(name), Count()),
+			columns=(ColumnReference(name), Count()),
 			where=tuple(self.clauses),
 			group_by=(name,),
 		)
-		return self.store.counts(attribute, statement)
+		return self.store.counts(column, statement)
 
 	def exists(self) -> bool:
 		statement = Select(
 			table=self.model_type.table,
-			columns=(Column("id"),),
+			columns=(ColumnReference("id"),),
 			where=tuple(self.clauses),
 			limit=self.at_most_one,
 		)
@@ -87,7 +87,7 @@ class Query[T: Model]:
 	def select(self, limit: int | None) -> Select:
 		return Select(
 			table=self.model_type.table,
-			columns=tuple(Column(name) for name in self.model_type.attributes),
+			columns=tuple(ColumnReference(name) for name in self.model_type.columns),
 			where=tuple(self.clauses),
 			ordering=tuple(self.ordering),
 			limit=limit,

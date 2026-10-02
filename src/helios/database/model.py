@@ -5,15 +5,15 @@ from uuid import UUID, uuid4
 
 from helios.declarative import check_init_keywords, check_single_base, declarations
 
-from .attribute import Attribute, declare, generated
+from .column import Column, declare, generated
 from .error import ModelError
 
 
-class ResolvedAttributes:
-	def __get__(self, instance: object, owner: type[Model]) -> dict[str, Attribute]:
-		for declared_attribute in owner._attributes.values():
-			declared_attribute.declaration.resolve()
-		return owner._attributes
+class ResolvedColumns:
+	def __get__(self, instance: object, owner: type[Model]) -> dict[str, Column]:
+		for declared_column in owner._columns.values():
+			declared_column.declaration.resolve()
+		return owner._columns
 
 
 @dataclass_transform(
@@ -23,8 +23,8 @@ class ResolvedAttributes:
 )
 class Model:
 	table: ClassVar[str] = ""
-	_attributes: ClassVar[dict[str, Attribute]] = {}
-	attributes = ResolvedAttributes()
+	_columns: ClassVar[dict[str, Column]] = {}
+	columns = ResolvedColumns()
 
 	id: UUID = generated()
 	created_at: datetime = generated()
@@ -36,43 +36,43 @@ class Model:
 		for name in METADATA:
 			if name in vars(cls) or name in annotations:
 				raise ModelError(f"{cls.__name__}.{name} is model metadata")
-		declare_attributes(cls, dict(Model._attributes))
+		declare_columns(cls, dict(Model._columns))
 
-	def __init__(self, **attributes: Any):
-		self._values = type(self).initialize(attributes)
+	def __init__(self, **columns: Any):
+		self._values = type(self).initialize(columns)
 		self._values["id"] = uuid4()
 
 	@classmethod
 	def hydrate(cls, values: dict[str, Any]) -> Model:
 		model = cls.__new__(cls)
-		model._values = {name: values[name] for name in cls.attributes}
+		model._values = {name: values[name] for name in cls.columns}
 		return model
 
 	@classmethod
-	def attribute(cls, name: str) -> Attribute:
+	def column(cls, name: str) -> Column:
 		try:
-			return cls.attributes[name]
+			return cls.columns[name]
 		except KeyError:
-			raise ModelError(f"{cls.__name__} has no attribute {name!r}") from None
+			raise ModelError(f"{cls.__name__} has no column {name!r}") from None
 
 	@classmethod
-	def initialize(cls, raw_attributes: dict[str, Any]) -> dict[str, Any]:
+	def initialize(cls, raw_columns: dict[str, Any]) -> dict[str, Any]:
 		initialized = {
 			name: definition
-			for name, definition in cls.attributes.items()
+			for name, definition in cls.columns.items()
 			if definition.init
 		}
 		check_init_keywords(
 			cls,
 			"attributes",
-			raw_attributes,
+			raw_columns,
 			initialized,
 			[name for name, definition in initialized.items() if definition.required],
 		)
 
 		values = {}
 		for name, definition in initialized.items():
-			value = raw_attributes.get(name, definition.default)
+			value = raw_columns.get(name, definition.default)
 			try:
 				definition.check(value)
 			except (TypeError, ValueError) as error:
@@ -84,29 +84,29 @@ class Model:
 		return f"{type(self).__name__}({self.id!r})"
 
 
-def declare_attributes(model_type: type[Model], attributes: dict[str, Attribute]):
+def declare_columns(model_type: type[Model], columns: dict[str, Column]):
 	name = model_type.__name__
-	own_attributes = {}
+	own_columns = {}
 	for declaration in declarations(model_type, declare, ModelError):
 		default = declaration.default
-		declared_attribute = default if isinstance(default, Attribute) else Attribute()
-		declared_attribute.bind(declaration)
-		own_attributes[declaration.name] = declared_attribute
+		declared_column = default if isinstance(default, Column) else Column()
+		declared_column.bind(declaration)
+		own_columns[declaration.name] = declared_column
 
-	for attribute_name, value in vars(model_type).items():
-		if isinstance(value, Attribute) and attribute_name not in own_attributes:
-			raise ModelError(f"'{name}.{attribute_name}' has no annotation")
+	for column_name, value in vars(model_type).items():
+		if isinstance(value, Column) and column_name not in own_columns:
+			raise ModelError(f"'{name}.{column_name}' has no annotation")
 
-	for attribute_name in [*vars(model_type), *own_attributes]:
-		if attribute_name in attributes:
-			raise ModelError(f"'{name}.{attribute_name}' is a reserved attribute")
+	for column_name in [*vars(model_type), *own_columns]:
+		if column_name in columns:
+			raise ModelError(f"'{name}.{column_name}' is a reserved attribute")
 
-	for attribute_name, declared_attribute in own_attributes.items():
-		setattr(model_type, attribute_name, declared_attribute)
-		attributes[attribute_name] = declared_attribute
-	model_type._attributes = attributes
+	for column_name, declared_column in own_columns.items():
+		setattr(model_type, column_name, declared_column)
+		columns[column_name] = declared_column
+	model_type._columns = columns
 
 
-METADATA = {"attributes"}
+METADATA = {"columns"}
 
-declare_attributes(Model, {})
+declare_columns(Model, {})
