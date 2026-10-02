@@ -96,7 +96,7 @@ class Preload:
 			)
 		elif found:
 			return found[0]
-		elif relationship.resolved.nullable:
+		elif relationship.nullable:
 			return None
 		else:
 			raise DatabaseError(f"{relationship.label} has no {target} row for {owner}")

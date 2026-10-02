@@ -7,7 +7,7 @@ from helios.http import Input
 
 from .error import FormError
 from .errors import Errors
-from .field import Field, declare
+from .field import Field
 from .filters import Filters
 from .key import Key
 from .parser import ParseError
@@ -29,13 +29,13 @@ class Form:
 		super().__init_subclass__(**keywords)
 		check_single_base(cls, Form, FormError)
 		cls.fields = {}
-		for declaration in declarations(cls, declare, FormError):
+		for declaration in declarations(cls, FormError):
 			if declaration.name == "values" or declaration.name in vars(Form):
 				raise FormError(
 					f"Form {cls.__name__} has a field named '{declaration.name}', "
 					"which Form uses"
 				)
-			field = declaration.resolve()
+			field = Field.from_declaration(declaration)
 			cls.fields[declaration.name] = field
 			setattr(cls, declaration.name, field)
 

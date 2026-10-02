@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
 from typing import Any, Literal, TYPE_CHECKING, TypeIs, cast, get_args, get_origin
 
 from helios.declarative import Declaration, DeclarationError, split_nullable
@@ -13,23 +12,20 @@ if TYPE_CHECKING:
 	from .model import Model
 
 
-@dataclass
-class Target:
-	model_type: type[Model]
-	nullable: bool
-
-
 class Relationship(ABC):
 	plural = False
 
 	name: str
 	owner: type[Model]
-	declaration: Declaration[object]
+	declaration: Declaration
+	_target: type[Model]
+	_nullable: bool
 
 	def __init__(self, id_name: str):
 		self.id_name = id_name
+		self.resolved = False
 
-	def bind(self, declaration: Declaration[object]):
+	def bind(self, declaration: Declaration):
 		self.name = declaration.name
 		self.owner = cast("type[Model]", declaration.owner)
 		self.declaration = declaration
@@ -38,18 +34,29 @@ class Relationship(ABC):
 	def label(self) -> str:
 		return f"{self.owner.__name__}.{self.name}"
 
-	@abstractmethod
-	def settle(self, declaration: Declaration[object]) -> Target: ...
+	def resolve(self):
+		if self.resolved:
+			return
+		try:
+			target, nullable = self.interpret(self.declaration.resolve())
+		except DeclarationError as error:
+			raise self.declaration.reject(error) from error
+		self._target = target
+		self._nullable = nullable
+		self.resolved = True
 
-	@property
-	def resolved(self) -> Target:
-		target = self.declaration.resolve()
-		assert isinstance(target, Target)
-		return target
+	@abstractmethod
+	def interpret(self, annotation: object) -> tuple[type[Model], bool]: ...
 
 	@property
 	def target(self) -> type[Model]:
-		return self.resolved.model_type
+		self.resolve()
+		return self._target
+
+	@property
+	def nullable(self) -> bool:
+		self.resolve()
+		return self._nullable
 
 	@abstractmethod
 	def check(self): ...
@@ -75,20 +82,17 @@ class Relationship(ABC):
 
 
 class BelongsTo(Relationship):
-	def settle(self, declaration: Declaration[object]) -> Target:
+	def interpret(self, annotation: object) -> tuple[type[Model], bool]:
 		try:
-			annotation, nullable = split_nullable(
-				declaration.name,
-				declaration.annotation,
-			)
+			target, nullable = split_nullable(self.name, annotation)
 		except DeclarationError:
-			annotation, nullable = None, False
-		if not is_model(annotation):
+			target, nullable = None, False
+		if not is_model(target):
 			raise DeclarationError(
-				declaration.name,
-				f"expected a model, got {declaration.annotation!r}",
+				self.name,
+				f"expected a model, got {annotation!r}",
 			)
-		return Target(annotation, nullable)
+		return target, nullable
 
 	def check_id(self, columns: Columns):
 		column = columns.get(self.id_name)
@@ -104,7 +108,7 @@ class BelongsTo(Relationship):
 
 	def check(self):
 		column = self.owner.columns[self.id_name]
-		if self.resolved.nullable != column.nullable:
+		if self.nullable != column.nullable:
 			raise ModelError(
 				f"{self.label}: annotation must include None exactly when "
 				f"{self.owner.__name__}.{self.id_name} is nullable"
@@ -140,34 +144,30 @@ class Inverse(Relationship):
 class HasMany(Inverse):
 	plural = True
 
-	def settle(self, declaration: Declaration[object]) -> Target:
-		annotation = declaration.annotation
+	def interpret(self, annotation: object) -> tuple[type[Model], bool]:
 		members = get_args(annotation)
 		if get_origin(annotation) is not list or len(members) != 1:
 			members = (None,)
 		if not is_model(members[0]):
 			raise DeclarationError(
-				declaration.name,
+				self.name,
 				f"expected list[<model>], got {annotation!r}",
 			)
-		return Target(members[0], nullable=False)
+		return members[0], False
 
 
 class HasOne(Inverse):
-	def settle(self, declaration: Declaration[object]) -> Target:
+	def interpret(self, annotation: object) -> tuple[type[Model], bool]:
 		try:
-			annotation, nullable = split_nullable(
-				declaration.name,
-				declaration.annotation,
-			)
+			target, nullable = split_nullable(self.name, annotation)
 		except DeclarationError:
-			annotation, nullable = None, False
-		if not nullable or not is_model(annotation):
+			target, nullable = None, False
+		if not nullable or not is_model(target):
 			raise DeclarationError(
-				declaration.name,
-				f"expected <model> | None, got {declaration.annotation!r}",
+				self.name,
+				f"expected <model> | None, got {annotation!r}",
 			)
-		return Target(annotation, nullable)
+		return target, nullable
 
 
 class Relationships(Mapping[str, Relationship]):
@@ -177,6 +177,7 @@ class Relationships(Mapping[str, Relationship]):
 
 	def __getitem__(self, name: str) -> Relationship:
 		relationship = self.declared[name]
+		relationship.resolve()
 		if name not in self.checked:
 			relationship.check()
 			self.checked.add(name)

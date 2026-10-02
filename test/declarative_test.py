@@ -3,7 +3,6 @@ from typing import ClassVar
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
 from helios.declarative import (
-	Declaration,
 	DeclarationError,
 	MISSING,
 	check_init_keywords,
@@ -17,14 +16,6 @@ class ExampleError(TypeError):
 	pass
 
 
-def annotation_of(declaration: Declaration[object]) -> object:
-	return declaration.annotation
-
-
-def reject(declaration: Declaration[object]) -> object:
-	raise DeclarationError(declaration.name, "not allowed")
-
-
 def test_reads_annotations_with_defaults():
 	class Post:
 		limit: ClassVar[int] = 10
@@ -32,7 +23,7 @@ def test_reads_annotations_with_defaults():
 		title: str
 		note: str = ""
 
-	found = declarations(Post, annotation_of, ExampleError)
+	found = declarations(Post, ExampleError)
 
 	assert_eq([declaration.name for declaration in found], ["title", "note"])
 	assert_that(found[0].default is MISSING)
@@ -40,14 +31,15 @@ def test_reads_annotations_with_defaults():
 	assert_eq([declaration.resolve() for declaration in found], [str, str])
 
 
-def test_settles_resolved_annotations_when_declared():
+def test_rejects_with_the_owner_error():
 	class Post:
 		title: str
 
-	with assert_raises(ExampleError) as raised:
-		declarations(Post, reject, ExampleError)
+	(declaration,) = declarations(Post, ExampleError)
+	rejected = declaration.reject(DeclarationError("title", "not allowed"))
 
-	assert_eq(str(raised.exception), "Post.title: not allowed")
+	assert_that(isinstance(rejected, ExampleError))
+	assert_eq(str(rejected), "Post.title: not allowed")
 
 
 def test_rejects_string_annotations():
@@ -55,7 +47,7 @@ def test_rejects_string_annotations():
 		title: "str"  # noqa: UP037
 
 	with assert_raises(ExampleError) as raised:
-		declarations(Post, annotation_of, ExampleError)
+		declarations(Post, ExampleError)
 
 	assert_eq(
 		str(raised.exception),
@@ -67,7 +59,7 @@ def test_resolves_pending_annotations_on_first_use():
 	class Post:
 		author: Author
 
-	(declaration,) = declarations(Post, annotation_of, ExampleError)
+	(declaration,) = declarations(Post, ExampleError)
 	pending = declaration.pending
 
 	class Author:
@@ -84,7 +76,7 @@ def test_rejects_annotations_that_never_resolve():
 	class Post:
 		author: Author  # noqa: F821  # ty: ignore[unresolved-reference]
 
-	(declaration,) = declarations(Post, annotation_of, ExampleError)
+	(declaration,) = declarations(Post, ExampleError)
 
 	with assert_raises(ExampleError) as raised:
 		declaration.resolve()

@@ -1,5 +1,5 @@
 from annotationlib import Format, ForwardRef, get_annotations
-from collections.abc import Callable, Collection
+from collections.abc import Collection
 from types import NoneType
 from typing import ClassVar, Union, get_args, get_origin
 
@@ -13,42 +13,32 @@ class DeclarationError(Exception):
 		self.detail = detail
 
 
-class Declaration[T]:
-	value: T
-
+class Declaration:
 	def __init__(
 		self,
 		owner: type,
 		name: str,
 		annotation: object,
 		default: object,
-		settle: Callable[[Declaration[T]], T],
 		error: type[Exception],
 	):
 		self.owner = owner
 		self.name = name
 		self.annotation = annotation
 		self.default = default
-		self.settle = settle
 		self.error = error
-		self.settled = False
-		if not self.pending:
-			self.resolve()
 
 	@property
 	def pending(self) -> bool:
 		return forward_reference(self.annotation) is not None
 
-	def resolve(self) -> T:
-		if not self.settled:
+	def resolve(self) -> object:
+		if self.pending:
 			try:
-				if self.pending:
-					self.annotation = self.evaluate()
-				self.value = self.settle(self)
+				self.annotation = self.evaluate()
 			except DeclarationError as error:
-				raise self.error(f"{self.owner.__name__}.{error}") from error
-			self.settled = True
-		return self.value
+				raise self.reject(error) from error
+		return self.annotation
 
 	def evaluate(self) -> object:
 		try:
@@ -59,12 +49,11 @@ class Declaration[T]:
 				f"unresolved annotation: {error.name}",
 			) from error
 
+	def reject(self, error: DeclarationError) -> Exception:
+		return self.error(f"{self.owner.__name__}.{error}")
 
-def declarations[T](
-	owner: type,
-	settle: Callable[[Declaration[T]], T],
-	error: type[Exception],
-) -> list[Declaration[T]]:
+
+def declarations(owner: type, error: type[Exception]) -> list[Declaration]:
 	found = []
 	for name, annotation in get_annotations(owner, format=Format.FORWARDREF).items():
 		if annotation is ClassVar or get_origin(annotation) is ClassVar:
@@ -76,7 +65,7 @@ def declarations[T](
 			)
 
 		default = vars(owner).get(name, MISSING)
-		found.append(Declaration(owner, name, annotation, default, settle, error))
+		found.append(Declaration(owner, name, annotation, default, error))
 	return found
 
 

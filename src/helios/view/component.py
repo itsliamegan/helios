@@ -34,14 +34,14 @@ rendering: ContextVar[Rendering] = ContextVar("rendering")
 class Component:
 	template: ClassVar[str]
 	accepts: ClassVar[set[str]] = set()
-	props: ClassVar[dict[str, Declaration[object]]] = {}
+	props: ClassVar[dict[str, Declaration]] = {}
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
 		check_single_base(cls, Component, ComponentError)
 		cls.props = {
 			declaration.name: declaration
-			for declaration in declarations(cls, prop_type, ComponentError)
+			for declaration in declarations(cls, ComponentError)
 		}
 		check_declaration(cls)
 
@@ -118,10 +118,6 @@ class Component:
 			f"{name}={getattr(self, name)!r}" for name in type(self).props
 		)
 		return f"{type(self).__name__}({values})"
-
-
-def prop_type(declaration: Declaration[object]) -> object:
-	return declaration.annotation
 
 
 def check_declaration(component: type[Component]):

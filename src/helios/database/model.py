@@ -4,13 +4,12 @@ from typing import Any, ClassVar, dataclass_transform
 from uuid import UUID, uuid4
 
 from helios.declarative import (
-	Declaration,
 	check_init_keywords,
 	check_single_base,
 	declarations,
 )
 
-from .column import Column, Columns, declare, generated
+from .column import Column, Columns, generated
 from .error import ModelError
 from .relationship import (
 	BelongsTo,
@@ -100,7 +99,7 @@ def declare_attributes(model_type: type[Model]):
 	reserved = Model.columns.declared
 	columns = {}
 	relationships = {}
-	for declaration in declarations(model_type, settle, ModelError):
+	for declaration in declarations(model_type, ModelError):
 		default = declaration.default
 		if isinstance(default, Relationship):
 			relationship = default
@@ -110,6 +109,10 @@ def declare_attributes(model_type: type[Model]):
 			column = default if isinstance(default, Column) else Column()
 			column.bind(declaration)
 			columns[declaration.name] = column
+
+	for attribute in [*columns.values(), *relationships.values()]:
+		if not attribute.declaration.pending:
+			attribute.resolve()
 
 	for name, value in vars(model_type).items():
 		if (
@@ -131,12 +134,6 @@ def declare_attributes(model_type: type[Model]):
 	for relationship in relationships.values():
 		if isinstance(relationship, BelongsTo):
 			relationship.check_id(model_type.columns)
-
-
-def settle(declaration: Declaration[object]) -> object:
-	if isinstance(declaration.default, Relationship):
-		return declaration.default.settle(declaration)
-	return declare(declaration)
 
 
 METADATA = {"columns", "relationships"}
