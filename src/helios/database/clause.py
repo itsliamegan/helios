@@ -188,8 +188,8 @@ class Membership:
 @dataclass
 class Exists:
 	table: str
-	target_column: str
-	owner_column: str
+	column: str
+	outer_column: str
 	group: Group
 
 

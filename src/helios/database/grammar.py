@@ -144,14 +144,14 @@ class Grammar:
 
 	def exists(self, condition: Exists, scope: Scope) -> Fragment:
 		alias = quote_identifier(scope.alias())
-		target_column = quote_identifier(condition.target_column)
-		owner_column = quote_identifier(condition.owner_column)
+		column = quote_identifier(condition.column)
+		outer_column = quote_identifier(condition.outer_column)
 		return Fragment.join(
 			[
 				Fragment(
 					f"EXISTS (SELECT 1 FROM {quote_identifier(condition.table)} "
-					f"AS {alias} WHERE {alias}.{target_column} = "
-					f"{scope.reference}.{owner_column} AND "
+					f"AS {alias} WHERE {alias}.{column} = "
+					f"{scope.reference}.{outer_column} AND "
 				),
 				self.group(condition.group, scope.inside(alias)),
 				Fragment(")"),
