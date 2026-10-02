@@ -86,7 +86,7 @@ def test_matches_url_string_to_named_route():
 
 	assert_that(match is not None)
 	assert_eq(match.route.name, "posts.show")
-	assert_eq(match.params, {"id": id})
+	assert_eq(match.parameters, {"id": id})
 
 
 def test_matches_url_object_to_named_route():
@@ -97,7 +97,7 @@ def test_matches_url_object_to_named_route():
 
 	assert_that(match is not None)
 	assert_eq(match.route.name, "posts.show")
-	assert_eq(match.params, {"id": id})
+	assert_eq(match.parameters, {"id": id})
 
 
 def test_matches_only_the_path_of_absolute_urls():
@@ -108,7 +108,7 @@ def test_matches_only_the_path_of_absolute_urls():
 
 	assert_that(match is not None)
 	assert_eq(match.route.name, "posts.show")
-	assert_eq(match.params, {"id": id})
+	assert_eq(match.parameters, {"id": id})
 
 
 def test_matches_url_string_with_url_in_query():

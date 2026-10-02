@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cached_property
 import re
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 from urllib.parse import quote
 
 from helios.http import URL
@@ -59,10 +59,10 @@ class Pattern:
 			return None
 		return self.convert(match.groupdict())
 
-	def path(self, params: Mapping[str, Any] | None = None) -> str:
-		params = params or {}
+	def path(self, parameters: Mapping[str, Any] | None = None) -> str:
+		parameters = parameters or {}
 		expected = set(self.parameters)
-		supplied = set(params)
+		supplied = set(parameters)
 		missing = expected - supplied
 		unexpected = supplied - expected
 		if missing:
@@ -75,7 +75,7 @@ class Pattern:
 		parts = []
 		for segment in self.segments:
 			if isinstance(segment, Parameter):
-				parts.append(segment.format(params[segment.name]))
+				parts.append(segment.format(parameters[segment.name]))
 			else:
 				parts.append(segment.text)
 		path = "/" + "/".join(parts)
@@ -83,11 +83,11 @@ class Pattern:
 			path += "/"
 		return path
 
-	def convert(self, raw_params: Mapping[str, str]) -> dict[str, Any] | None:
+	def convert(self, raw_parameters: Mapping[str, str]) -> dict[str, Any] | None:
 		try:
 			return {
 				name: self.parameters[name].converter.convert(value)
-				for name, value in raw_params.items()
+				for name, value in raw_parameters.items()
 			}
 		except ValueError:
 			return None
@@ -104,12 +104,15 @@ class Text:
 
 @dataclass
 class Parameter:
+	syntax: ClassVar[re.Pattern[str]] = re.compile(r"{(\w+)(?::(\w+))?}")
+	value_syntax: ClassVar[re.Pattern[str]] = re.compile(r"[\w-]+")
+
 	name: str
 	converter: Converter[Any]
 
 	@classmethod
 	def parse(cls, text: str) -> Self | None:
-		match = PARAMETER_REGEX.fullmatch(text)
+		match = cls.syntax.fullmatch(text)
 		if match is None:
 			return None
 
@@ -122,14 +125,10 @@ class Parameter:
 
 	@property
 	def expression(self) -> str:
-		return f"(?P<{self.name}>{PARAMETER_VALUE_REGEX})"
+		return f"(?P<{self.name}>{self.value_syntax.pattern})"
 
 	def format(self, value: Any) -> str:
 		encoded = quote(self.converter.format(value), safe="")
-		if re.fullmatch(PARAMETER_VALUE_REGEX, encoded) is None:
+		if self.value_syntax.fullmatch(encoded) is None:
 			raise ValueError(f"invalid route parameter: {self.name}")
 		return encoded
-
-
-PARAMETER_REGEX = re.compile(r"{(\w+)(?::(\w+))?}")
-PARAMETER_VALUE_REGEX = r"[\w-]+"

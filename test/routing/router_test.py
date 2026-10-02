@@ -66,7 +66,7 @@ def test_routes_by_method():
 	assert_eq(store_match, Match(store, {}))
 
 
-def test_routes_with_params():
+def test_routes_with_parameters():
 	route = Route.get("/articles/{slug}", handle)
 	router = Router([route])
 
@@ -94,7 +94,7 @@ def test_routes_with_uuid_converter():
 	assert_eq(match, Match(route, {"id": id}))
 
 
-def test_passes_converted_params_to_handler_by_name():
+def test_passes_converted_parameters_to_handler_by_name():
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
 	called_with = []
 
@@ -207,7 +207,7 @@ def test_guard_response_stops_dispatch():
 	assert_eq(calls, ["stop"])
 
 
-def test_passes_converted_params_to_guards_by_name():
+def test_passes_converted_parameters_to_guards_by_name():
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
 	called_with = []
 
@@ -259,7 +259,7 @@ def test_generates_named_grouped_route():
 	assert_eq(path, f"/posts/{id}/edit")
 
 
-def test_rejects_generated_params_outside_route_syntax():
+def test_rejects_generated_parameters_outside_route_syntax():
 	router = Router(
 		[
 			Route.get(

@@ -16,11 +16,11 @@ class URLs:
 	def route(
 		self,
 		name: str,
-		params: Mapping[str, Any] | None = None,
+		parameters: Mapping[str, Any] | None = None,
 		query: Query | Mapping[str, str | Sequence[str]] | None = None,
 		absolute: bool = False,
 	) -> URL:
-		path = self.router.path(name, params)
+		path = self.router.path(name, parameters)
 		if isinstance(query, Mapping):
 			query = Query(query)
 		if not absolute:

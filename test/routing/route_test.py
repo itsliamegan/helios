@@ -99,7 +99,7 @@ def test_composes_nested_group_prefixes_and_trailing_slashes():
 	)
 
 
-def test_converts_params_in_grouped_patterns():
+def test_converts_parameters_in_grouped_patterns():
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
 	called_with = []
 

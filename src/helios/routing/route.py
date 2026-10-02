@@ -94,12 +94,14 @@ class Route:
 			return None
 		return self.pattern.match(url)
 
-	def __call__(self, request: Request, context: Context, **params: Any) -> Response:
+	def __call__(
+		self, request: Request, context: Context, **parameters: Any
+	) -> Response:
 		for guard in self.guards:
-			response = guard(request, context, **params)
+			response = guard(request, context, **parameters)
 			if response is not None:
 				return response
-		return self.handler(request, context, **params)
+		return self.handler(request, context, **parameters)
 
 	def __repr__(self) -> str:
 		return (
