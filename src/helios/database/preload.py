@@ -9,12 +9,6 @@ if TYPE_CHECKING:
 	from .store import Store
 
 
-class Branch:
-	def __init__(self, relationship: Relationship):
-		self.relationship = relationship
-		self.branches: dict[str, Branch] = {}
-
-
 class Preload:
 	def __init__(self, store: Store, model_type: type[Model], paths: Iterable[str]):
 		self.store = store
@@ -100,3 +94,9 @@ class Preload:
 			return None
 		else:
 			raise DatabaseError(f"{relationship.label} has no {target} row for {owner}")
+
+
+class Branch:
+	def __init__(self, relationship: Relationship):
+		self.relationship = relationship
+		self.branches: dict[str, Branch] = {}

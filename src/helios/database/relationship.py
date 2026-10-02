@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterator, Mapping
 from typing import Any, Literal, TYPE_CHECKING, TypeIs, cast, get_args, get_origin
 
 from helios.declarative import Declaration, DeclarationError, split_nullable
@@ -8,8 +7,20 @@ from .codec import UUID
 from .error import ModelError
 
 if TYPE_CHECKING:
-	from .column import Columns
+	from .columns import Columns
 	from .model import Model
+
+
+def belongs_to(id_name: str, *, init: Literal[False] = False) -> Any:
+	return BelongsTo(id_name)
+
+
+def has_many(id_name: str, *, init: Literal[False] = False) -> Any:
+	return HasMany(id_name)
+
+
+def has_one(id_name: str, *, init: Literal[False] = False) -> Any:
+	return HasOne(id_name)
 
 
 class Relationship(ABC):
@@ -177,49 +188,7 @@ class HasOne(Inverse):
 		self.resolved = True
 
 
-class Relationships(Mapping[str, Relationship]):
-	def __init__(self, declared: dict[str, Relationship]):
-		self.declared = declared
-		self.checked: set[str] = set()
-
-	def __getitem__(self, name: str) -> Relationship:
-		relationship = self.declared[name]
-		relationship.resolve()
-		if name not in self.checked:
-			relationship.check()
-			self.checked.add(name)
-		return relationship
-
-	def __contains__(self, name: object) -> bool:
-		return name in self.declared
-
-	def __iter__(self) -> Iterator[str]:
-		return iter(self.declared)
-
-	def __len__(self) -> int:
-		return len(self.declared)
-
-	def of_kind[R: Relationship](self, kind: type[R]) -> list[R]:
-		return [
-			relationship
-			for relationship in self.values()
-			if isinstance(relationship, kind)
-		]
-
-
 def is_model(annotation: object) -> TypeIs[type[Model]]:
 	from .model import Model
 
 	return isinstance(annotation, type) and issubclass(annotation, Model)
-
-
-def belongs_to(id_name: str, *, init: Literal[False] = False) -> Any:
-	return BelongsTo(id_name)
-
-
-def has_many(id_name: str, *, init: Literal[False] = False) -> Any:
-	return HasMany(id_name)
-
-
-def has_one(id_name: str, *, init: Literal[False] = False) -> Any:
-	return HasOne(id_name)

@@ -9,16 +9,17 @@ from helios.declarative import (
 	declarations,
 )
 
-from .column import Column, Columns, generated
+from .column import Column, generated
+from .columns import Columns
 from .error import ModelError
 from .relationship import (
 	BelongsTo,
 	Relationship,
-	Relationships,
 	belongs_to,
 	has_many,
 	has_one,
 )
+from .relationships import Relationships
 
 
 @dataclass_transform(

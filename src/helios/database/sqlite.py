@@ -7,53 +7,8 @@ from .config import Config
 from .error import DatabaseBusy, DatabaseError
 
 
-def quote_identifier(identifier: str) -> str:
-	escaped = identifier.replace('"', '""')
-	return f'"{escaped}"'
-
-
-def translate(error: sqlite3.Error, operation: str) -> DatabaseError:
-	code = getattr(error, "sqlite_errorcode", None)
-	if isinstance(code, int) and code & 0xFF in (
-		sqlite3.SQLITE_BUSY,
-		sqlite3.SQLITE_LOCKED,
-	):
-		return DatabaseBusy(f"database {operation} could not acquire a lock")
-	return DatabaseError(f"database {operation} failed")
-
-
-class Cursor:
-	def __init__(self, cursor: sqlite3.Cursor):
-		self.cursor = cursor
-
-	@property
-	def columns(self) -> tuple[str, ...]:
-		description = self.cursor.description
-		if description is None:
-			return ()
-		return tuple(column[0] for column in description)
-
-	@property
-	def changed_rows(self) -> int:
-		return self.cursor.rowcount
-
-	def fetch_one(self) -> tuple[Scalar | None, ...] | None:
-		try:
-			return self.cursor.fetchone()
-		except sqlite3.Error as error:
-			raise translate(error, "fetch") from error
-
-	def fetch_all(self) -> list[tuple[Scalar | None, ...]]:
-		try:
-			return self.cursor.fetchall()
-		except sqlite3.Error as error:
-			raise translate(error, "fetch") from error
-
-	def close(self):
-		try:
-			self.cursor.close()
-		except sqlite3.Error as error:
-			raise translate(error, "cursor close") from error
+def connect(config: Config) -> Connection:
+	return Connection(config)
 
 
 class Connection:
@@ -152,5 +107,50 @@ class Connection:
 			raise rollback_error
 
 
-def connect(config: Config) -> Connection:
-	return Connection(config)
+class Cursor:
+	def __init__(self, cursor: sqlite3.Cursor):
+		self.cursor = cursor
+
+	@property
+	def columns(self) -> tuple[str, ...]:
+		description = self.cursor.description
+		if description is None:
+			return ()
+		return tuple(column[0] for column in description)
+
+	@property
+	def changed_rows(self) -> int:
+		return self.cursor.rowcount
+
+	def fetch_one(self) -> tuple[Scalar | None, ...] | None:
+		try:
+			return self.cursor.fetchone()
+		except sqlite3.Error as error:
+			raise translate(error, "fetch") from error
+
+	def fetch_all(self) -> list[tuple[Scalar | None, ...]]:
+		try:
+			return self.cursor.fetchall()
+		except sqlite3.Error as error:
+			raise translate(error, "fetch") from error
+
+	def close(self):
+		try:
+			self.cursor.close()
+		except sqlite3.Error as error:
+			raise translate(error, "cursor close") from error
+
+
+def translate(error: sqlite3.Error, operation: str) -> DatabaseError:
+	code = getattr(error, "sqlite_errorcode", None)
+	if isinstance(code, int) and code & 0xFF in (
+		sqlite3.SQLITE_BUSY,
+		sqlite3.SQLITE_LOCKED,
+	):
+		return DatabaseBusy(f"database {operation} could not acquire a lock")
+	return DatabaseError(f"database {operation} failed")
+
+
+def quote_identifier(identifier: str) -> str:
+	escaped = identifier.replace('"', '""')
+	return f'"{escaped}"'

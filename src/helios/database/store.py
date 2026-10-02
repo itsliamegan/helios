@@ -3,12 +3,13 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from .clause import Clause, ConditionParser
+from .clause import Clause
 from .codec import Scalar
 from .column import Column
 from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .model import Model
+from .parser import ConditionParser
 from .preload import Preload
 from .query import Query
 from .registry import Registry

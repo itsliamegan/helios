@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 
-from .clause import Clause, ConditionParser
+from .clause import Clause
 from .error import ModelError
 from .model import Model
+from .parser import ConditionParser
 from .statement import ColumnReference, Count, Direction, Select
 
 if TYPE_CHECKING:
