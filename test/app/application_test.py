@@ -145,6 +145,6 @@ def test_provides_framework_bindings():
 		return Response.text(str(urls.route("home", absolute=True)))
 
 	router = Router([Route(Method.GET, Pattern("/"), index, name="home")])
-	app = Application(Config(URL("https://example.com:8443")), router, [])
+	app = Application(Config(URL.parse("https://example.com:8443")), router, [])
 
 	assert_eq(str(app.handle(request()).body), "https://example.com:8443/")

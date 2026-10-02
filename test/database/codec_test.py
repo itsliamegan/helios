@@ -9,7 +9,7 @@ from helios.database.codec import Bool, Codec, Date, Int, Scalar, Str, URL, UUID
 
 def test_round_trips_scalar_codecs():
 	identifier = uuid4()
-	url = http.URL("https://example.com/search?q=today")
+	url = http.URL.parse("https://example.com/search?q=today")
 
 	assert_eq(Str().decode(Str().encode("title")), "title")
 	assert_eq(Int().decode(Int().encode(3)), 3)

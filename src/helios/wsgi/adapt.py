@@ -1,12 +1,12 @@
 from collections.abc import Iterable
-from urllib.parse import parse_qs as parse_query
-from urllib.parse import urlparse as parse_url
+from urllib.parse import quote
 from wsgiref.types import StartResponse, WSGIEnvironment
 
 from werkzeug.datastructures import EnvironHeaders
+from werkzeug.exceptions import BadRequest
 from werkzeug.formparser import FormDataParser
 from werkzeug.http import parse_options_header
-from werkzeug.wsgi import get_current_url
+from werkzeug.wsgi import get_host
 
 from helios.http import (
 	File,
@@ -55,10 +55,28 @@ class RequestAdapter:
 		return Method.parse(self.environment["REQUEST_METHOD"])
 
 	def url(self) -> URL:
-		raw = get_current_url(self.environment)
-		parsed = parse_url(raw)
-		query = Query(parse_query(parsed.query, keep_blank_values=True))
-		return URL(parsed.path, query)
+		host = get_host(self.environment)
+		if not host:
+			raise BadRequest("invalid Host header")
+
+		origin = URL.parse(f"{self.environment["wsgi.url_scheme"]}://{host}")
+		return URL(
+			self.path(),
+			Query.parse(self.query()),
+			scheme=origin.scheme,
+			host=origin.host,
+			port=origin.port,
+		)
+
+	def path(self) -> str:
+		script = self.environment.get("SCRIPT_NAME", "")
+		info = self.environment.get("PATH_INFO", "")
+		raw = (script + info).encode("latin-1")
+		return quote(raw, safe=PATH_SAFE) or "/"
+
+	def query(self) -> str:
+		raw = self.environment.get("QUERY_STRING", "").encode("latin-1")
+		return quote(raw, safe=QUERY_SAFE)
 
 	def headers(self) -> Headers:
 		return Headers(dict(EnvironHeaders(self.environment)))
@@ -93,3 +111,10 @@ class RequestAdapter:
 			]
 
 		return Input(input_items), Files(file_items)
+
+
+# WSGI servers hand over the path decoded and the query string as sent, both as
+# latin-1 strings of the original bytes. These re-encode only what a URL can't
+# carry literally, so an escaped query keeps its escapes.
+PATH_SAFE = "!$&'()*+,/:;=@"
+QUERY_SAFE = "!$&'()*+,/:;=?@%"

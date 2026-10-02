@@ -22,7 +22,7 @@ def test_provider_shares_urls_with_templates():
 			return context.get(Views).render("index")
 
 		app = Application(
-			Config(URL("https://example.com")),
+			Config(URL.parse("https://example.com")),
 			Router(
 				[
 					Route(Method.GET, Pattern("/"), index),
@@ -75,7 +75,7 @@ def test_provider_registers_components():
 			return context.get(Views).render("index", {"names": ["Travel", "Food"]})
 
 		app = Application(
-			Config(URL("https://example.com")),
+			Config(URL.parse("https://example.com")),
 			Router([Route(Method.GET, Pattern("/"), index)]),
 			[
 				helios.view.Provider(

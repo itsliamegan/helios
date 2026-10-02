@@ -67,7 +67,7 @@ class URL(Scalar[http.URL]):
 	def parse(self, values: list[str]) -> http.URL:
 		raw = self.single(values).strip()
 		try:
-			return http.URL(raw)
+			return http.URL.parse(raw)
 		except ValueError as err:
 			raise ParseError("must be a valid URL") from err
 

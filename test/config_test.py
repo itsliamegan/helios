@@ -75,7 +75,7 @@ def test_loads_url():
 
 def test_defaults_url():
 	loaded = Config.load({})
-	default = URL("http://localhost:8000")
+	default = URL.parse("http://localhost:8000")
 
 	assert_eq(loaded.url("BASE_URL", default), default)
 
