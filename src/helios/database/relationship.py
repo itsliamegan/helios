@@ -9,7 +9,7 @@ from .codec import UUID
 from .error import DatabaseError, ModelError
 
 if TYPE_CHECKING:
-	from .column import Column, Columns
+	from .column import Columns
 	from .model import Model
 
 
@@ -69,17 +69,7 @@ class Relationship(ABC):
 		try:
 			return instance._state.loaded[self.name]
 		except KeyError:
-			if instance._state.stored:
-				message = (
-					f"{self.label} is not loaded; "
-					f"load it with store.preload(models, {self.name!r})"
-				)
-			else:
-				message = (
-					f"{self.label} is not loaded, "
-					"and a model built with the constructor cannot be loaded"
-				)
-			raise ModelError(message) from None
+			raise ModelError(f"{self.label} is not loaded") from None
 
 	def __set__(self, instance: Model, value: object):
 		raise AttributeError(f"{self.label} is read-only")
@@ -105,7 +95,7 @@ class BelongsTo(Relationship):
 		column = columns.get(self.id_name)
 		if column is None:
 			detail = "is not a column"
-		elif not holds_uuid(column):
+		elif not isinstance(column.codec, UUID):
 			detail = "does not hold a UUID"
 		else:
 			return
@@ -140,17 +130,11 @@ class BelongsTo(Relationship):
 			)
 		return matches[0]
 
-	def __set__(self, instance: Model, value: object):
-		raise AttributeError(
-			f"{self.label} is read-only; "
-			f"use store.update on {self.owner.__name__}.{self.id_name}"
-		)
-
 
 class Inverse(Relationship):
 	def check(self):
 		column = self.target.columns.get(self.id_name)
-		if column is None or not holds_uuid(column):
+		if column is None or not isinstance(column.codec, UUID):
 			raise ModelError(
 				f"{self.label}: {self.target.__name__}.{self.id_name} "
 				"does not hold a UUID"
@@ -233,10 +217,6 @@ def is_model(annotation: object) -> TypeIs[type[Model]]:
 	from .model import Model
 
 	return isinstance(annotation, type) and issubclass(annotation, Model)
-
-
-def holds_uuid(column: Column) -> bool:
-	return isinstance(column.codec, UUID)
 
 
 def belongs_to(id_name: str, *, init: Literal[False] = False) -> Any:

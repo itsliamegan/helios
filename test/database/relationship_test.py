@@ -19,106 +19,106 @@ from helios.database import (
 from helios.database.sqlite import connect
 
 
-class User(Model):
-	table = "users"
+class Author(Model):
+	table = "authors"
 
 	name: str
+	profile: Profile | None = has_one("author_id")
 
 
-class Board(Model):
-	table = "boards"
-
-	title: str
-	creator_id: UUID
-	creator: User = belongs_to("creator_id")
-	placements: list[Placement] = has_many("board_id")
-	shares: list[Share] = has_many("board_id")
-
-
-class Pin(Model):
-	table = "pins"
+class Post(Model):
+	table = "posts"
 
 	title: str
-	placements: list[Placement] = has_many("pin_id")
-	document: Document | None = has_one("pin_id")
+	author_id: UUID
+	author: Author = belongs_to("author_id")
+	taggings: list[Tagging] = has_many("post_id")
+	comments: list[Comment] = has_many("post_id")
 
 
-class Placement(Model):
-	table = "placements"
+class Tag(Model):
+	table = "tags"
 
-	pin_id: UUID
-	pin: Pin = belongs_to("pin_id")
-	board_id: UUID
-	board: Board = belongs_to("board_id")
+	name: str
+	taggings: list[Tagging] = has_many("tag_id")
+
+
+class Tagging(Model):
+	table = "taggings"
+
+	post_id: UUID
+	post: Post = belongs_to("post_id")
+	tag_id: UUID
+	tag: Tag = belongs_to("tag_id")
 	position: int
 
 
-class Share(Model):
-	table = "shares"
+class Comment(Model):
+	table = "comments"
 
-	board_id: UUID
-	board: Board = belongs_to("board_id")
-	user_id: UUID
-	user: User = belongs_to("user_id")
-
-
-class Document(Model):
-	table = "documents"
-
-	pin_id: UUID
-	pin: Pin = belongs_to("pin_id")
-	body: str
+	post_id: UUID
+	post: Post = belongs_to("post_id")
+	author_id: UUID
+	author: Author = belongs_to("author_id")
 
 
-class Invite(Model):
-	table = "invites"
+class Profile(Model):
+	table = "profiles"
 
-	target_id: UUID | None = None
-	target: User | None = belongs_to("target_id")
+	author_id: UUID
+	author: Author = belongs_to("author_id")
+	bio: str
 
 
-MODELS = [User, Board, Pin, Placement, Share, Document, Invite]
+class Draft(Model):
+	table = "drafts"
+
+	reviewer_id: UUID | None = None
+	reviewer: Author | None = belongs_to("reviewer_id")
+
+
+MODELS: list[type[Model]] = [Author, Post, Tag, Tagging, Comment, Profile, Draft]
 
 SCHEMA = """
-CREATE TABLE users (
+CREATE TABLE authors (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
 	name TEXT NOT NULL
 );
-CREATE TABLE boards (
+CREATE TABLE posts (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
 	title TEXT NOT NULL,
-	creator_id TEXT NOT NULL REFERENCES users (id)
+	author_id TEXT NOT NULL REFERENCES authors (id)
 );
-CREATE TABLE pins (
+CREATE TABLE tags (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	title TEXT NOT NULL
+	name TEXT NOT NULL
 );
-CREATE TABLE placements (
+CREATE TABLE taggings (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	pin_id TEXT NOT NULL REFERENCES pins (id),
-	board_id TEXT NOT NULL REFERENCES boards (id),
+	post_id TEXT NOT NULL REFERENCES posts (id),
+	tag_id TEXT NOT NULL REFERENCES tags (id),
 	position INTEGER NOT NULL
 );
-CREATE TABLE shares (
+CREATE TABLE comments (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	board_id TEXT NOT NULL REFERENCES boards (id),
-	user_id TEXT NOT NULL REFERENCES users (id)
+	post_id TEXT NOT NULL REFERENCES posts (id),
+	author_id TEXT NOT NULL REFERENCES authors (id)
 );
-CREATE TABLE documents (
+CREATE TABLE profiles (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	pin_id TEXT NOT NULL REFERENCES pins (id),
-	body TEXT NOT NULL
+	author_id TEXT NOT NULL REFERENCES authors (id),
+	bio TEXT NOT NULL
 );
-CREATE TABLE invites (
+CREATE TABLE drafts (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	target_id TEXT REFERENCES users (id)
+	reviewer_id TEXT REFERENCES authors (id)
 );
 """
 
@@ -136,222 +136,213 @@ def open_store() -> Iterator[Store]:
 
 
 def test_relationships_are_not_constructor_parameters():
-	user = User(name="Ada")
-	board = Board(title="Ideas", creator_id=user.id)
-	pin = Pin(title="Sketch")
+	author = Author(name="Ada")
+	post = Post(title="Ideas", author_id=author.id)
 
 	with assert_raises(TypeError):
-		Board(
+		Post(
 			title="Ideas",
-			creator_id=user.id,
-			creator=user,  # ty: ignore[unknown-argument]
+			author_id=author.id,
+			author=author,  # ty: ignore[unknown-argument]
 		)
 	with assert_raises(TypeError):
-		Board(
+		Post(
 			title="Ideas",
-			creator_id=user.id,
-			placements=[],  # ty: ignore[unknown-argument]
+			author_id=author.id,
+			taggings=[],  # ty: ignore[unknown-argument]
 		)
 	with assert_raises(TypeError):
-		Pin(title="Sketch", document=None)  # ty: ignore[unknown-argument]
-	assert_eq(board.creator_id, user.id)
-	assert_eq(pin.title, "Sketch")
+		Author(name="Ada", profile=None)  # ty: ignore[unknown-argument]
+	assert_eq(post.author_id, author.id)
+	assert_eq(author.name, "Ada")
 
 
 def test_rejects_a_belongs_to_naming_a_missing_or_non_uuid_column():
 	with assert_raises(ModelError) as missing:
 
 		class MissingId(Model):
-			pin_id: UUID
-			pin: Pin = belongs_to("pin_ide")
+			tag_id: UUID
+			tag: Tag = belongs_to("tag_ide")
 
 	with assert_raises(ModelError) as not_uuid:
 
 		class TextId(Model):
-			title: str
-			pin: Pin = belongs_to("title")
+			name: str
+			tag: Tag = belongs_to("name")
 
 	assert_eq(
 		str(missing.exception),
-		"MissingId.pin: belongs_to names 'pin_ide', which is not a column",
+		"MissingId.tag: belongs_to names 'tag_ide', which is not a column",
 	)
 	assert_eq(
 		str(not_uuid.exception),
-		"TextId.pin: belongs_to names 'title', which does not hold a UUID",
+		"TextId.tag: belongs_to names 'name', which does not hold a UUID",
 	)
 
 
 def test_rejects_wrong_annotations():
 	with assert_raises(ModelError) as belongs:
 
-		class Mark(Model):
-			pin_id: UUID
-			pin: str = belongs_to("pin_id")
+		class NotAModel(Model):
+			tag_id: UUID
+			tag: str = belongs_to("tag_id")
 
 	with assert_raises(ModelError) as many:
 
-		class Shelf(Model):
-			placements: Placement = has_many("board_id")
+		class NotAList(Model):
+			taggings: Tagging = has_many("post_id")
 
 	with assert_raises(ModelError) as one:
 
-		class Card(Model):
-			document: list[str] = has_one("pin_id")
+		class NotOneModel(Model):
+			profile: list[str] = has_one("author_id")
 
 	with assert_raises(ModelError) as not_nullable:
 
-		class Folder(Model):
-			document: Document = has_one("pin_id")
+		class NotNullable(Model):
+			profile: Profile = has_one("author_id")
 
-	assert_eq(str(belongs.exception), "Mark.pin: expected a model, got <class 'str'>")
+	assert_eq(
+		str(belongs.exception),
+		"NotAModel.tag: expected a model, got <class 'str'>",
+	)
 	assert_eq(
 		str(many.exception),
-		f"Shelf.placements: expected list[<model>], got {Placement!r}",
+		f"NotAList.taggings: expected list[<model>], got {Tagging!r}",
 	)
 	assert_eq(
 		str(one.exception),
-		"Card.document: expected <model> | None, got list[str]",
+		"NotOneModel.profile: expected <model> | None, got list[str]",
 	)
 	assert_eq(
 		str(not_nullable.exception),
-		f"Folder.document: expected <model> | None, got {Document!r}",
+		f"NotNullable.profile: expected <model> | None, got {Profile!r}",
 	)
 
 
 def test_checks_forward_referenced_annotations_on_first_use():
 	class Note(Model):
-		author_id: UUID
-		author: list[Author] = belongs_to("author_id")
+		writer_id: UUID
+		writer: list[Writer] = belongs_to("writer_id")
 
-	class Author(Model):
+	class Writer(Model):
 		name: str
 
 	with assert_raises(ModelError):
-		Note.relationships["author"]
+		Note.relationships["writer"]
 
 
 def test_resolves_targets_declared_after_the_model():
-	assert_that(Board.relationships["placements"].target is Placement)
-	assert_that(Board.relationships["shares"].target is Share)
-	assert_that(Pin.relationships["document"].target is Document)
+	assert_that(Post.relationships["taggings"].target is Tagging)
+	assert_that(Post.relationships["comments"].target is Comment)
+	assert_that(Author.relationships["profile"].target is Profile)
 
 
 def test_checks_each_relationship_when_it_is_read():
 	class Note(Model):
 		author_id: UUID
-		author: User | None = belongs_to("author_id")
-		board_id: UUID
-		board: Board = belongs_to("board_id")
+		author: Author | None = belongs_to("author_id")
+		post_id: UUID
+		post: Post = belongs_to("post_id")
 
 	assert_that("author" in Note.relationships)
-	assert_that(Note.relationships["board"].target is Board)
+	assert_that(Note.relationships["post"].target is Post)
 	with assert_raises(ModelError):
 		Note.relationships["author"]
 
 
 def test_rejects_a_nullability_mismatch_on_first_use():
 	class Loose(Model):
-		user_id: UUID
-		user: User | None = belongs_to("user_id")
+		author_id: UUID
+		author: Author | None = belongs_to("author_id")
 
 	class Strict(Model):
-		user_id: UUID | None = None
-		user: User = belongs_to("user_id")
+		author_id: UUID | None = None
+		author: Author = belongs_to("author_id")
 
 	with assert_raises(ModelError) as loose:
-		Loose.relationships["user"]
+		Loose.relationships["author"]
 	with assert_raises(ModelError) as strict:
-		Strict.relationships["user"]
+		Strict.relationships["author"]
 
 	assert_eq(
 		str(loose.exception),
-		"Loose.user: annotation must include None exactly when "
-		"Loose.user_id is nullable",
+		"Loose.author: annotation must include None exactly when "
+		"Loose.author_id is nullable",
 	)
 	assert_eq(
 		str(strict.exception),
-		"Strict.user: annotation must include None exactly when "
-		"Strict.user_id is nullable",
+		"Strict.author: annotation must include None exactly when "
+		"Strict.author_id is nullable",
 	)
-	assert_that(Invite.relationships["target"].target is User)
+	assert_that(Draft.relationships["reviewer"].target is Author)
 
 
 def test_rejects_a_target_column_that_is_missing_or_not_a_uuid():
-	class Wall(Model):
-		placements: list[Placement] = has_many("board_ide")
-		positioned: list[Placement] = has_many("position")
-		document: Document | None = has_one("body")
+	class Mistargeted(Model):
+		taggings: list[Tagging] = has_many("post_ide")
+		positioned: list[Tagging] = has_many("position")
+		profile: Profile | None = has_one("bio")
 
 	cases = [
-		("placements", "Wall.placements: Placement.board_ide does not hold a UUID"),
-		("positioned", "Wall.positioned: Placement.position does not hold a UUID"),
-		("document", "Wall.document: Document.body does not hold a UUID"),
+		("taggings", "Mistargeted.taggings: Tagging.post_ide does not hold a UUID"),
+		("positioned", "Mistargeted.positioned: Tagging.position does not hold a UUID"),
+		("profile", "Mistargeted.profile: Profile.bio does not hold a UUID"),
 	]
 	for name, message in cases:
 		with assert_raises(ModelError) as raised:
-			Wall.relationships[name]
+			Mistargeted.relationships[name]
 		assert_eq(str(raised.exception), message)
 
 
 def test_reading_an_unloaded_relationship_raises():
 	with open_store() as store:
-		user = store.create(User, name="Ada")
-		board = store.create(Board, title="Ideas", creator_id=user.id)
-		stored = store.find_one(Board, board.id)
-		constructed = Board(title="Ideas", creator_id=user.id)
+		author = store.create(Author, name="Ada")
+		post = store.create(Post, title="Ideas", author_id=author.id)
+		stored = store.find_one(Post, post.id)
+		constructed = Post(title="Ideas", author_id=author.id)
 
 		with assert_raises(ModelError) as from_store:
-			_ = stored.placements
+			_ = stored.taggings
 		with assert_raises(ModelError) as from_constructor:
-			_ = constructed.creator
+			_ = constructed.author
 
-		assert_eq(
-			str(from_store.exception),
-			"Board.placements is not loaded; "
-			"load it with store.preload(models, 'placements')",
-		)
-		assert_eq(
-			str(from_constructor.exception),
-			"Board.creator is not loaded, "
-			"and a model built with the constructor cannot be loaded",
-		)
+		assert_eq(str(from_store.exception), "Post.taggings is not loaded")
+		assert_eq(str(from_constructor.exception), "Post.author is not loaded")
 
 
 def test_assigning_a_relationship_raises():
-	placement = Placement(pin_id=uuid4(), board_id=uuid4(), position=0)
-	board = Board(title="Ideas", creator_id=uuid4())
+	tagging = Tagging(tag_id=uuid4(), post_id=uuid4(), position=0)
+	post = Post(title="Ideas", author_id=uuid4())
 
 	with assert_raises(AttributeError) as belongs:
-		placement.pin = Pin(title="Sketch")
+		tagging.tag = Tag(name="Python")
 	with assert_raises(AttributeError) as many:
-		board.placements = []
+		post.taggings = []
 
-	assert_eq(
-		str(belongs.exception),
-		"Placement.pin is read-only; use store.update on Placement.pin_id",
-	)
-	assert_eq(str(many.exception), "Board.placements is read-only")
+	assert_eq(str(belongs.exception), "Tagging.tag is read-only")
+	assert_eq(str(many.exception), "Post.taggings is read-only")
 
 
 def test_relationships_are_not_columns():
 	with open_store() as store:
-		user = store.create(User, name="Ada")
-		board = store.create(Board, title="Ideas", creator_id=user.id)
+		author = store.create(Author, name="Ada")
+		post = store.create(Post, title="Ideas", author_id=author.id)
 
 		with assert_raises(ModelError) as raised:
-			Board.column("creator")
+			Post.column("author")
 		with assert_raises(ModelError):
-			store.query(Board).order_by("creator")
+			store.query(Post).order_by("author")
 		with assert_raises(ModelError):
-			store.query(Board).count_by("placements")
+			store.query(Post).count_by("taggings")
 		with assert_raises(ModelError):
-			store.update(board, creator=user)
+			store.update(post, author=author)
 		with assert_raises(ModelError):
-			store.find_by(Board, creator=user)
+			store.find_by(Post, author=author)
 
 		assert_eq(
 			str(raised.exception),
-			"Board.creator is a relationship, not a column",
+			"Post.author is a relationship, not a column",
 		)
 
 
@@ -359,12 +350,12 @@ def test_rejects_relationships_with_reserved_names():
 	with assert_raises(ModelError):
 
 		class Shadow(Model):
-			id: User = belongs_to("user_id")
-			user_id: UUID
+			id: Author = belongs_to("author_id")
+			author_id: UUID
 
 	with assert_raises(ModelError):
 
 		class Meta(Model):
-			relationships: list[Placement] = has_many(  # ty: ignore[invalid-attribute-override]
-				"board_id"
+			relationships: list[Tagging] = has_many(  # ty: ignore[invalid-attribute-override]
+				"post_id"
 			)

@@ -19,106 +19,106 @@ from helios.database import (
 from helios.database.sqlite import connect
 
 
-class User(Model):
-	table = "users"
+class Author(Model):
+	table = "authors"
 
 	name: str
+	profile: Profile | None = has_one("author_id")
 
 
-class Board(Model):
-	table = "boards"
-
-	title: str
-	creator_id: UUID
-	creator: User = belongs_to("creator_id")
-	placements: list[Placement] = has_many("board_id")
-	shares: list[Share] = has_many("board_id")
-
-
-class Pin(Model):
-	table = "pins"
+class Post(Model):
+	table = "posts"
 
 	title: str
-	placements: list[Placement] = has_many("pin_id")
-	document: Document | None = has_one("pin_id")
+	author_id: UUID
+	author: Author = belongs_to("author_id")
+	taggings: list[Tagging] = has_many("post_id")
+	comments: list[Comment] = has_many("post_id")
 
 
-class Placement(Model):
-	table = "placements"
+class Tag(Model):
+	table = "tags"
 
-	pin_id: UUID
-	pin: Pin = belongs_to("pin_id")
-	board_id: UUID
-	board: Board = belongs_to("board_id")
+	name: str
+	taggings: list[Tagging] = has_many("tag_id")
+
+
+class Tagging(Model):
+	table = "taggings"
+
+	post_id: UUID
+	post: Post = belongs_to("post_id")
+	tag_id: UUID
+	tag: Tag = belongs_to("tag_id")
 	position: int
 
 
-class Share(Model):
-	table = "shares"
+class Comment(Model):
+	table = "comments"
 
-	board_id: UUID
-	board: Board = belongs_to("board_id")
-	user_id: UUID
-	user: User = belongs_to("user_id")
-
-
-class Document(Model):
-	table = "documents"
-
-	pin_id: UUID
-	pin: Pin = belongs_to("pin_id")
-	body: str
+	post_id: UUID
+	post: Post = belongs_to("post_id")
+	author_id: UUID
+	author: Author = belongs_to("author_id")
 
 
-class Invite(Model):
-	table = "invites"
+class Profile(Model):
+	table = "profiles"
 
-	target_id: UUID | None = None
-	target: User | None = belongs_to("target_id")
+	author_id: UUID
+	author: Author = belongs_to("author_id")
+	bio: str
 
 
-MODELS = [User, Board, Pin, Placement, Share, Document, Invite]
+class Draft(Model):
+	table = "drafts"
+
+	reviewer_id: UUID | None = None
+	reviewer: Author | None = belongs_to("reviewer_id")
+
+
+MODELS: list[type[Model]] = [Author, Post, Tag, Tagging, Comment, Profile, Draft]
 
 SCHEMA = """
-CREATE TABLE users (
+CREATE TABLE authors (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
 	name TEXT NOT NULL
 );
-CREATE TABLE boards (
+CREATE TABLE posts (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
 	title TEXT NOT NULL,
-	creator_id TEXT NOT NULL REFERENCES users (id)
+	author_id TEXT NOT NULL REFERENCES authors (id)
 );
-CREATE TABLE pins (
+CREATE TABLE tags (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	title TEXT NOT NULL
+	name TEXT NOT NULL
 );
-CREATE TABLE placements (
+CREATE TABLE taggings (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	pin_id TEXT NOT NULL REFERENCES pins (id),
-	board_id TEXT NOT NULL REFERENCES boards (id),
+	post_id TEXT NOT NULL REFERENCES posts (id),
+	tag_id TEXT NOT NULL REFERENCES tags (id),
 	position INTEGER NOT NULL
 );
-CREATE TABLE shares (
+CREATE TABLE comments (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	board_id TEXT NOT NULL REFERENCES boards (id),
-	user_id TEXT NOT NULL REFERENCES users (id)
+	post_id TEXT NOT NULL REFERENCES posts (id),
+	author_id TEXT NOT NULL REFERENCES authors (id)
 );
-CREATE TABLE documents (
+CREATE TABLE profiles (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	pin_id TEXT NOT NULL REFERENCES pins (id),
-	body TEXT NOT NULL
+	author_id TEXT NOT NULL REFERENCES authors (id),
+	bio TEXT NOT NULL
 );
-CREATE TABLE invites (
+CREATE TABLE drafts (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	target_id TEXT REFERENCES users (id)
+	reviewer_id TEXT REFERENCES authors (id)
 );
 """
 
@@ -137,38 +137,42 @@ def open_store() -> Iterator[Store]:
 
 class Fixture:
 	def __init__(self, store: Store):
-		self.ada = store.create(User, name="Ada")
-		self.bo = store.create(User, name="Bo")
-		self.cy = store.create(User, name="Cy")
-		self.ideas = store.create(Board, title="Ideas", creator_id=self.ada.id)
-		self.plans = store.create(Board, title="Plans", creator_id=self.bo.id)
-		self.secret = store.create(Board, title="Secret", creator_id=self.cy.id)
-		store.create(Share, board_id=self.plans.id, user_id=self.ada.id)
-		self.sketch = store.create(Pin, title="Sketch")
-		self.photo = store.create(Pin, title="Photo")
-		self.note = store.create(Pin, title="Note")
-		store.create(Document, pin_id=self.sketch.id, body="Lines")
-		self.sketch_on_ideas = self.place(store, self.sketch, self.ideas, 0)
-		self.photo_on_ideas = self.place(store, self.photo, self.ideas, 1)
-		self.sketch_on_plans = self.place(store, self.sketch, self.plans, 1)
-		self.note_on_plans = self.place(store, self.note, self.plans, 0)
-		self.sketch_on_secret = self.place(store, self.sketch, self.secret, 0)
-		self.photo_on_secret = self.place(store, self.photo, self.secret, 1)
+		self.ada = store.create(Author, name="Ada")
+		self.bo = store.create(Author, name="Bo")
+		self.cy = store.create(Author, name="Cy")
+		store.create(Profile, author_id=self.ada.id, bio="Writer")
+		self.ideas = store.create(Post, title="Ideas", author_id=self.ada.id)
+		self.plans = store.create(Post, title="Plans", author_id=self.bo.id)
+		self.secret = store.create(Post, title="Secret", author_id=self.cy.id)
+		store.create(Comment, post_id=self.plans.id, author_id=self.ada.id)
+		self.python = store.create(Tag, name="Python")
+		self.rust = store.create(Tag, name="Rust")
+		self.sql = store.create(Tag, name="SQL")
+		self.python_on_ideas = self.tag(store, self.python, self.ideas, 0)
+		self.rust_on_ideas = self.tag(store, self.rust, self.ideas, 1)
+		self.python_on_plans = self.tag(store, self.python, self.plans, 1)
+		self.sql_on_plans = self.tag(store, self.sql, self.plans, 0)
+		self.python_on_secret = self.tag(store, self.python, self.secret, 0)
+		self.rust_on_secret = self.tag(store, self.rust, self.secret, 1)
 
-	def place(self, store: Store, pin: Pin, board: Board, position: int) -> Placement:
+	def tag(self, store: Store, tag: Tag, post: Post, position: int) -> Tagging:
 		return store.create(
-			Placement,
-			pin_id=pin.id,
-			board_id=board.id,
+			Tagging,
+			tag_id=tag.id,
+			post_id=post.id,
 			position=position,
 		)
 
 
-def titles(models: list[Board] | list[Pin]) -> set[str]:
-	return {model.title for model in models}
+def titles(posts: list[Post]) -> set[str]:
+	return {post.title for post in posts}
 
 
-def ids(models: list[Placement] | list[Invite]) -> set[UUID]:
+def names(models: list[Author] | list[Tag]) -> set[str]:
+	return {model.name for model in models}
+
+
+def ids(models: list[Tagging] | list[Draft]) -> set[UUID]:
 	return {model.id for model in models}
 
 
@@ -176,11 +180,11 @@ def test_filters_through_belongs_to():
 	with open_store() as store:
 		fixture = Fixture(store)
 
-		found = store.query(Placement).where({"board.title": "Plans"}).all()
+		found = store.query(Tagging).where({"post.title": "Plans"}).all()
 
 		assert_eq(
 			ids(found),
-			{fixture.sketch_on_plans.id, fixture.note_on_plans.id},
+			{fixture.python_on_plans.id, fixture.sql_on_plans.id},
 		)
 
 
@@ -188,60 +192,60 @@ def test_filters_through_has_many_and_has_one():
 	with open_store() as store:
 		fixture = Fixture(store)
 
-		boards = store.query(Board).where({"placements.pin_id": fixture.note.id})
-		pins = store.query(Pin).where({"document.body": "Lines"})
+		posts = store.query(Post).where({"taggings.tag_id": fixture.sql.id})
+		authors = store.query(Author).where({"profile.bio": "Writer"})
 
-		assert_eq(titles(boards.all()), {"Plans"})
-		assert_eq(titles(pins.all()), {"Sketch"})
+		assert_eq(titles(posts.all()), {"Plans"})
+		assert_eq(names(authors.all()), {"Ada"})
 
 
 def test_filters_through_nested_paths():
 	with open_store() as store:
 		Fixture(store)
 
-		found = store.query(Pin).where({"placements.board.title": "Secret"}).all()
+		found = store.query(Tag).where({"taggings.post.title": "Secret"}).all()
 
-		assert_eq(titles(found), {"Sketch", "Photo"})
+		assert_eq(names(found), {"Python", "Rust"})
 
 
 def test_applies_access_rules():
 	with open_store() as store:
 		fixture = Fixture(store)
-		user = fixture.ada.id
+		author = fixture.ada.id
 
-		boards = store.query(Board).where_any(
-			{"creator_id": user},
-			{"shares.user_id": user},
+		posts = store.query(Post).where_any(
+			{"author_id": author},
+			{"comments.author_id": author},
 		)
-		placements = (
-			store.query(Placement)
-			.where({"pin_id": fixture.sketch.id})
-			.where_any({"board.creator_id": user}, {"board.shares.user_id": user})
+		taggings = (
+			store.query(Tagging)
+			.where({"tag_id": fixture.python.id})
+			.where_any({"post.author_id": author}, {"post.comments.author_id": author})
 		)
 
-		assert_eq(titles(boards.all()), {"Ideas", "Plans"})
+		assert_eq(titles(posts.all()), {"Ideas", "Plans"})
 		assert_eq(
-			ids(placements.all()),
-			{fixture.sketch_on_ideas.id, fixture.sketch_on_plans.id},
+			ids(taggings.all()),
+			{fixture.python_on_ideas.id, fixture.python_on_plans.id},
 		)
 
 
 def test_keys_under_one_path_apply_to_the_same_related_row():
 	with open_store() as store:
 		fixture = Fixture(store)
-		conditions = {"placements.position": 0, "placements.pin_id": fixture.photo.id}
+		conditions = {"taggings.position": 0, "taggings.tag_id": fixture.rust.id}
 
-		together = store.query(Board).where(conditions).all()
+		together = store.query(Post).where(conditions).all()
 		apart = (
-			store.query(Board)
-			.where({"placements.position": 0})
-			.where({"placements.pin_id": fixture.photo.id})
+			store.query(Post)
+			.where({"taggings.position": 0})
+			.where({"taggings.tag_id": fixture.rust.id})
 			.all()
 		)
 		grouped = (
-			store.query(Board)
-			.where_any({"placements.position": 0})
-			.where_any({"placements.pin_id": fixture.photo.id})
+			store.query(Post)
+			.where_any({"taggings.position": 0})
+			.where_any({"taggings.tag_id": fixture.rust.id})
 			.all()
 		)
 
@@ -255,31 +259,31 @@ def test_nests_paths_under_a_shared_relationship():
 		fixture = Fixture(store)
 
 		found = (
-			store.query(Pin)
+			store.query(Tag)
 			.where(
 				{
-					"placements.position": 0,
-					"placements.board.creator_id": fixture.bo.id,
+					"taggings.position": 0,
+					"taggings.post.author_id": fixture.bo.id,
 				}
 			)
 			.all()
 		)
 
-		assert_eq(titles(found), {"Note"})
+		assert_eq(names(found), {"SQL"})
 
 
 def test_where_not_is_the_exact_complement_of_a_path():
 	with open_store() as store:
 		fixture = Fixture(store)
-		invited = store.create(Invite, target_id=fixture.ada.id)
-		other = store.create(Invite, target_id=fixture.bo.id)
-		open_invite = store.create(Invite)
+		reviewed = store.create(Draft, reviewer_id=fixture.ada.id)
+		other = store.create(Draft, reviewer_id=fixture.bo.id)
+		unreviewed = store.create(Draft)
 
-		kept = store.query(Invite).where({"target.name": "Ada"}).all()
-		dropped = store.query(Invite).where_not({"target.name": "Ada"}).all()
+		kept = store.query(Draft).where({"reviewer.name": "Ada"}).all()
+		dropped = store.query(Draft).where_not({"reviewer.name": "Ada"}).all()
 
-		assert_eq(ids(kept), {invited.id})
-		assert_eq(ids(dropped), {other.id, open_invite.id})
+		assert_eq(ids(kept), {reviewed.id})
+		assert_eq(ids(dropped), {other.id, unreviewed.id})
 
 
 def test_follows_a_path_through_the_same_table_twice():
@@ -287,29 +291,29 @@ def test_follows_a_path_through_the_same_table_twice():
 		fixture = Fixture(store)
 
 		found = (
-			store.query(Placement)
-			.where({"board.placements.pin_id": fixture.note.id})
-			.all()
+			store.query(Tagging).where({"post.taggings.tag_id": fixture.sql.id}).all()
 		)
 
 		assert_eq(
 			ids(found),
-			{fixture.sketch_on_plans.id, fixture.note_on_plans.id},
+			{fixture.python_on_plans.id, fixture.sql_on_plans.id},
 		)
 
 
 def test_count_by_and_exists_respect_paths():
 	with open_store() as store:
 		fixture = Fixture(store)
-		shared = store.query(Placement).where({"board.shares.user_id": fixture.ada.id})
+		commented = store.query(Tagging).where(
+			{"post.comments.author_id": fixture.ada.id}
+		)
 
 		assert_eq(
-			shared.count_by("pin_id"),
-			{fixture.sketch.id: 1, fixture.note.id: 1},
+			commented.count_by("tag_id"),
+			{fixture.python.id: 1, fixture.sql.id: 1},
 		)
-		assert_eq(shared.exists(), True)
+		assert_eq(commented.exists(), True)
 		assert_eq(
-			store.query(Board).where({"shares.user_id": fixture.cy.id}).exists(),
+			store.query(Post).where({"comments.author_id": fixture.cy.id}).exists(),
 			False,
 		)
 
@@ -317,19 +321,17 @@ def test_count_by_and_exists_respect_paths():
 def test_rejects_invalid_paths():
 	with open_store() as store:
 		cases = [
-			("pin_id.title", "where Placement.pin_id is not a relationship"),
-			("board", "where Placement.board is not a column"),
-			("board.titel", "where Board.titel is not a column"),
-			("board..title", "which is not of the form 'name' or 'name operator'"),
+			("tag_id.name", "where Tagging.tag_id is not a relationship"),
+			("post", "where Tagging.post is not a column"),
+			("post.titel", "where Post.titel is not a column"),
+			("post..title", "which is not of the form 'name' or 'name operator'"),
 		]
 		for key, detail in cases:
 			with assert_raises(ModelError) as raised:
-				store.query(Placement).where({key: "Ideas"})
-			assert_eq(
-				str(raised.exception), f"Query on Placement has {key!r}, {detail}"
-			)
+				store.query(Tagging).where({key: "Ideas"})
+			assert_eq(str(raised.exception), f"Query on Tagging has {key!r}, {detail}")
 
 
-def test_checks_values_against_the_final_attribute():
+def test_checks_values_against_the_final_column():
 	with open_store() as store, assert_raises(ModelError):
-		store.query(Placement).where({"board.title": 1})
+		store.query(Tagging).where({"post.title": 1})

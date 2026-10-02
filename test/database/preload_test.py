@@ -20,106 +20,106 @@ from helios.database import (
 from helios.database.sqlite import connect
 
 
-class User(Model):
-	table = "users"
+class Author(Model):
+	table = "authors"
 
 	name: str
+	profile: Profile | None = has_one("author_id")
 
 
-class Board(Model):
-	table = "boards"
-
-	title: str
-	creator_id: UUID
-	creator: User = belongs_to("creator_id")
-	placements: list[Placement] = has_many("board_id")
-	shares: list[Share] = has_many("board_id")
-
-
-class Pin(Model):
-	table = "pins"
+class Post(Model):
+	table = "posts"
 
 	title: str
-	placements: list[Placement] = has_many("pin_id")
-	document: Document | None = has_one("pin_id")
+	author_id: UUID
+	author: Author = belongs_to("author_id")
+	taggings: list[Tagging] = has_many("post_id")
+	comments: list[Comment] = has_many("post_id")
 
 
-class Placement(Model):
-	table = "placements"
+class Tag(Model):
+	table = "tags"
 
-	pin_id: UUID
-	pin: Pin = belongs_to("pin_id")
-	board_id: UUID
-	board: Board = belongs_to("board_id")
+	name: str
+	taggings: list[Tagging] = has_many("tag_id")
+
+
+class Tagging(Model):
+	table = "taggings"
+
+	post_id: UUID
+	post: Post = belongs_to("post_id")
+	tag_id: UUID
+	tag: Tag = belongs_to("tag_id")
 	position: int
 
 
-class Share(Model):
-	table = "shares"
+class Comment(Model):
+	table = "comments"
 
-	board_id: UUID
-	board: Board = belongs_to("board_id")
-	user_id: UUID
-	user: User = belongs_to("user_id")
-
-
-class Document(Model):
-	table = "documents"
-
-	pin_id: UUID
-	pin: Pin = belongs_to("pin_id")
-	body: str
+	post_id: UUID
+	post: Post = belongs_to("post_id")
+	author_id: UUID
+	author: Author = belongs_to("author_id")
 
 
-class Invite(Model):
-	table = "invites"
+class Profile(Model):
+	table = "profiles"
 
-	target_id: UUID | None = None
-	target: User | None = belongs_to("target_id")
+	author_id: UUID
+	author: Author = belongs_to("author_id")
+	bio: str
 
 
-MODELS: list[type[Model]] = [User, Board, Pin, Placement, Share, Document, Invite]
+class Draft(Model):
+	table = "drafts"
+
+	reviewer_id: UUID | None = None
+	reviewer: Author | None = belongs_to("reviewer_id")
+
+
+MODELS: list[type[Model]] = [Author, Post, Tag, Tagging, Comment, Profile, Draft]
 
 SCHEMA = """
-CREATE TABLE users (
+CREATE TABLE authors (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
 	name TEXT NOT NULL
 );
-CREATE TABLE boards (
+CREATE TABLE posts (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
 	title TEXT NOT NULL,
-	creator_id TEXT NOT NULL REFERENCES users (id)
+	author_id TEXT NOT NULL REFERENCES authors (id)
 );
-CREATE TABLE pins (
+CREATE TABLE tags (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	title TEXT NOT NULL
+	name TEXT NOT NULL
 );
-CREATE TABLE placements (
+CREATE TABLE taggings (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	pin_id TEXT NOT NULL REFERENCES pins (id),
-	board_id TEXT NOT NULL REFERENCES boards (id),
+	post_id TEXT NOT NULL REFERENCES posts (id),
+	tag_id TEXT NOT NULL REFERENCES tags (id),
 	position INTEGER NOT NULL
 );
-CREATE TABLE shares (
+CREATE TABLE comments (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	board_id TEXT NOT NULL REFERENCES boards (id),
-	user_id TEXT NOT NULL REFERENCES users (id)
+	post_id TEXT NOT NULL REFERENCES posts (id),
+	author_id TEXT NOT NULL REFERENCES authors (id)
 );
-CREATE TABLE documents (
+CREATE TABLE profiles (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	pin_id TEXT NOT NULL REFERENCES pins (id),
-	body TEXT NOT NULL
+	author_id TEXT NOT NULL REFERENCES authors (id),
+	bio TEXT NOT NULL
 );
-CREATE TABLE invites (
+CREATE TABLE drafts (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
-	target_id TEXT REFERENCES users (id)
+	reviewer_id TEXT REFERENCES authors (id)
 );
 """
 
@@ -163,206 +163,198 @@ def selects(statements: list[str], table: str) -> int:
 
 class Fixture:
 	def __init__(self, store: Store):
-		self.ada = store.create(User, name="Ada")
-		self.ideas = store.create(Board, title="Ideas", creator_id=self.ada.id)
-		self.empty = store.create(Board, title="Empty", creator_id=self.ada.id)
-		self.sketch = store.create(Pin, title="Sketch")
-		self.photo = store.create(Pin, title="Photo")
-		self.document = store.create(Document, pin_id=self.sketch.id, body="Lines")
-		self.first = self.place(store, self.sketch, 0)
-		self.second = self.place(store, self.photo, 1)
-		self.third = self.place(store, self.sketch, 2)
+		self.ada = store.create(Author, name="Ada")
+		self.bo = store.create(Author, name="Bo")
+		self.profile = store.create(Profile, author_id=self.ada.id, bio="Writer")
+		self.ideas = store.create(Post, title="Ideas", author_id=self.ada.id)
+		self.empty = store.create(Post, title="Empty", author_id=self.ada.id)
+		self.python = store.create(Tag, name="Python")
+		self.rust = store.create(Tag, name="Rust")
+		self.first = self.tag(store, self.python, 0)
+		self.second = self.tag(store, self.rust, 1)
+		self.third = self.tag(store, self.python, 2)
 
-	def place(self, store: Store, pin: Pin, position: int) -> Placement:
+	def tag(self, store: Store, tag: Tag, position: int) -> Tagging:
 		return store.create(
-			Placement,
-			pin_id=pin.id,
-			board_id=self.ideas.id,
+			Tagging,
+			tag_id=tag.id,
+			post_id=self.ideas.id,
 			position=position,
 		)
 
 
-def by_position(placements: list[Placement]) -> list[int]:
-	return sorted(placement.position for placement in placements)
+def by_position(taggings: list[Tagging]) -> list[int]:
+	return sorted(tagging.position for tagging in taggings)
 
 
 def test_loads_belongs_to():
 	with open_store() as store:
 		fixture = Fixture(store)
-		invited = store.create(Invite, target_id=fixture.ada.id)
-		unaddressed = store.create(Invite)
+		reviewed = store.create(Draft, reviewer_id=fixture.ada.id)
+		unreviewed = store.create(Draft)
 
-		store.preload([fixture.first, fixture.second], "pin")
-		store.preload([invited, unaddressed], "target")
+		store.preload([fixture.first, fixture.second], "tag")
+		store.preload([reviewed, unreviewed], "reviewer")
 
-		assert_eq(fixture.first.pin.id, fixture.sketch.id)
-		assert_eq(fixture.second.pin.title, "Photo")
-		assert_that(invited.target is not None and invited.target.name == "Ada")
-		assert_that(unaddressed.target is None)
+		assert_eq(fixture.first.tag.id, fixture.python.id)
+		assert_eq(fixture.second.tag.name, "Rust")
+		assert_that(reviewed.reviewer is not None and reviewed.reviewer.name == "Ada")
+		assert_that(unreviewed.reviewer is None)
 
 
 def test_loads_has_many():
 	with open_store() as store:
 		fixture = Fixture(store)
 
-		store.preload([fixture.ideas, fixture.empty], "placements")
+		store.preload([fixture.ideas, fixture.empty], "taggings")
 
-		assert_eq(by_position(fixture.ideas.placements), [0, 1, 2])
-		assert_eq(fixture.empty.placements, [])
+		assert_eq(by_position(fixture.ideas.taggings), [0, 1, 2])
+		assert_eq(fixture.empty.taggings, [])
 
 
 def test_loads_has_one():
 	with open_store() as store:
 		fixture = Fixture(store)
 
-		store.preload([fixture.sketch, fixture.photo], "document")
+		store.preload([fixture.ada, fixture.bo], "profile")
 
-		document = fixture.sketch.document
-		assert document is not None
-		assert_eq(document.body, "Lines")
-		assert_that(fixture.photo.document is None)
+		profile = fixture.ada.profile
+		assert profile is not None
+		assert_eq(profile.bio, "Writer")
+		assert_that(fixture.bo.profile is None)
 
 
 def test_loads_nested_paths_and_runs_shared_prefixes_once():
 	with open_store() as store:
 		fixture = Fixture(store)
-		board = store.find_one(Board, fixture.ideas.id)
+		post = store.find_one(Post, fixture.ideas.id)
 
 		with recording(store) as statements:
-			store.preload(board, "placements.pin", "placements.board")
+			store.preload(post, "taggings.tag", "taggings.post")
 
-		assert_eq(selects(statements, "placements"), 1)
+		assert_eq(selects(statements, "taggings"), 1)
 		assert_eq(
-			sorted(placement.pin.title for placement in board.placements),
-			["Photo", "Sketch", "Sketch"],
+			sorted(tagging.tag.name for tagging in post.taggings),
+			["Python", "Python", "Rust"],
 		)
 		assert_eq(
-			{placement.board.id for placement in board.placements},
-			{board.id},
+			{tagging.post.id for tagging in post.taggings},
+			{post.id},
 		)
 
 
 def test_reuses_loaded_relationships():
 	with open_store() as store:
 		fixture = Fixture(store)
-		board = store.find_one(Board, fixture.ideas.id)
-		store.preload(board, "placements")
-		placements = board.placements
+		post = store.find_one(Post, fixture.ideas.id)
+		store.preload(post, "taggings")
+		taggings = post.taggings
 
 		with recording(store) as statements:
-			store.preload(board, "placements.pin")
+			store.preload(post, "taggings.tag")
 
-		assert_that(board.placements is placements)
-		assert_eq(selects(statements, "placements"), 0)
-		assert_eq(selects(statements, "pins"), 1)
+		assert_that(post.taggings is taggings)
+		assert_eq(selects(statements, "taggings"), 0)
+		assert_eq(selects(statements, "tags"), 1)
 		assert_eq(
-			sorted(placement.pin.title for placement in placements),
-			["Photo", "Sketch", "Sketch"],
+			sorted(tagging.tag.name for tagging in taggings),
+			["Python", "Python", "Rust"],
 		)
 
 
 def test_shares_one_object_per_row():
 	with open_store() as store:
 		fixture = Fixture(store)
-		placements = store.query(Placement).where({"pin_id": fixture.sketch.id}).all()
+		taggings = store.query(Tagging).where({"tag_id": fixture.python.id}).all()
 
-		store.preload(placements, "pin")
+		store.preload(taggings, "tag")
 
-		assert_eq(len(placements), 2)
-		assert_that(placements[0].pin is placements[1].pin)
+		assert_eq(len(taggings), 2)
+		assert_that(taggings[0].tag is taggings[1].tag)
 
 
 def test_splits_large_id_sets_into_batches():
 	with open_store() as store:
 		fixture = Fixture(store)
 		for position in range(3, 8):
-			fixture.place(store, store.create(Pin, title=f"Pin {position}"), position)
-		placements = store.find_all(Placement)
+			fixture.tag(store, store.create(Tag, name=f"Tag {position}"), position)
+		taggings = store.find_all(Tagging)
 		store.connection.connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 2)
 
 		with recording(store) as statements:
-			store.preload(placements, "pin")
+			store.preload(taggings, "tag")
 
-		assert_eq(selects(statements, "pins"), 4)
+		assert_eq(selects(statements, "tags"), 4)
 		assert_eq(
-			{placement.pin.id for placement in placements},
-			{placement.pin_id for placement in placements},
+			{tagging.tag.id for tagging in taggings},
+			{tagging.tag_id for tagging in taggings},
 		)
 
 
 def test_runs_no_query_without_ids():
 	with open_store() as store:
-		invites = [store.create(Invite), store.create(Invite)]
+		drafts = [store.create(Draft), store.create(Draft)]
 
 		with recording(store) as statements:
-			store.preload(invites, "target")
+			store.preload(drafts, "reviewer")
 
 		assert_eq(statements, [])
-		assert_that(all(invite.target is None for invite in invites))
+		assert_that(all(draft.reviewer is None for draft in drafts))
 
 
 def test_update_unloads_a_changed_belongs_to():
 	with open_store() as store:
 		fixture = Fixture(store)
-		store.preload([fixture.first, fixture.second], "pin")
+		store.preload([fixture.first, fixture.second], "tag")
 
-		store.update(fixture.first, pin_id=fixture.photo.id)
-		store.update(fixture.second, pin_id=fixture.photo.id, position=4)
+		store.update(fixture.first, tag_id=fixture.rust.id)
+		store.update(fixture.second, tag_id=fixture.rust.id, position=4)
 
 		with assert_raises(ModelError):
-			_ = fixture.first.pin
-		assert_eq(fixture.second.pin.title, "Photo")
+			_ = fixture.first.tag
+		assert_eq(fixture.second.tag.name, "Rust")
 
 
 def test_loaded_lists_are_snapshots():
 	with open_store() as store:
 		fixture = Fixture(store)
-		store.preload([fixture.ideas, fixture.empty], "placements")
+		store.preload([fixture.ideas, fixture.empty], "taggings")
 
-		fixture.place(store, fixture.photo, 3)
+		fixture.tag(store, fixture.rust, 3)
 		store.delete(fixture.second)
-		store.update(fixture.third, board_id=fixture.empty.id)
+		store.update(fixture.third, post_id=fixture.empty.id)
 
-		assert_eq(by_position(fixture.ideas.placements), [0, 1, 2])
-		assert_eq(fixture.empty.placements, [])
+		assert_eq(by_position(fixture.ideas.taggings), [0, 1, 2])
+		assert_eq(fixture.empty.taggings, [])
 
 
 def test_rejects_invalid_arguments_before_any_query():
 	with open_store() as store:
 		fixture = Fixture(store)
-		constructed = Placement(
-			pin_id=fixture.sketch.id, board_id=fixture.ideas.id, position=9
+		constructed = Tagging(
+			tag_id=fixture.python.id,
+			post_id=fixture.ideas.id,
+			position=9,
 		)
 		cases = [
 			(
-				lambda: store.preload(fixture.first),
-				"store.preload requires at least one path",
-			),
-			(
-				lambda: store.preload(fixture.first, "pin.titel"),
+				lambda: store.preload(fixture.first, "tag.nam"),
 				(
-					"store.preload on Placement has 'pin.titel', "
-					"where Pin.titel is not a relationship"
+					"store.preload on Tagging has 'tag.nam', "
+					"where Tag.nam is not a relationship"
 				),
 			),
 			(
-				lambda: store.preload(fixture.first, "pin."),
-				"store.preload on Placement has 'pin.', which is not a relationship path",
+				lambda: store.preload(fixture.first, "tag."),
+				"store.preload on Tagging has 'tag.', which is not a relationship path",
 			),
 			(
-				lambda: store.preload([fixture.first, fixture.sketch], "pin"),
-				"store.preload takes models of one model type, got Placement and Pin",
+				lambda: store.preload([fixture.first, fixture.python], "tag"),
+				"store.preload takes models of one model type",
 			),
 			(
-				lambda: store.preload("placements", "pin"),  # ty: ignore[invalid-argument-type]
-				"store.preload takes a model or a list of models, got str",
-			),
-			(
-				lambda: store.preload([fixture.first, constructed], "pin"),
-				(
-					"store.preload takes stored models, "
-					f"and {constructed!r} was built with the constructor"
-				),
+				lambda: store.preload([fixture.first, constructed], "tag"),
+				"store.preload can only be called with stored models",
 			),
 		]
 
@@ -371,7 +363,7 @@ def test_rejects_invalid_arguments_before_any_query():
 				with assert_raises(ModelError) as raised:
 					preload()
 				assert_eq(str(raised.exception), message)
-			store.preload([], "pin")
+			store.preload([], "tag")
 
 		assert_eq(statements, [])
 
@@ -379,42 +371,42 @@ def test_rejects_invalid_arguments_before_any_query():
 def test_rejects_several_has_one_rows():
 	with open_store() as store:
 		fixture = Fixture(store)
-		store.create(Document, pin_id=fixture.sketch.id, body="Shading")
+		store.create(Profile, author_id=fixture.ada.id, bio="Reader")
 
 		with assert_raises(DatabaseError) as raised:
-			store.preload(fixture.sketch, "document")
+			store.preload(fixture.ada, "profile")
 
 		assert_eq(
 			str(raised.exception),
-			f"Pin.document has several Document rows for Pin {fixture.sketch.id}",
+			f"Author.profile has several Profile rows for Author {fixture.ada.id}",
 		)
 
 
 def test_rejects_a_dangling_belongs_to():
-	user_id, board_id, placement_id, pin_id = uuid4(), uuid4(), uuid4(), uuid4()
+	author_id, post_id, tagging_id, tag_id = uuid4(), uuid4(), uuid4(), uuid4()
 	created = "2025-01-02T03:04:05.000000Z"
 	rows = f"""
-	INSERT INTO users VALUES ('{user_id}', '{created}', 'Ada');
-	INSERT INTO boards VALUES ('{board_id}', '{created}', 'Ideas', '{user_id}');
-	INSERT INTO placements
-	VALUES ('{placement_id}', '{created}', '{pin_id}', '{board_id}', 0);
+	INSERT INTO authors VALUES ('{author_id}', '{created}', 'Ada');
+	INSERT INTO posts VALUES ('{post_id}', '{created}', 'Ideas', '{author_id}');
+	INSERT INTO taggings
+	VALUES ('{tagging_id}', '{created}', '{post_id}', '{tag_id}', 0);
 	"""
 	with open_store(rows=rows) as store:
-		placement = store.find_one(Placement, placement_id)
+		tagging = store.find_one(Tagging, tagging_id)
 
 		with assert_raises(DatabaseError) as raised:
-			store.preload(placement, "pin")
+			store.preload(tagging, "tag")
 
 		assert_eq(
 			str(raised.exception),
-			f"Placement.pin refers to Pin {pin_id}, which does not exist",
+			f"Tagging.tag refers to Tag {tag_id}, which does not exist",
 		)
 
 
 def test_rejects_an_unregistered_target():
-	with open_store([User, Board, Placement]) as store:
-		user = store.create(User, name="Ada")
-		board = store.create(Board, title="Ideas", creator_id=user.id)
+	with open_store([Author, Post, Tagging]) as store:
+		author = store.create(Author, name="Ada")
+		post = store.create(Post, title="Ideas", author_id=author.id)
 
 		with assert_raises(ModelError):
-			store.preload(board, "placements.pin")
+			store.preload(post, "taggings.tag")

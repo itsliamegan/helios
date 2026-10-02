@@ -43,7 +43,7 @@ class Model:
 		for name in METADATA:
 			if name in vars(cls) or name in annotations:
 				raise ModelError(f"{cls.__name__}.{name} is model metadata")
-		declare_columns(cls, dict(Model.columns.declared))
+		declare_attributes(cls)
 
 	def __init__(self, **columns: Any):
 		values = type(self).initialize(columns)
@@ -97,36 +97,36 @@ class Model:
 		return f"{type(self).__name__}({self.id!r})"
 
 
-def declare_columns(model_type: type[Model], columns: dict[str, Column]):
-	name = model_type.__name__
-	own_columns = {}
+def declare_attributes(model_type: type[Model]):
+	reserved = Model.columns.declared
+	columns = {}
 	relationships = {}
 	for declaration in declarations(model_type, settle, ModelError):
 		default = declaration.default
 		if isinstance(default, Relationship):
-			default.bind(declaration)
-			relationships[declaration.name] = default
+			relationship = default
+			relationship.bind(declaration)
+			relationships[declaration.name] = relationship
 		else:
-			declared_column = default if isinstance(default, Column) else Column()
-			declared_column.bind(declaration)
-			own_columns[declaration.name] = declared_column
+			column = default if isinstance(default, Column) else Column()
+			column.bind(declaration)
+			columns[declaration.name] = column
 
-	for column_name, value in vars(model_type).items():
+	for name, value in vars(model_type).items():
 		if (
 			isinstance(value, Column | Relationship)
-			and column_name not in own_columns
-			and column_name not in relationships
+			and name not in columns
+			and name not in relationships
 		):
-			raise ModelError(f"'{name}.{column_name}' has no annotation")
+			raise ModelError(f"'{model_type.__name__}.{name}' has no annotation")
 
-	for column_name in [*vars(model_type), *own_columns]:
-		if column_name in columns:
-			raise ModelError(f"'{name}.{column_name}' is a reserved attribute")
+	for name in [*vars(model_type), *columns]:
+		if name in reserved:
+			raise ModelError(f"'{model_type.__name__}.{name}' is a reserved attribute")
 
-	for column_name, declared_column in own_columns.items():
-		setattr(model_type, column_name, declared_column)
-		columns[column_name] = declared_column
-	model_type.columns = Columns(columns)
+	for name, column in columns.items():
+		setattr(model_type, name, column)
+	model_type.columns = Columns({**reserved, **columns})
 	model_type.relationships = Relationships(relationships)
 
 	for relationship in relationships.values():
@@ -142,4 +142,4 @@ def settle(declaration: Declaration[object]) -> object:
 
 METADATA = {"columns", "relationships"}
 
-declare_columns(Model, {})
+declare_attributes(Model)

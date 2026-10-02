@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING
 
 from .error import ModelError
@@ -24,7 +24,7 @@ def branches(
 	subject = f"store.preload on {model_type.__name__}"
 	tree: dict[str, Branch] = {}
 	for path in paths:
-		segments = path.split(".") if isinstance(path, str) else [""]
+		segments = path.split(".")
 		if not all(segments):
 			raise ModelError(
 				f"{subject} has {path!r}, which is not a relationship path"
@@ -45,7 +45,7 @@ def branches(
 	return tree
 
 
-def load(store: Store, models: list[Model], branches: dict[str, Branch]):
+def load(store: Store, models: Sequence[Model], branches: dict[str, Branch]):
 	for name, branch in branches.items():
 		relationship = branch.relationship
 		pending = [model for model in models if name not in model._state.loaded]
@@ -54,8 +54,10 @@ def load(store: Store, models: list[Model], branches: dict[str, Branch]):
 
 		children: dict[int, Model] = {}
 		for model in models:
-			for child in held(model._state.loaded[name]):
-				children[id(child)] = child
+			loaded = model._state.loaded[name]
+			for child in loaded if isinstance(loaded, list) else [loaded]:
+				if isinstance(child, Model):
+					children[id(child)] = child
 		if branch.branches and children:
 			load(store, list(children.values()), branch.branches)
 
@@ -82,12 +84,3 @@ def fill(store: Store, relationship: Relationship, models: list[Model]):
 	for model in models:
 		found = matches.get(model._state.values[owner_column], [])
 		model._state.loaded[relationship.name] = relationship.collect(model, found)
-
-
-def held(value: object) -> list[Model]:
-	if isinstance(value, list):
-		return value
-	elif isinstance(value, Model):
-		return [value]
-	else:
-		return []

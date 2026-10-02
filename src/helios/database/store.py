@@ -78,38 +78,18 @@ class Store:
 			raise NotFoundError(model_type, model.id)
 
 	def preload[T: Model](self, models: T | list[T], *paths: str):
-		if not paths:
-			raise ModelError("store.preload requires at least one path")
-		given = [models] if isinstance(models, Model) else models
-		if not isinstance(given, list):
-			raise ModelError(
-				"store.preload takes a model or a list of models, "
-				f"got {type(given).__name__}"
-			)
-		for model in given:
-			if not isinstance(model, Model):
-				raise ModelError(
-					"store.preload takes a model or a list of models, "
-					f"got {type(model).__name__}"
-				)
-		if not given:
+		if not isinstance(models, list):
+			models = [models]
+		if not models:
 			return
 
-		model_types = list(dict.fromkeys(type(model) for model in given))
+		model_types = {type(model) for model in models}
 		if len(model_types) > 1:
-			names = [model_type.__name__ for model_type in model_types]
-			raise ModelError(
-				"store.preload takes models of one model type, "
-				f"got {", ".join(names[:-1])} and {names[-1]}"
-			)
-		model_type = self.registry.get(model_types[0])
-		for model in given:
-			if not model._state.stored:
-				raise ModelError(
-					f"store.preload takes stored models, "
-					f"and {model!r} was built with the constructor"
-				)
-		load(self, list(given), branches(self.registry, model_type, paths))
+			raise ModelError("store.preload takes models of one model type")
+		model_type = self.registry.get(model_types.pop())
+		if not all(model._state.stored for model in models):
+			raise ModelError("store.preload can only be called with stored models")
+		load(self, models, branches(self.registry, model_type, paths))
 
 	def identifying(self, model: Model) -> tuple[Clause, ...]:
 		return (Clause((Group.parse(self.registry, type(model), {"id": model.id}),)),)
