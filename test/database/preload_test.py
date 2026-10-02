@@ -399,7 +399,7 @@ def test_rejects_a_dangling_belongs_to():
 
 		assert_eq(
 			str(raised.exception),
-			f"Tagging.tag refers to Tag {tag_id}, which does not exist",
+			f"Tagging.tag has no Tag row for Tagging {tagging_id}",
 		)
 
 

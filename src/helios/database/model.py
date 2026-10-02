@@ -20,7 +20,6 @@ from .relationship import (
 	has_many,
 	has_one,
 )
-from .state import State
 
 
 @dataclass_transform(
@@ -46,17 +45,17 @@ class Model:
 		declare_attributes(cls)
 
 	def __init__(self, **columns: Any):
-		values = type(self).initialize(columns)
-		values["id"] = uuid4()
-		self._state = State(values, stored=False)
+		self._values = type(self).initialize(columns)
+		self._values["id"] = uuid4()
+		self._loaded: dict[str, object] = {}
+		self._stored = False
 
 	@classmethod
 	def hydrate(cls, values: dict[str, Any]) -> Model:
 		model = cls.__new__(cls)
-		model._state = State(
-			{name: values[name] for name in cls.columns},
-			stored=True,
-		)
+		model._values = {name: values[name] for name in cls.columns}
+		model._loaded = {}
+		model._stored = True
 		return model
 
 	@classmethod

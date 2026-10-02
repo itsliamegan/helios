@@ -6,7 +6,7 @@ from typing import Any, Literal, TYPE_CHECKING, TypeIs, cast, get_args, get_orig
 from helios.declarative import Declaration, DeclarationError, split_nullable
 
 from .codec import UUID
-from .error import DatabaseError, ModelError
+from .error import ModelError
 
 if TYPE_CHECKING:
 	from .column import Columns
@@ -20,6 +20,8 @@ class Target:
 
 
 class Relationship(ABC):
+	plural = False
+
 	name: str
 	owner: type[Model]
 	declaration: Declaration[object]
@@ -60,14 +62,11 @@ class Relationship(ABC):
 	@abstractmethod
 	def target_column(self) -> str: ...
 
-	@abstractmethod
-	def collect(self, parent: Model, matches: list[Model]) -> object: ...
-
 	def __get__(self, instance: Model | None, owner: type) -> object:
 		if instance is None:
 			return self
 		try:
-			return instance._state.loaded[self.name]
+			return instance._loaded[self.name]
 		except KeyError:
 			raise ModelError(f"{self.label} is not loaded") from None
 
@@ -119,17 +118,6 @@ class BelongsTo(Relationship):
 	def target_column(self) -> str:
 		return "id"
 
-	def collect(self, parent: Model, matches: list[Model]) -> object:
-		id = parent._state.values[self.id_name]
-		if id is None:
-			return None
-		if not matches:
-			raise DatabaseError(
-				f"{self.label} refers to {self.target.__name__} {id}, "
-				"which does not exist"
-			)
-		return matches[0]
-
 
 class Inverse(Relationship):
 	def check(self):
@@ -150,6 +138,8 @@ class Inverse(Relationship):
 
 
 class HasMany(Inverse):
+	plural = True
+
 	def settle(self, declaration: Declaration[object]) -> Target:
 		annotation = declaration.annotation
 		members = get_args(annotation)
@@ -161,9 +151,6 @@ class HasMany(Inverse):
 				f"expected list[<model>], got {annotation!r}",
 			)
 		return Target(members[0], nullable=False)
-
-	def collect(self, parent: Model, matches: list[Model]) -> object:
-		return list(matches)
 
 
 class HasOne(Inverse):
@@ -181,14 +168,6 @@ class HasOne(Inverse):
 				f"expected <model> | None, got {declaration.annotation!r}",
 			)
 		return Target(annotation, nullable)
-
-	def collect(self, parent: Model, matches: list[Model]) -> object:
-		if len(matches) > 1:
-			raise DatabaseError(
-				f"{self.label} has several {self.target.__name__} rows "
-				f"for {self.owner.__name__} {parent.id}"
-			)
-		return matches[0] if matches else None
 
 
 class Relationships(Mapping[str, Relationship]):
@@ -211,6 +190,13 @@ class Relationships(Mapping[str, Relationship]):
 
 	def __len__(self) -> int:
 		return len(self.declared)
+
+	def of_kind[R: Relationship](self, kind: type[R]) -> list[R]:
+		return [
+			relationship
+			for relationship in self.values()
+			if isinstance(relationship, kind)
+		]
 
 
 def is_model(annotation: object) -> TypeIs[type[Model]]:

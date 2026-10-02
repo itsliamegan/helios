@@ -9,7 +9,7 @@ from .column import Column
 from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .model import Model
-from .preload import branches, load
+from .preload import Preload
 from .query import Query
 from .registry import Registry
 from .relationship import BelongsTo
@@ -37,13 +37,13 @@ class Store:
 	) -> T:
 		registered = self.registry.get(cast(type[T], model_type))
 		model = model_type(*args, **values)
-		model._state.values["created_at"] = datetime.now(UTC)
+		model._values["created_at"] = datetime.now(UTC)
 		encoded = {
-			name: column.encode(model._state.values[name], registered)
+			name: column.encode(model._values[name], registered)
 			for name, column in registered.columns.items()
 		}
 		self.write(Insert(registered.table, encoded))
-		model._state.stored = True
+		model._stored = True
 		return model
 
 	def update(self, model: Model, **values: Any):
@@ -58,18 +58,16 @@ class Store:
 			encoded[name] = column.encode(value, model_type)
 		moved = [
 			relationship.name
-			for relationship in model_type.relationships.values()
-			if isinstance(relationship, BelongsTo)
-			and relationship.id_name in values
-			and values[relationship.id_name]
-			!= model._state.values[relationship.id_name]
+			for relationship in model_type.relationships.of_kind(BelongsTo)
+			if relationship.id_name in values
+			and values[relationship.id_name] != model._values[relationship.id_name]
 		]
 		statement = Update(model_type.table, encoded, self.identifying(model))
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
-		model._state.values.update(values)
+		model._values.update(values)
 		for name in moved:
-			model._state.loaded.pop(name, None)
+			model._loaded.pop(name, None)
 
 	def delete(self, model: Model):
 		model_type = self.registry.get(type(model))
@@ -87,9 +85,9 @@ class Store:
 		if len(model_types) > 1:
 			raise ModelError("store.preload takes models of one model type")
 		model_type = self.registry.get(model_types.pop())
-		if not all(model._state.stored for model in models):
+		if not all(model._stored for model in models):
 			raise ModelError("store.preload can only be called with stored models")
-		load(self, models, branches(self.registry, model_type, paths))
+		Preload(self, model_type, paths).run(models)
 
 	def identifying(self, model: Model) -> tuple[Clause, ...]:
 		return (Clause((Group.parse(self.registry, type(model), {"id": model.id}),)),)

@@ -1,9 +1,8 @@
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING
 
-from .error import ModelError
+from .error import DatabaseError, ModelError
 from .model import Model
-from .registry import Registry
 from .relationship import Relationship
 
 if TYPE_CHECKING:
@@ -16,22 +15,24 @@ class Branch:
 		self.branches: dict[str, Branch] = {}
 
 
-def branches(
-	registry: Registry,
-	model_type: type[Model],
-	paths: Iterable[str],
-) -> dict[str, Branch]:
-	subject = f"store.preload on {model_type.__name__}"
-	tree: dict[str, Branch] = {}
-	for path in paths:
+class Preload:
+	def __init__(self, store: Store, model_type: type[Model], paths: Iterable[str]):
+		self.store = store
+		self.model_type = model_type
+		self.branches: dict[str, Branch] = {}
+		for path in paths:
+			self.add(path)
+
+	def add(self, path: str):
+		subject = f"store.preload on {self.model_type.__name__}"
 		segments = path.split(".")
 		if not all(segments):
 			raise ModelError(
 				f"{subject} has {path!r}, which is not a relationship path"
 			)
 
-		level = tree
-		current = model_type
+		level = self.branches
+		current = self.model_type
 		for segment in segments:
 			relationship = current.relationships.get(segment)
 			if relationship is None:
@@ -39,48 +40,63 @@ def branches(
 					f"{subject} has {path!r}, "
 					f"where {current.__name__}.{segment} is not a relationship"
 				)
-			current = registry.get(relationship.target)
+			current = self.store.registry.get(relationship.target)
 			branch = level.setdefault(segment, Branch(relationship))
 			level = branch.branches
-	return tree
 
+	def run(self, models: Sequence[Model]):
+		self.load(models, self.branches)
 
-def load(store: Store, models: Sequence[Model], branches: dict[str, Branch]):
-	for name, branch in branches.items():
-		relationship = branch.relationship
-		pending = [model for model in models if name not in model._state.loaded]
-		if pending:
-			fill(store, relationship, pending)
+	def load(self, models: Sequence[Model], branches: dict[str, Branch]):
+		for name, branch in branches.items():
+			pending = [model for model in models if name not in model._loaded]
+			if pending:
+				self.fill(branch.relationship, pending)
 
-		children: dict[int, Model] = {}
-		for model in models:
-			loaded = model._state.loaded[name]
-			for child in loaded if isinstance(loaded, list) else [loaded]:
-				if isinstance(child, Model):
-					children[id(child)] = child
-		if branch.branches and children:
-			load(store, list(children.values()), branch.branches)
+			children: dict[int, Model] = {}
+			for model in models:
+				loaded = model._loaded[name]
+				for child in loaded if isinstance(loaded, list) else [loaded]:
+					if isinstance(child, Model):
+						children[id(child)] = child
+			if branch.branches and children:
+				self.load(list(children.values()), branch.branches)
 
-
-def fill(store: Store, relationship: Relationship, models: list[Model]):
-	owner_column = relationship.owner_column
-	target_column = relationship.target_column
-	values = list(
-		dict.fromkeys(
-			model._state.values[owner_column]
-			for model in models
-			if model._state.values[owner_column] is not None
+	def fill(self, relationship: Relationship, models: list[Model]):
+		owner_column = relationship.owner_column
+		target_column = relationship.target_column
+		values = list(
+			dict.fromkeys(
+				model._values[owner_column]
+				for model in models
+				if model._values[owner_column] is not None
+			)
 		)
-	)
 
-	matches: dict[object, list[Model]] = {}
-	size = store.connection.parameter_limit
-	for start in range(0, len(values), size):
-		batch = values[start : start + size]
-		query = store.query(relationship.target)
-		for row in query.where({f"{target_column} in": batch}).all():
-			matches.setdefault(row._state.values[target_column], []).append(row)
+		matches: dict[object, list[Model]] = {}
+		size = self.store.connection.parameter_limit
+		for start in range(0, len(values), size):
+			batch = values[start : start + size]
+			query = self.store.query(relationship.target)
+			for row in query.where({f"{target_column} in": batch}).all():
+				matches.setdefault(row._values[target_column], []).append(row)
 
-	for model in models:
-		found = matches.get(model._state.values[owner_column], [])
-		model._state.loaded[relationship.name] = relationship.collect(model, found)
+		for model in models:
+			found = matches.get(model._values[owner_column], [])
+			model._loaded[relationship.name] = self.loaded(relationship, model, found)
+
+	def loaded(self, relationship: Relationship, model: Model, found: list[Model]):
+		target = relationship.target.__name__
+		owner = f"{relationship.owner.__name__} {model.id}"
+		if relationship.plural:
+			return found
+		elif len(found) > 1:
+			raise DatabaseError(
+				f"{relationship.label} has several {target} rows for {owner}"
+			)
+		elif found:
+			return found[0]
+		elif relationship.resolved.nullable:
+			return None
+		else:
+			raise DatabaseError(f"{relationship.label} has no {target} row for {owner}")
