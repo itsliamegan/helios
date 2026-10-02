@@ -243,6 +243,18 @@ def test_rejects_attributes_named_like_model_metadata():
 			columns = {}
 
 
+def test_rejects_attributes_named_like_model_members():
+	with assert_raises(ModelError):
+
+		class Annotated(Model):
+			hydrate: str
+
+	with assert_raises(ModelError):
+
+		class Assigned(Model):
+			column = None
+
+
 def test_declares_a_column_named_values():
 	class Tally(Model):
 		values: str

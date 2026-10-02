@@ -2,7 +2,12 @@ from typing import Any, ClassVar, Self, dataclass_transform
 
 from luna.inflect import sentence, words
 
-from helios.declarative import check_init_keywords, check_single_base, declarations
+from helios.declarative import (
+	check_init_keywords,
+	check_reserved_names,
+	check_single_base,
+	declarations,
+)
 from helios.http import Input
 
 from .error import FormError
@@ -16,6 +21,7 @@ from .rules import Rules
 
 INVALID = "invalid"
 REQUIRED = "required"
+METADATA = {"fields"}
 
 
 @dataclass_transform(kw_only_default=True, eq_default=False)
@@ -28,13 +34,9 @@ class Form:
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
 		check_single_base(cls, Form, FormError)
+		check_reserved_names(cls, Form, METADATA, FormError)
 		cls.fields = {}
 		for declaration in declarations(cls, FormError):
-			if declaration.name == "values" or declaration.name in vars(Form):
-				raise FormError(
-					f"Form {cls.__name__} has a field named '{declaration.name}', "
-					"which Form uses"
-				)
 			field = Field.from_declaration(declaration)
 			cls.fields[declaration.name] = field
 			setattr(cls, declaration.name, field)
@@ -52,14 +54,14 @@ class Form:
 			[name for name, field in form.fields.items() if field.required],
 		)
 
-		self.values: dict[str, Any] = {}
+		self._values: dict[str, Any] = {}
 		for name, field in form.fields.items():
-			self.values[name] = values.get(name, field.initial)
+			self._values[name] = values.get(name, field.initial)
 
 	@classmethod
 	def validate(cls, input: Input) -> tuple[Self, Errors]:
 		form = cls.__new__(cls)
-		form.values = {}
+		form._values = {}
 		errors = Errors()
 		for name, field in cls.fields.items():
 			if field.missing(input):
@@ -67,7 +69,7 @@ class Form:
 					key = Key(name, rest=REQUIRED)
 					errors.add(name, cls.message(key, "must be provided"))
 				else:
-					form.values[name] = field.initial
+					form._values[name] = field.initial
 				continue
 
 			try:
@@ -81,7 +83,7 @@ class Form:
 					raise
 				errors.add(name, cls.message(error.key, error.message, error.key.item))
 			else:
-				form.values[name] = value
+				form._values[name] = value
 		return form, errors
 
 	@classmethod
@@ -95,8 +97,8 @@ class Form:
 
 	def __repr__(self) -> str:
 		values = ", ".join(
-			f"{name}={self.values[name]!r}"
+			f"{name}={self._values[name]!r}"
 			for name in type(self).fields
-			if name in self.values
+			if name in self._values
 		)
 		return f"{type(self).__name__}({values})"

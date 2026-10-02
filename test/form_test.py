@@ -263,16 +263,23 @@ def test_rejects_undefined_annotations():
 			author: Author  # noqa: F821  # ty: ignore[unresolved-reference]
 
 
-def test_rejects_field_names_form_uses():
-	with assert_raises(FormError) as raised:
+def test_rejects_names_form_uses():
+	with assert_raises(FormError):
 
-		class BadForm(Form):
-			values: str
+		class DeclaredForm(Form):
+			validate: str
 
-	assert_eq(
-		str(raised.exception),
-		"Form BadForm has a field named 'values', which Form uses",
-	)
+	with assert_raises(FormError):
+
+		class AssignedForm(Form):
+			fields = {}
+
+
+def test_declares_a_field_named_values():
+	class TagForm(Form):
+		values: str
+
+	assert_eq(TagForm(values="a").values, "a")
 
 
 class WebURL(Rule[str]):

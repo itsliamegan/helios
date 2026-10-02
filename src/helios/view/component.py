@@ -1,4 +1,3 @@
-from annotationlib import get_annotations
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform
@@ -6,15 +5,16 @@ from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform
 from markupsafe import Markup
 
 from helios.declarative import (
-	Declaration,
 	MISSING,
 	check_init_keywords,
+	check_reserved_names,
 	check_single_base,
 	declarations,
 )
 
 from .attributes import Attributes, html_name
 from .error import ComponentError
+from .prop import Prop
 from .view import View
 
 if TYPE_CHECKING:
@@ -34,16 +34,18 @@ rendering: ContextVar[Rendering] = ContextVar("rendering")
 class Component:
 	template: ClassVar[str]
 	accepts: ClassVar[set[str]] = set()
-	props: ClassVar[dict[str, Declaration]] = {}
+	props: ClassVar[dict[str, Prop]] = {}
 
 	def __init_subclass__(cls, **keywords: Any):
 		super().__init_subclass__(**keywords)
 		check_single_base(cls, Component, ComponentError)
-		cls.props = {
-			declaration.name: declaration
-			for declaration in declarations(cls, ComponentError)
-		}
+		check_reserved_names(cls, Component, METADATA, ComponentError)
+		cls.props = {}
+		for declaration in declarations(cls, ComponentError):
+			cls.props[declaration.name] = Prop(declaration)
 		check_declaration(cls)
+		for name, prop in cls.props.items():
+			setattr(cls, name, prop)
 
 	@classmethod
 	def accepts_attribute(cls, name: str) -> bool:
@@ -51,8 +53,8 @@ class Component:
 
 	def __init__(self, **keywords: Any):
 		component = type(self)
-		for declaration in component.props.values():
-			declaration.resolve()
+		for prop in component.props.values():
+			prop.resolve()
 		props = {}
 		attributes = {}
 		for name, value in keywords.items():
@@ -81,18 +83,15 @@ class Component:
 			"props",
 			props,
 			component.props,
-			[
-				name
-				for name, declaration in component.props.items()
-				if declaration.default is MISSING
-			],
+			[name for name, prop in component.props.items() if prop.required],
 		)
 
-		for name, declaration in component.props.items():
-			setattr(self, name, props.get(name, declaration.default))
+		self._values: dict[str, Any] = {}
+		for name, prop in component.props.items():
+			self._values[name] = props.get(name, prop.default)
 
 		if "attributes" in component.props:
-			for name in sorted(vars(self)["attributes"].names()):
+			for name in sorted(self._values["attributes"].names()):
 				if not component.accepts_attribute(name):
 					raise TypeError(
 						f'{component.__name__} does not accept the attribute "{name}"'
@@ -122,14 +121,10 @@ class Component:
 
 def check_declaration(component: type[Component]):
 	name = component.__name__
-	for prop_name, declaration in component.props.items():
+	for prop_name, prop in component.props.items():
 		if prop_name == "component":
-			raise ComponentError(f'Component {name} has a prop named "component"')
-		if prop_name in vars(Component) or prop_name in get_annotations(Component):
-			raise ComponentError(
-				f'Component {name} has a prop named "{prop_name}", which Component uses'
-			)
-		default = declaration.default
+			raise ComponentError(f"{name}.component is reserved by Component")
+		default = prop.default
 		if default is not MISSING and default.__hash__ is None:
 			raise ComponentError(
 				f'Component {name} has a mutable default for "{prop_name}"'
@@ -143,3 +138,6 @@ def check_declaration(component: type[Component]):
 		raise ComponentError(
 			f"Component {name} declares accepts but has no attributes prop"
 		)
+
+
+METADATA = {"props"}

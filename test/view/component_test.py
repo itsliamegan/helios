@@ -420,6 +420,12 @@ def test_rejects_props_named_like_component_members():
 		class Wrapper(Component):
 			template: str = "wrapper"  # ty: ignore[invalid-attribute-override]
 
+	with assert_raises(ComponentError):
+
+		class Assigned(Component):
+			template = "assigned"
+			props = {}
+
 
 def test_rejects_mutable_defaults():
 	with assert_raises(ComponentError):
