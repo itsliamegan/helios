@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 import re
 from typing import Any
 from urllib.parse import quote
@@ -6,29 +7,31 @@ from helios.http import URL
 
 from .convert import Converter
 
-PARAM_REGEX = re.compile(r"{(\w+)(?::(\w+))?}")
-PARAM_VALUE_REGEX = r"[\w-]+"
+PARAMETER_REGEX = re.compile(r"{(\w+)(?::(\w+))?}")
+PARAMETER_VALUE_REGEX = r"[\w-]+"
 
 
 class Pattern:
 	def __init__(self, raw: str):
 		self.converters: dict[str, Converter[Any]] = {}
-		lit = raw
-		for param in PARAM_REGEX.finditer(raw):
-			name, converter_name = param.groups()
+		expression = raw
+		for parameter in PARAMETER_REGEX.finditer(raw):
+			name, converter_name = parameter.groups()
 			converter_name = converter_name or "str"
 			converter = Converter.for_name(converter_name)
 			if converter is None:
 				raise ValueError(f"Unknown pattern converter: {converter_name}")
 			self.converters[name] = converter
-			lit = lit.replace(param.group(), f"(?P<{name}>{PARAM_VALUE_REGEX})")
+			expression = expression.replace(
+				parameter.group(), f"(?P<{name}>{PARAMETER_VALUE_REGEX})"
+			)
 
-		if lit.endswith("/"):
-			lit += "?$"
+		if expression.endswith("/"):
+			expression += "?$"
 		else:
-			lit += "/?$"
+			expression += "/?$"
 		self.raw = raw
-		self.regex = re.compile(lit)
+		self.regex = re.compile(expression)
 
 	def prefixed(self, prefix: str) -> Pattern:
 		if not prefix:
@@ -41,7 +44,7 @@ class Pattern:
 			return None
 		return self.convert(match.groupdict())
 
-	def path(self, params: dict[str, Any] | None = None) -> str:
+	def path(self, params: Mapping[str, Any] | None = None) -> str:
 		params = params or {}
 		expected = set(self.converters)
 		supplied = set(params)
@@ -58,13 +61,13 @@ class Pattern:
 			name = match.group(1)
 			value = self.converters[name].format(params[name])
 			encoded = quote(value, safe="")
-			if re.fullmatch(PARAM_VALUE_REGEX, encoded) is None:
+			if re.fullmatch(PARAMETER_VALUE_REGEX, encoded) is None:
 				raise ValueError(f"invalid route parameter: {name}")
 			return encoded
 
-		return PARAM_REGEX.sub(replace, self.raw)
+		return PARAMETER_REGEX.sub(replace, self.raw)
 
-	def convert(self, raw_params: dict[str, str]) -> dict[str, Any] | None:
+	def convert(self, raw_params: Mapping[str, str]) -> dict[str, Any] | None:
 		try:
 			return {
 				name: self.converters[name].convert(value)

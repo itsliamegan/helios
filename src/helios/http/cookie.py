@@ -1,6 +1,7 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Self
 
 from werkzeug.http import dump_cookie, parse_cookie
 
@@ -40,7 +41,7 @@ class Cookie:
 class Cookies:
 	cookies: dict[str, Cookie]
 
-	def __init__(self, pairs: dict[str, str] | None = None):
+	def __init__(self, pairs: Mapping[str, str] | None = None):
 		if pairs is None:
 			pairs = {}
 		cookies = {}
@@ -49,7 +50,7 @@ class Cookies:
 		self.cookies = cookies
 
 	@classmethod
-	def from_headers(cls, headers: Headers) -> Cookies:
+	def from_headers(cls, headers: Headers) -> Self:
 		cookies = cls()
 		if "Cookie" not in headers:
 			return cookies

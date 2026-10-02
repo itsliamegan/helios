@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from typing import Any, Concatenate, TYPE_CHECKING
 
 from helios.http import Method, Request, Response, URL
@@ -18,7 +18,7 @@ class Route:
 		method: Method,
 		pattern: Pattern,
 		handler: Handler[...],
-		guards: list[Guard[...]] | None = None,
+		guards: Sequence[Guard[...]] | None = None,
 		name: str | None = None,
 	):
 		self.method = method
@@ -27,7 +27,7 @@ class Route:
 		self.guards = guards or []
 		self.name = name
 
-	def within(self, prefix: str, guards: list[Guard[...]]) -> Route:
+	def within(self, prefix: str, guards: Sequence[Guard[...]]) -> Route:
 		if not prefix and not guards:
 			return self
 		return Route(
@@ -43,12 +43,12 @@ class Route:
 			return None
 		return self.pattern.match(url)
 
-	def __call__(self, req: Request, ctx: Context, **params: Any) -> Response:
+	def __call__(self, request: Request, context: Context, **params: Any) -> Response:
 		for guard in self.guards:
-			res = guard(req, ctx, **params)
-			if res is not None:
-				return res
-		return self.handler(req, ctx, **params)
+			response = guard(request, context, **params)
+			if response is not None:
+				return response
+		return self.handler(request, context, **params)
 
 	def __repr__(self) -> str:
 		return (
@@ -60,15 +60,15 @@ class Route:
 class Group:
 	def __init__(
 		self,
-		routes: list[Route | Group],
+		routes: Sequence[Route | Group],
 		prefix: str = "",
-		guards: list[Guard[...]] | None = None,
+		guards: Sequence[Guard[...]] | None = None,
 	):
 		self.routes = list(routes)
 		self.prefix = prefix
 		self.guards = guards or []
 
-	def within(self, prefix: str, guards: list[Guard[...]]) -> Group:
+	def within(self, prefix: str, guards: Sequence[Guard[...]]) -> Group:
 		return Group(self.routes, join(prefix, self.prefix), [*guards, *self.guards])
 
 	def __iter__(self) -> Iterator[Route]:

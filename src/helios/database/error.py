@@ -15,7 +15,7 @@ class DatabaseError(RuntimeError):
 	pass
 
 
-class DatabaseBusy(DatabaseError):
+class DatabaseBusyError(DatabaseError):
 	pass
 
 

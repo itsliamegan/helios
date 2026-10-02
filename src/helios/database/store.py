@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
@@ -76,8 +76,8 @@ class Store:
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
 
-	def load[T: Model](self, models: T | list[T], *paths: str):
-		if not isinstance(models, list):
+	def load[T: Model](self, models: T | Sequence[T], *paths: str):
+		if not isinstance(models, Sequence):
 			models = [models]
 		if not models:
 			return
@@ -184,4 +184,4 @@ class Store:
 				"database row contains an invalid model value"
 			) from error
 
-		return cast(T, model_type.hydrate(values))
+		return model_type.hydrate(values)

@@ -1,8 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from helios.app import Application, Container, Context, Next
-from helios.app import Provider as ApplicationProvider
+from helios.app import Application, Container, Context, Next, Provider
 from helios.http import Cookie, Request, Response
 
 from .config import Config
@@ -12,7 +11,7 @@ from .store import Session, Store
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
-class Provider(ApplicationProvider):
+class Provider(Provider):
 	def __init__(self, config: Config, driver: Driver):
 		self.config = config
 		self.driver = driver

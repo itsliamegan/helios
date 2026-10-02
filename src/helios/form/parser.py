@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 import re
 from typing import Any, NewType, get_args, get_origin
 import uuid
@@ -29,11 +30,11 @@ class Parser[T](ABC):
 			return List(item_parser)
 
 	@abstractmethod
-	def parse(self, values: list[str]) -> T: ...
+	def parse(self, values: Sequence[str]) -> T: ...
 
 
 class Scalar[T](Parser[T]):
-	def single(self, values: list[str]) -> str:
+	def single(self, values: Sequence[str]) -> str:
 		if len(values) != 1:
 			raise ParseError("must be a single value")
 		else:
@@ -41,12 +42,12 @@ class Scalar[T](Parser[T]):
 
 
 class Str(Scalar[str]):
-	def parse(self, values: list[str]) -> str:
+	def parse(self, values: Sequence[str]) -> str:
 		return self.single(values)
 
 
 class Int(Scalar[int]):
-	def parse(self, values: list[str]) -> int:
+	def parse(self, values: Sequence[str]) -> int:
 		raw = self.single(values).strip()
 		if re.fullmatch(r"-?[0-9]+", raw) is None:
 			raise ParseError("must be a whole number")
@@ -55,25 +56,25 @@ class Int(Scalar[int]):
 
 
 class UUID(Scalar[uuid.UUID]):
-	def parse(self, values: list[str]) -> uuid.UUID:
+	def parse(self, values: Sequence[str]) -> uuid.UUID:
 		raw = self.single(values).strip()
 		try:
 			return uuid.UUID(raw)
-		except ValueError as err:
-			raise ParseError("must be a valid UUID") from err
+		except ValueError as error:
+			raise ParseError("must be a valid UUID") from error
 
 
 class URL(Scalar[http.URL]):
-	def parse(self, values: list[str]) -> http.URL:
+	def parse(self, values: Sequence[str]) -> http.URL:
 		raw = self.single(values).strip()
 		try:
 			return http.URL.parse(raw)
-		except ValueError as err:
-			raise ParseError("must be a valid URL") from err
+		except ValueError as error:
+			raise ParseError("must be a valid URL") from error
 
 
 class Bool(Parser[bool]):
-	def parse(self, values: list[str]) -> bool:
+	def parse(self, values: Sequence[str]) -> bool:
 		if len(values) == 1 and values[0].strip() == "on":
 			return True
 		else:
@@ -84,7 +85,7 @@ class List[T](Parser[list[T]]):
 	def __init__(self, parser: Parser[T]):
 		self.parser = parser
 
-	def parse(self, values: list[str]) -> list[T]:
+	def parse(self, values: Sequence[str]) -> list[T]:
 		try:
 			return [self.parser.parse([item]) for item in values]
 		except ParseError as error:

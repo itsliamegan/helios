@@ -4,17 +4,17 @@ from .source import Driver, Source
 
 
 class Driver(Driver):
-	def __init__(self, dir: Path):
-		self.dir = dir
+	def __init__(self, directory: Path):
+		self.directory = directory
 
 	def names(self) -> list[str]:
 		names = []
-		for dir, _, files in self.dir.walk():
-			parts = dir.relative_to(self.dir).parts
+		for folder, _, files in self.directory.walk():
+			parts = folder.relative_to(self.directory).parts
 			if any(part.startswith(".") for part in parts):
 				continue
 			for file in files:
-				path = dir.joinpath(file)
+				path = folder.joinpath(file)
 				if file.startswith(".") or path.suffix != ".html":
 					continue
 				names.append(".".join(parts + (path.stem,)))
@@ -39,7 +39,7 @@ class Driver(Driver):
 		parts = name.split(".")
 		if any(part == "" or part.startswith(".") for part in parts):
 			return None
-		path = self.dir.joinpath(*parts).with_suffix(".html")
+		path = self.directory.joinpath(*parts).with_suffix(".html")
 		if not path.is_file():
 			return None
 		else:

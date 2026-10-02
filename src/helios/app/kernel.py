@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 import sys
 import traceback
 
@@ -18,7 +18,7 @@ class Kernel:
 		self,
 		container: Container,
 		router: Router,
-		middlewares: list[Middleware],
+		middlewares: Sequence[Middleware],
 	):
 		self.container = container
 		self.pipeline = self.build(router, middlewares)
@@ -30,7 +30,7 @@ class Kernel:
 		finally:
 			context.close()
 
-	def build(self, router: Router, middlewares: list[Middleware]) -> Next:
+	def build(self, router: Router, middlewares: Sequence[Middleware]) -> Next:
 		next: Next = self.render_http_errors(router)
 		for middleware in reversed(middlewares):
 			next = self.render_http_errors(self.bind(middleware, next))

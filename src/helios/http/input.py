@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 
@@ -6,10 +6,10 @@ from dataclasses import dataclass
 class Input:
 	items: dict[str, list[str]]
 
-	def __init__(self, items: Mapping[str, str | list[str]] | None = None):
+	def __init__(self, items: Mapping[str, str | Sequence[str]] | None = None):
 		self.items = {}
 		for name, value in (items or {}).items():
-			self.items[name] = list(value) if isinstance(value, list) else [value]
+			self.items[name] = [value] if isinstance(value, str) else list(value)
 
 	def first(self, name: str) -> str | None:
 		values = self.items.get(name)

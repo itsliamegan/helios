@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_raises, assert_that
 
-from helios.database import Config, DatabaseBusy, DatabaseError
+from helios.database import Config, DatabaseBusyError, DatabaseError
 from helios.database.sqlite import connect
 
 
@@ -95,7 +95,7 @@ def test_translates_writer_contention_to_database_busy():
 		second = connect(Config(path, timedelta(milliseconds=10)))
 		try:
 			first.begin()
-			with assert_raises(DatabaseBusy) as raised:
+			with assert_raises(DatabaseBusyError) as raised:
 				second.begin()
 			exception = raised.exception
 			assert exception is not None

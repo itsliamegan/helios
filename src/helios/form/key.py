@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Self
 
 ITEM = "*"
 
@@ -10,7 +11,7 @@ class Key:
 	rest: str = ""
 
 	@classmethod
-	def parse(cls, text: str) -> Key:
+	def parse(cls, text: str) -> Self:
 		name, _, remainder = text.partition(".")
 		marker, _, rest = remainder.partition(".")
 		if marker == ITEM:

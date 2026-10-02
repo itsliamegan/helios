@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,7 +12,7 @@ from helios.view import Engine, View
 class Flashes:
 	flashes: dict[str, Flash]
 
-	def __init__(self, flashes: dict[str, Any] | None = None):
+	def __init__(self, flashes: Mapping[str, Any] | None = None):
 		flashes = flashes or {}
 		self.flashes = {}
 		for name in flashes:

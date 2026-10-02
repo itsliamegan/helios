@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Self
 
 from .error import UnsupportedMethodError
 
@@ -11,7 +12,7 @@ class Method(Enum):
 	DELETE = "DELETE"
 
 	@classmethod
-	def parse(cls, raw: object) -> Method:
+	def parse(cls, raw: object) -> Self:
 		try:
 			return cls(raw)
 		except ValueError:

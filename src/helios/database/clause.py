@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Self
 
 from .codec import Scalar, encode
 from .column import Column
@@ -27,7 +27,7 @@ class Comparison:
 	value: Scalar
 
 	@classmethod
-	def parse(cls, column: Column, operator: Operator, value: object) -> Comparison:
+	def parse(cls, column: Column, operator: Operator, value: object) -> Self:
 		if value is None:
 			raise ValueError("cannot compare with None")
 
@@ -40,7 +40,7 @@ class IsNull:
 	name: str
 
 	@classmethod
-	def parse(cls, column: Column) -> IsNull:
+	def parse(cls, column: Column) -> Self:
 		column.check(None)
 		return cls(column.name)
 
@@ -52,7 +52,7 @@ class Membership:
 	includes_null: bool
 
 	@classmethod
-	def parse(cls, column: Column, value: object) -> Membership:
+	def parse(cls, column: Column, value: object) -> Self:
 		if isinstance(value, (str, bytes)) or not isinstance(value, Iterable):
 			raise TypeError(
 				"expected an iterable other than str or bytes, "

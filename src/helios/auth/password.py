@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Self
 
 from werkzeug.security import check_password_hash, generate_password_hash

@@ -1,7 +1,7 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Self
 
 
 @dataclass(init=False)
@@ -11,14 +11,16 @@ class Helpers:
 
 	def __init__(
 		self,
-		filters: dict[str, Callable[..., Any]] | None = None,
-		globals: dict[str, Any] | None = None,
+		filters: Mapping[str, Callable[..., Any]] | None = None,
+		globals: Mapping[str, Any] | None = None,
 	):
-		self.filters = filters or {}
-		self.globals = globals or {}
+		filters = filters or {}
+		globals = globals or {}
+		self.filters = dict(filters)
+		self.globals = dict(globals)
 
 	@classmethod
-	def defaults(cls) -> Helpers:
+	def defaults(cls) -> Self:
 		return cls(filters={"date": date, "elapsed": elapsed})
 
 	def update(self, other: Helpers):
@@ -35,12 +37,12 @@ def elapsed(then: datetime, now: datetime | None = None) -> str:
 		now = datetime.now(UTC)
 	diff = now - then
 	if diff.days == 0:
-		mins = diff.seconds / 60
+		minutes = diff.seconds / 60
 		hours = diff.seconds / (60 * 60)
-		if mins < 1:
+		if minutes < 1:
 			return "less than a minute ago"
 		elif hours < 1:
-			return f"{round(mins)} {pluralize("minute", round(mins))} ago"
+			return f"{round(minutes)} {pluralize("minute", round(minutes))} ago"
 		else:
 			return f"{round(hours)} {pluralize("hour", round(hours))} ago"
 	elif diff.days < 7:

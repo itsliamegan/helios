@@ -1,3 +1,4 @@
+from typing import Self
 from urllib.parse import urlsplit
 
 from .query import Query
@@ -39,7 +40,7 @@ class URL:
 		self.fragment = fragment
 
 	@classmethod
-	def parse(cls, raw: str) -> URL:
+	def parse(cls, raw: str) -> Self:
 		parts = urlsplit(raw)
 		if parts.scheme and not parts.netloc:
 			raise ValueError(f"absolute URL has no host: {raw!r}")

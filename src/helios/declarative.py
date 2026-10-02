@@ -1,5 +1,5 @@
 from annotationlib import Format, ForwardRef, get_annotations
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from functools import reduce
 from operator import or_
 from types import NoneType
@@ -90,7 +90,7 @@ def declarations(owner: type, error: type[Exception]) -> list[Declaration]:
 def evaluate_annotation(
 	annotation: object,
 	owner: type,
-	supplied: dict[str, type],
+	supplied: Mapping[str, type],
 ) -> object:
 	if isinstance(annotation, ForwardRef):
 		return annotation.evaluate(locals={**vars(owner), **supplied})

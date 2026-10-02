@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Any
 
 from helios.app import Context
@@ -15,7 +16,7 @@ class Views:
 	def render(
 		self,
 		name: str,
-		assigns: dict[str, Any] | None = None,
+		assigns: Mapping[str, Any] | None = None,
 		status: Status = Status.OK,
 	) -> Response:
 		view = View(name)

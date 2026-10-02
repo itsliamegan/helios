@@ -1,5 +1,6 @@
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 from luna.inflect import dash
 from markupsafe import Markup
@@ -17,7 +18,7 @@ class Attributes:
 		)
 
 	@classmethod
-	def from_html_names(cls, values: dict[str, Any]) -> Attributes:
+	def from_html_names(cls, values: Mapping[str, Any]) -> Self:
 		attributes = cls()
 		attributes.values = split_class_names(values)
 		return attributes
@@ -57,14 +58,14 @@ def html_name(name: str) -> str:
 	return dash(name)
 
 
-def split_class_names(values: dict[str, Any]) -> dict[str, Any]:
+def split_class_names(values: Mapping[str, Any]) -> dict[str, Any]:
 	split = dict(values)
 	if "class" in split:
 		split["class"] = class_names(split["class"])
 	return split
 
 
-def class_names(value: str | list[Any] | None) -> list[str]:
+def class_names(value: str | Sequence[Any] | None) -> list[str]:
 	if not value:
 		value = []
 	if isinstance(value, str):

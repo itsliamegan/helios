@@ -237,6 +237,15 @@ def test_updates_header_through_reference():
 	assert_eq(list(headers["Accept"]), ["text/html", "text/plain"])
 
 
+def test_adding_to_a_header_leaves_given_values_unchanged():
+	given = ["text/html"]
+	headers = Headers({"Accept": given})
+
+	headers["Accept"] += "text/plain"
+
+	assert_eq(given, ["text/html"])
+
+
 def test_iterates_header_pairs():
 	headers = Headers()
 	headers["Accept"] = "text/html"
