@@ -160,7 +160,7 @@ def test_find_by_matches_the_equivalent_query():
 			connection.close()
 
 
-def test_find_by_supports_only_attribute_equality():
+def test_find_by_supports_only_column_equality():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path)

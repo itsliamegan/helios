@@ -3,9 +3,9 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from .attribute import Attribute
 from .clause import Clause, Group
 from .codec import Scalar
+from .column import Column
 from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .model import Model
@@ -54,8 +54,8 @@ class Store:
 		model = model_type(*args, **values)
 		model._values["created_at"] = datetime.now(UTC)
 		encoded = {
-			name: attribute.encode(model._values[name], registered)
-			for name, attribute in registered.attributes.items()
+			name: column.encode(model._values[name], registered)
+			for name, column in registered.columns.items()
 		}
 		self.write(Insert(registered.table, encoded))
 		return model
@@ -66,10 +66,10 @@ class Store:
 			raise ModelError(f"{model_type.__name__}.update requires values")
 		encoded: dict[str, Scalar | None] = {}
 		for name, value in values.items():
-			attribute = model_type.attribute(name)
-			if not attribute.init:
+			column = model_type.column(name)
+			if not column.init:
 				raise ModelError(f"{model_type.__name__}.{name} is generated")
-			encoded[name] = attribute.encode(value, model_type)
+			encoded[name] = column.encode(value, model_type)
 		statement = Update(model_type.table, encoded, self.identifying(model))
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
@@ -93,10 +93,10 @@ class Store:
 	def find_all[T: Model](self, model_type: type[T]) -> list[T]:
 		return self.query(model_type).all()
 
-	def find_by[T: Model](self, model_type: type[T], **attributes: Any) -> list[T]:
-		for name in attributes:
-			model_type.attribute(name)
-		return self.query(model_type).where(attributes).all()
+	def find_by[T: Model](self, model_type: type[T], **columns: Any) -> list[T]:
+		for name in columns:
+			model_type.column(name)
+		return self.query(model_type).where(columns).all()
 
 	def query[T: Model](self, model_type: type[T]) -> Query[T]:
 		self.registry.get(model_type)
@@ -115,10 +115,10 @@ class Store:
 		column_names, rows = self.read(statement)
 		return [self.hydrate(model_type, column_names, row) for row in rows]
 
-	def counts(self, attribute: Attribute, statement: Select) -> dict[Any, int]:
+	def counts(self, column: Column, statement: Select) -> dict[Any, int]:
 		_columns, rows = self.read(statement)
 		try:
-			return {attribute.decode(key): cast(int, count) for key, count in rows}
+			return {column.decode(key): cast(int, count) for key, count in rows}
 		except (TypeError, ValueError) as error:
 			raise DatabaseError(
 				"database row contains an invalid model value"
@@ -153,7 +153,7 @@ class Store:
 		column_names: tuple[str, ...],
 		row: tuple[Scalar | None, ...],
 	) -> T:
-		expected = tuple(model_type.attributes)
+		expected = tuple(model_type.columns)
 		if (
 			len(column_names) != len(expected)
 			or len(set(column_names)) != len(column_names)
@@ -165,7 +165,7 @@ class Store:
 		values: dict[str, Any] = {}
 		try:
 			for name, raw_value in zip(column_names, row, strict=True):
-				values[name] = model_type.attributes[name].decode(raw_value)
+				values[name] = model_type.columns[name].decode(raw_value)
 		except (TypeError, ValueError) as error:
 			raise DatabaseError(
 				"database row contains an invalid model value"

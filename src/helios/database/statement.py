@@ -42,13 +42,13 @@ class Raw:
 	parameters: tuple[Any, ...]
 
 
-type Expression = Column | Count
+type Expression = ColumnReference | Count
 
 type Direction = Literal["asc", "desc"]
 
 
 @dataclass
-class Column:
+class ColumnReference:
 	name: str
 
 

@@ -39,7 +39,7 @@ def test_preserves_explicit_null_instead_of_default():
 	assert_that(Post(title=None).title is None)
 
 
-def test_assigning_an_attribute_raises_and_keeps_the_value():
+def test_assigning_a_column_raises_and_keeps_the_value():
 	class Post(Model):
 		title: str
 
@@ -59,7 +59,7 @@ def test_assigning_an_attribute_raises_and_keeps_the_value():
 	assert_eq(post.id, original_id)
 
 
-def test_rejects_missing_extra_non_init_and_null_attributes():
+def test_rejects_missing_extra_non_init_and_null_columns():
 	class Post(Model):
 		title: str
 
@@ -73,7 +73,7 @@ def test_rejects_missing_extra_non_init_and_null_attributes():
 		Post(title=None)  # ty: ignore[invalid-argument-type]
 
 
-def test_requires_nullable_attributes_without_defaults():
+def test_requires_nullable_columns_without_defaults():
 	class Post(Model):
 		summary: str | None
 
@@ -82,13 +82,13 @@ def test_requires_nullable_attributes_without_defaults():
 	assert_that(Post(summary=None).summary is None)
 
 
-def test_declares_attributes_only_from_instance_annotations():
+def test_declares_columns_only_from_instance_annotations():
 	class Post(Model):
 		table = "posts"
 		kind: ClassVar[str] = "post"
 		title: str
 
-	assert_eq(list(Post.attributes), ["id", "created_at", "title"])
+	assert_eq(list(Post.columns), ["id", "created_at", "title"])
 
 
 def test_resolves_codecs_nested_in_the_model():
@@ -176,7 +176,7 @@ def test_rejects_unresolved_annotations_on_construction():
 		Post(author=None)
 
 
-def test_rejects_attributes_without_supported_annotations():
+def test_rejects_columns_without_supported_annotations():
 	with assert_raises(ModelError):
 
 		class Unannotated(Model):
@@ -224,15 +224,15 @@ def test_rejects_attributes_named_like_model_metadata():
 	with assert_raises(ModelError):
 
 		class Annotated(Model):
-			attributes: str
+			columns: str
 
 	with assert_raises(ModelError):
 
 		class Assigned(Model):
-			attributes = {}
+			columns = {}
 
 
-def test_declares_an_attribute_named_values():
+def test_declares_a_column_named_values():
 	class Tally(Model):
 		values: str
 

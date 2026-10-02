@@ -2,8 +2,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Literal, TypeIs
 
-from .attribute import Attribute
 from .codec import Scalar, encode
+from .column import Column
 from .error import ModelError
 from .model import Model
 
@@ -31,9 +31,9 @@ class Group:
 			except ValueError as error:
 				raise ModelError(f"{subject} has {text!r}, which {error}") from error
 
-			attribute = model_type.attribute(key.name)
+			column = model_type.column(key.name)
 			try:
-				parsed.append(key.condition(attribute, value))
+				parsed.append(key.condition(column, value))
 			except (TypeError, ValueError) as error:
 				raise ModelError(
 					f"{subject} has an invalid value for {text!r}: {error}"
@@ -58,15 +58,15 @@ class Key:
 		else:
 			raise ValueError("has an unknown operator")
 
-	def condition(self, attribute: Attribute, value: object) -> Condition:
+	def condition(self, column: Column, value: object) -> Condition:
 		operator = self.operator
 		match operator:
 			case "in":
-				return Membership.parse(attribute, value)
+				return Membership.parse(column, value)
 			case "=" if value is None:
-				return IsNull.parse(attribute)
+				return IsNull.parse(column)
 			case _:
-				return Comparison.parse(attribute, operator, value)
+				return Comparison.parse(column, operator, value)
 
 
 type Condition = Comparison | IsNull | Membership
@@ -79,14 +79,12 @@ class Comparison:
 	value: Scalar
 
 	@classmethod
-	def parse(
-		cls, attribute: Attribute, operator: Operator, value: object
-	) -> Comparison:
+	def parse(cls, column: Column, operator: Operator, value: object) -> Comparison:
 		if value is None:
 			raise ValueError("cannot compare with None")
 
-		attribute.check(value)
-		return cls(attribute.name, operator, encode(attribute.codec, value))
+		column.check(value)
+		return cls(column.name, operator, encode(column.codec, value))
 
 
 @dataclass
@@ -94,9 +92,9 @@ class IsNull:
 	name: str
 
 	@classmethod
-	def parse(cls, attribute: Attribute) -> IsNull:
-		attribute.check(None)
-		return cls(attribute.name)
+	def parse(cls, column: Column) -> IsNull:
+		column.check(None)
+		return cls(column.name)
 
 
 @dataclass
@@ -106,7 +104,7 @@ class Membership:
 	includes_null: bool
 
 	@classmethod
-	def parse(cls, attribute: Attribute, value: object) -> Membership:
+	def parse(cls, column: Column, value: object) -> Membership:
 		if isinstance(value, (str, bytes)) or not isinstance(value, Iterable):
 			raise TypeError(
 				"expected an iterable other than str or bytes, "
@@ -115,15 +113,13 @@ class Membership:
 
 		members = list(value)
 		for member in members:
-			attribute.check(member)
+			column.check(member)
 		values = tuple(
 			dict.fromkeys(
-				encode(attribute.codec, member)
-				for member in members
-				if member is not None
+				encode(column.codec, member) for member in members if member is not None
 			)
 		)
-		return cls(attribute.name, values, None in members)
+		return cls(column.name, values, None in members)
 
 
 type Operator = Literal["=", "<", "<=", ">", ">="]

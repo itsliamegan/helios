@@ -16,7 +16,7 @@ class Encoding:
 	nullable: bool
 
 
-class Attribute:
+class Column:
 	name: str
 	declaration: Declaration[Encoding]
 
@@ -89,7 +89,7 @@ class Attribute:
 
 
 def generated(init: bool = False) -> Any:
-	return Attribute(init)
+	return Column(init)
 
 
 def declare(declaration: Declaration[Encoding]) -> Encoding:
@@ -98,6 +98,6 @@ def declare(declaration: Declaration[Encoding]) -> Encoding:
 	if codec is None:
 		raise DeclarationError(
 			declaration.name,
-			f"unsupported attribute type: {annotation!r}",
+			f"unsupported column type: {annotation!r}",
 		)
 	return Encoding(codec, nullable)
