@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 from helios.declarative import Declaration, MISSING
@@ -6,10 +7,13 @@ if TYPE_CHECKING:
 	from .component import Component
 
 
+@dataclass
 class Prop:
-	def __init__(self, declaration: Declaration):
-		self.name = declaration.name
-		self.declaration = declaration
+	declaration: Declaration
+
+	@property
+	def name(self) -> str:
+		return self.declaration.name
 
 	@property
 	def default(self) -> object:
