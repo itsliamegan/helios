@@ -9,8 +9,10 @@ class Status(Enum):
 	FORBIDDEN = 403, "Forbidden"
 	NOT_FOUND = 404, "Not Found"
 	CONFLICT = 409, "Conflict"
+	CONTENT_TOO_LARGE = 413, "Content Too Large"
 	TOO_MANY_REQUESTS = 429, "Too Many Requests"
 	INTERNAL_SERVER_ERROR = 500, "Internal Server Error"
+	NOT_IMPLEMENTED = 501, "Not Implemented"
 
 	def __init__(self, code: int, reason: str):
 		self.code = code

@@ -15,8 +15,10 @@ from helios.http import (
 	Request,
 	Response,
 	SameSite,
+	Status,
 	URL,
 )
+from helios.http.error import NotFoundError
 
 
 def test_encodes_url_path():
@@ -162,6 +164,13 @@ def test_creates_file_response():
 		'attachment; filename="report.pdf"',
 	)
 	assert_eq(str(response.headers["Content-Length"]), "2")
+
+
+def test_creates_error_response():
+	response = Response.error(NotFoundError())
+
+	assert_eq(response.status, Status.NOT_FOUND)
+	assert_eq(str(response.body), "404 Not Found")
 
 
 def test_gets_request_referrer():

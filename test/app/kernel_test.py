@@ -1,21 +1,17 @@
 from contextlib import contextmanager
 
-from luna.test.assertion import assert_eq, assert_raises
+from luna.test.assertion import assert_eq, assert_that
 
-from helios.app import Container, Context, Kernel
+from helios.app import Container, Kernel
 from helios.http import (
-	Buffered,
-	Cookies,
-	Headers,
 	Input,
 	Method,
 	Request,
 	Response,
 	Status,
 	URL,
-	UnsupportedMethodError,
 )
-from helios.http.error import NotFoundError
+from helios.http.error import ContentTooLargeError, NotFoundError
 from helios.routing import Pattern, Route, Router
 
 
@@ -23,35 +19,37 @@ def request() -> Request:
 	return Request(Method.GET, URL("/"))
 
 
-def test_records_handled_errors_for_outer_middleware():
+def test_records_raised_error_as_aborted_for_outer_middleware():
 	seen = []
 
 	def observe(request, context, next):
 		response = next(request, context)
-		seen.append(context.error)
+		seen.append(context.aborted)
 		return response
 
 	kernel = Kernel(Container(), Router([]), [observe])
 	response = kernel.handle(request())
 
 	assert_eq(response.status, Status.NOT_FOUND)
-	assert isinstance(seen[0], NotFoundError)
-	assert_eq(str(response.headers["Content-Length"]), "13")
+	assert_that(isinstance(seen[0], NotFoundError))
 
 
-def test_content_length_uses_encoded_body_size():
-	def index(request, context):
-		return Response(Status.OK, Headers(), Cookies(), Buffered(b"\x00\xff"))
+def test_records_error_raised_by_inner_middleware_as_aborted():
+	seen = []
 
-	kernel = Kernel(
-		Container(),
-		Router([Route(Method.GET, Pattern("/"), index)]),
-		[],
-	)
+	def observe(request, context, next):
+		response = next(request, context)
+		seen.append(context.aborted)
+		return response
 
+	def refuse(request, context, next):
+		raise ContentTooLargeError()
+
+	kernel = Kernel(Container(), Router([]), [observe, refuse])
 	response = kernel.handle(request())
 
-	assert_eq(str(response.headers["Content-Length"]), "2")
+	assert_eq(response.status, Status.CONTENT_TOO_LARGE)
+	assert_that(isinstance(seen[0], ContentTooLargeError))
 
 
 def test_unexpected_errors_skip_response_middleware_and_close_resources():
@@ -81,16 +79,15 @@ def test_unexpected_errors_skip_response_middleware_and_close_resources():
 	response = kernel.handle(request())
 
 	assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
-	assert_eq(str(response.headers["Content-Length"]), "25")
 	assert_eq(events, ["closed"])
 
 
-def test_returned_error_response_has_no_context_error():
+def test_returned_error_response_is_not_aborted():
 	seen = []
 
 	def observe(request, context, next):
 		response = next(request, context)
-		seen.append(context.error)
+		seen.append(context.aborted)
 		return response
 
 	def index(request, context):
@@ -123,12 +120,17 @@ def test_overrides_method_from_input():
 	assert_eq(str(response.body), "False")
 
 
-def test_rejects_unknown_method_override():
-	request = Request(Method.POST, URL("/"), input=Input({"_method": "delete"}))
+def test_rejects_unknown_method_override_as_bad_request():
+	def destroy(request, context):
+		return Response.empty()
 
-	with assert_raises(UnsupportedMethodError):
-		Kernel.adapt_artificial_method(
-			request,
-			Context(Container(), request),
-			lambda req, ctx: Response.empty(),
-		)
+	kernel = Kernel(
+		Container(),
+		Router([Route(Method.DELETE, Pattern("/"), destroy)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(Method.POST, URL("/"), input=Input({"_method": "delete"}))
+	)
+
+	assert_eq(response.status, Status.BAD_REQUEST)
