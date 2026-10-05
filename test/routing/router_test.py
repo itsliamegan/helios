@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Container, Context
 from helios.http import Method, Request, Response, Status, URL
@@ -115,14 +115,14 @@ def test_uuid_converter_doesnt_match_invalid_uuid():
 
 	match = pattern.match(URL("/posts/not-a-uuid"))
 
-	assert_that(match is None)
+	assert_eq(match, None)
 
 
 def test_matches_pattern_text_literally():
 	pattern = Pattern.parse("/posts.json")
 
 	assert_eq(pattern.match(URL("/posts.json")), {})
-	assert_that(pattern.match(URL("/postsXjson")) is None)
+	assert_eq(pattern.match(URL("/postsXjson")), None)
 
 
 def test_rejects_segments_mixing_text_and_parameters():
@@ -233,7 +233,7 @@ def test_doesnt_run_guards_for_unmatched_routes():
 	router = Router([Route.get("/articles", handle, guards=[guard])])
 	match = router.match(Method.GET, URL("/missing"))
 
-	assert_that(match is None)
+	assert_eq(match, None)
 	assert_eq(calls, [])
 
 

@@ -1,4 +1,4 @@
-from luna.test.assertion import assert_eq
+from luna.test.assertion import assert_eq, assert_is_instance
 from markupsafe import Markup
 
 from helios.view import Attributes
@@ -50,7 +50,7 @@ def test_renders_as_markup():
 
 	html = attributes.__html__()
 
-	assert isinstance(html, Markup)
+	assert_is_instance(html, Markup)
 	assert_eq(html, 'id="menu"')
 
 

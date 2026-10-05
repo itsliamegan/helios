@@ -3,7 +3,13 @@ from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_is_instance,
+	assert_not_in,
+	assert_raises,
+	assert_that,
+)
 
 from helios.database import Config, DatabaseBusyError, DatabaseError
 from helios.database.sqlite import connect
@@ -81,8 +87,7 @@ def test_enforces_foreign_keys():
 					"INSERT INTO posts (author_id) VALUES (?)", ("missing",)
 				)
 			exception = raised.exception
-			assert exception is not None
-			assert_that(isinstance(exception.__cause__, sqlite3.IntegrityError))
+			assert_is_instance(exception.__cause__, sqlite3.IntegrityError)
 		finally:
 			connection.close()
 
@@ -98,8 +103,7 @@ def test_translates_writer_contention_to_database_busy():
 			with assert_raises(DatabaseBusyError) as raised:
 				second.begin()
 			exception = raised.exception
-			assert exception is not None
-			assert_that(isinstance(exception.__cause__, sqlite3.OperationalError))
+			assert_is_instance(exception.__cause__, sqlite3.OperationalError)
 		finally:
 			second.close()
 			first.close()
@@ -116,9 +120,8 @@ def test_translates_statement_errors_without_bound_values():
 				connection.execute("INSERT INTO missing (value) VALUES (?)", (secret,))
 
 			exception = raised.exception
-			assert exception is not None
-			assert_that(isinstance(exception.__cause__, sqlite3.Error))
-			assert_that(secret not in str(exception))
+			assert_is_instance(exception.__cause__, sqlite3.Error)
+			assert_not_in(secret, str(exception))
 		finally:
 			connection.close()
 

@@ -5,7 +5,12 @@ from tempfile import TemporaryDirectory
 from typing import Any, cast
 from uuid import UUID, uuid4
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_is_instance,
+	assert_is_not,
+	assert_raises,
+)
 
 from helios import http
 from helios.database import (
@@ -100,21 +105,21 @@ def test_crud_and_scalar_round_trip():
 		try:
 			created = store.create(Record, **record_values())
 			found = store.find_one(Record, created.id)
-			assert_that(found is not created)
+			assert_is_not(found, created)
 			assert_eq(found.id, created.id)
 			assert_eq([item.id for item in store.find_all(Record)], [created.id])
 			assert_eq(
 				[item.id for item in store.find_by(Record, active=True)],
 				[created.id],
 			)
-			assert_that(isinstance(found.id, UUID))
+			assert_is_instance(found.id, UUID)
 			assert_eq(found.created_at.tzinfo, UTC)
 			assert_eq(found.count, 3)
 			assert_eq(found.active, True)
-			assert_that(isinstance(found.owner_id, UUID))
-			assert_that(isinstance(found.link, http.URL))
+			assert_is_instance(found.owner_id, UUID)
+			assert_is_instance(found.link, http.URL)
 			assert_eq(found.published_at.tzinfo, UTC)
-			assert_that(found.note is None)
+			assert_eq(found.note, None)
 			assert_eq(found.token.value, "secret")
 
 			store.update(created, name="Revised")
@@ -131,7 +136,7 @@ def test_crud_and_scalar_round_trip():
 			assert_eq(reloaded.owner_id, created.owner_id)
 			assert_eq(str(reloaded.link), str(created.link))
 			assert_eq(reloaded.published_at, created.published_at)
-			assert_that(reloaded.note is None)
+			assert_eq(reloaded.note, None)
 			assert_eq(reloaded.token.value, "secret")
 		finally:
 			second_connection.close()
@@ -335,8 +340,7 @@ def test_deletes_model_and_reports_missing_lookup():
 			with assert_raises(NotFoundError) as raised:
 				store.find_one(Record, model.id)
 			exception = raised.exception
-			assert exception is not None
-			assert_that(exception.model_type is Record)
+			assert_eq(exception.model_type, Record)
 			assert_eq(exception.id, model.id)
 		finally:
 			connection.close()
@@ -423,7 +427,7 @@ def test_round_trips_models_with_codecs_declared_later():
 		finally:
 			second_connection.close()
 
-		assert_that(found is not created)
+		assert_is_not(found, created)
 		assert_eq(found.label.text, "new")
 
 
@@ -516,7 +520,7 @@ def test_reads_return_distinct_models():
 			first = store.find_one(Record, created.id)
 			second = store.find_one(Record, created.id)
 
-			assert_that(first is not second)
+			assert_is_not(first, second)
 			assert_eq(first.name, second.name)
 			assert_eq(first.count, second.count)
 		finally:
@@ -529,7 +533,7 @@ def test_create_returns_a_stored_model():
 		try:
 			created = store.create(Record, **record_values())
 
-			assert_that(isinstance(created.id, UUID))
+			assert_is_instance(created.id, UUID)
 			assert_eq(created.created_at.tzinfo, UTC)
 			found = store.find_one(Record, created.id)
 			assert_eq(found.created_at, created.created_at)
@@ -570,8 +574,7 @@ def test_update_and_delete_on_a_constructed_model_raise_not_found():
 
 			for raised in (updated, deleted):
 				exception = raised.exception
-				assert exception is not None
-				assert_that(exception.model_type is Record)
+				assert_eq(exception.model_type, Record)
 				assert_eq(exception.id, model.id)
 			assert_eq(model.name, "Intro")
 		finally:

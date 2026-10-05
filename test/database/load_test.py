@@ -5,7 +5,13 @@ import sqlite3
 from tempfile import TemporaryDirectory
 from uuid import UUID, uuid4
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_is,
+	assert_not_none,
+	assert_raises,
+	assert_that,
+)
 
 from helios.database import (
 	Config,
@@ -198,8 +204,8 @@ def test_loads_belongs_to():
 
 		assert_eq(fixture.first.tag.id, fixture.python.id)
 		assert_eq(fixture.second.tag.name, "Rust")
-		assert_that(reviewed.reviewer is not None and reviewed.reviewer.name == "Ada")
-		assert_that(unreviewed.reviewer is None)
+		assert_eq(assert_not_none(reviewed.reviewer).name, "Ada")
+		assert_eq(unreviewed.reviewer, None)
 
 
 def test_loads_has_many():
@@ -218,10 +224,9 @@ def test_loads_has_one():
 
 		store.load([fixture.ada, fixture.bo], "profile")
 
-		profile = fixture.ada.profile
-		assert profile is not None
+		profile = assert_not_none(fixture.ada.profile)
 		assert_eq(profile.bio, "Writer")
-		assert_that(fixture.bo.profile is None)
+		assert_eq(fixture.bo.profile, None)
 
 
 def test_loads_nested_paths_and_runs_shared_prefixes_once():
@@ -268,7 +273,7 @@ def test_shares_one_object_per_row():
 		store.load(taggings, "tag")
 
 		assert_eq(len(taggings), 2)
-		assert_that(taggings[0].tag is taggings[1].tag)
+		assert_is(taggings[0].tag, taggings[1].tag)
 
 
 def test_splits_large_id_sets_into_batches():

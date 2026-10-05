@@ -2,7 +2,15 @@ from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq, assert_not, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_is_instance,
+	assert_not,
+	assert_not_eq,
+	assert_not_in,
+	assert_raises,
+	assert_that,
+)
 
 from helios.auth.password import Digest, Password
 from helios.database import Config, Model, Store
@@ -21,10 +29,10 @@ def test_creates_and_matches_password():
 def test_redacts_password_representation():
 	password = Password.from_plaintext("secret")
 	encoded = Password.Codec().encode(password)
-	assert isinstance(encoded, str)
+	assert_is_instance(encoded, str)
 
-	assert_that(encoded not in repr(password))
-	assert_that("secret" not in repr(password))
+	assert_not_in(encoded, repr(password))
+	assert_not_in("secret", repr(password))
 
 
 def test_round_trips_password_attrs():
@@ -66,7 +74,7 @@ def test_round_trips_password_attrs():
 			backup_password: Password | None = found.backup_password
 
 			assert_that(password.matches("secret"))
-			assert_that(backup_password is None)
+			assert_eq(backup_password, None)
 		finally:
 			connection.close()
 
@@ -87,7 +95,7 @@ def test_generates_salted_digests():
 	first = Digest.generate("secret")
 	second = Digest.generate("secret")
 
-	assert_that(first.encode() != second.encode())
+	assert_not_eq(first.encode(), second.encode())
 
 
 def test_decodes_digest_without_rehashing():
@@ -108,5 +116,5 @@ def test_rejects_malformed_digest_representation():
 def test_redacts_digest_representation():
 	digest = Digest.generate("secret")
 
-	assert_that(digest.encode() not in repr(digest))
-	assert_that("secret" not in repr(digest))
+	assert_not_in(digest.encode(), repr(digest))
+	assert_not_in("secret", repr(digest))

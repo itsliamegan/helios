@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from luna.test.assertion import assert_eq, assert_that
+from luna.test.assertion import assert_eq, assert_not_none
 
 from helios.http import Query, Response, URL
 from helios.routing import (
@@ -84,7 +84,7 @@ def test_matches_url_string_to_named_route():
 
 	match = urls.match(f"/posts/{id}?sort=recent")
 
-	assert_that(match is not None)
+	assert_not_none(match)
 	assert_eq(match.route.name, "posts.show")
 	assert_eq(match.parameters, {"id": id})
 
@@ -95,7 +95,7 @@ def test_matches_url_object_to_named_route():
 
 	match = urls.match(URL(f"/posts/{id}"))
 
-	assert_that(match is not None)
+	assert_not_none(match)
 	assert_eq(match.route.name, "posts.show")
 	assert_eq(match.parameters, {"id": id})
 
@@ -106,7 +106,7 @@ def test_matches_only_the_path_of_absolute_urls():
 
 	match = urls.match(f"https://elsewhere.example/posts/{id}")
 
-	assert_that(match is not None)
+	assert_not_none(match)
 	assert_eq(match.route.name, "posts.show")
 	assert_eq(match.parameters, {"id": id})
 
@@ -117,7 +117,7 @@ def test_matches_url_string_with_url_in_query():
 
 	match = urls.match(f"/posts/{id}?return_to=https://elsewhere.example/")
 
-	assert_that(match is not None)
+	assert_not_none(match)
 	assert_eq(match.route.name, "posts.show")
 
 
@@ -127,7 +127,7 @@ def test_matches_only_get_routes():
 
 	match = urls.match(f"/posts/{id}/title")
 
-	assert_that(match is None)
+	assert_eq(match, None)
 
 
 def test_doesnt_match_missing_or_unknown_urls():
@@ -138,7 +138,7 @@ def test_doesnt_match_missing_or_unknown_urls():
 	unparseable = urls.match("http://[invalid/posts/")
 	hostless = urls.match("cork.example/posts/")
 
-	assert_that(missing is None)
-	assert_that(unknown is None)
-	assert_that(unparseable is None)
-	assert_that(hostless is None)
+	assert_eq(missing, None)
+	assert_eq(unknown, None)
+	assert_eq(unparseable, None)
+	assert_eq(hostless, None)

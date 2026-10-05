@@ -2,7 +2,7 @@ import importlib.util
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq
+from luna.test.assertion import assert_eq, assert_not_none
 
 from helios.app import Application, Config
 from helios.http import Method, Request, URL
@@ -62,13 +62,15 @@ def test_provider_registers_components():
 		views_dir.joinpath("index.html").write_text(
 			"{% for name in names %}{{ TagChip(name=name) }}{% endfor %}"
 		)
-		spec = importlib.util.spec_from_file_location(
-			"chip",
-			views_dir.joinpath("tags", "chip.py"),
+		spec = assert_not_none(
+			importlib.util.spec_from_file_location(
+				"chip",
+				views_dir.joinpath("tags", "chip.py"),
+			)
 		)
-		assert spec is not None and spec.loader is not None
+		loader = assert_not_none(spec.loader)
 		chip = importlib.util.module_from_spec(spec)
-		spec.loader.exec_module(chip)
+		loader.exec_module(chip)
 
 		def index(request, context):
 			return context.get(Views).render("index", {"names": ["Travel", "Food"]})

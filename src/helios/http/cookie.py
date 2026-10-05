@@ -77,5 +77,5 @@ class Cookies:
 		else:
 			self.cookies[name] = Cookie(name, value)
 
-	def __contains__(self, name: str) -> bool:
+	def __contains__(self, name: object) -> bool:
 		return name in self.cookies

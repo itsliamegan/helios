@@ -20,7 +20,7 @@ class Errors:
 		else:
 			return None
 
-	def __contains__(self, name: str) -> bool:
+	def __contains__(self, name: object) -> bool:
 		return name in self.messages
 
 	def __bool__(self) -> bool:

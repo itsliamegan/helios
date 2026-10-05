@@ -56,8 +56,8 @@ class Headers:
 		else:
 			self.headers[name] = Header(raw_name, value)
 
-	def __contains__(self, name: str) -> bool:
-		return normalize(name) in self.headers
+	def __contains__(self, name: object) -> bool:
+		return isinstance(name, str) and normalize(name) in self.headers
 
 	def __iter__(self) -> Iterator[tuple[str, str]]:
 		for name in self.headers:

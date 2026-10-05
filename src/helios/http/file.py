@@ -28,5 +28,5 @@ class Files:
 	def all(self, name: str) -> list[File]:
 		return list(self.items.get(name, []))
 
-	def __contains__(self, name: str) -> bool:
+	def __contains__(self, name: object) -> bool:
 		return name in self.items

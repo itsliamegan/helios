@@ -34,7 +34,7 @@ class Session:
 		self.items = {}
 		self.dirty = True
 
-	def __contains__(self, key: str) -> bool:
+	def __contains__(self, key: object) -> bool:
 		return key in self.items
 
 	def touch(self):
@@ -111,7 +111,7 @@ class Store:
 	def is_dirty(self) -> bool:
 		return self.dirty or any(session.dirty for session in self.sessions.values())
 
-	def __contains__(self, id: UUID) -> bool:
+	def __contains__(self, id: object) -> bool:
 		return id in self.sessions
 
 	def __repr__(self) -> str:

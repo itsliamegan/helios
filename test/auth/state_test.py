@@ -1,6 +1,13 @@
 from uuid import uuid4
 
-from luna.test.assertion import assert_eq, assert_not, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_in,
+	assert_not,
+	assert_not_eq,
+	assert_not_in,
+	assert_raises,
+)
 
 from helios.auth import AuthenticationError, Authenticator
 from helios.database import Model
@@ -22,8 +29,8 @@ def test_signs_in():
 
 	auth.sign_in(user)
 
-	assert_that(session.id != old_id)
-	assert_that(old_id not in sessions)
+	assert_not_eq(session.id, old_id)
+	assert_not_in(old_id, sessions)
 	assert_eq(auth.user, user)
 	assert_eq(session["_user_id"], str(user.id))
 
@@ -37,10 +44,10 @@ def test_signs_out():
 
 	auth.sign_out()
 
-	assert_that(session.id != old_id)
-	assert_that(old_id not in sessions)
+	assert_not_eq(session.id, old_id)
+	assert_not_in(old_id, sessions)
 	assert_not(auth.is_signed_in())
-	assert_that("_user_id" not in session)
+	assert_not_in("_user_id", session)
 
 
 def test_signs_out_when_already_signed_out():
@@ -50,7 +57,7 @@ def test_signs_out_when_already_signed_out():
 
 	auth.sign_out()
 
-	assert_that(session.id != old_id)
+	assert_not_eq(session.id, old_id)
 	assert_not(auth.is_signed_in())
 
 
@@ -61,7 +68,7 @@ def test_keeps_other_session_values_on_sign_out():
 
 	auth.sign_out()
 
-	assert_that("_flash" in session)
+	assert_in("_flash", session)
 
 
 def test_returns_user_when_signed_in():

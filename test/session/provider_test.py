@@ -6,7 +6,13 @@ from tempfile import TemporaryDirectory
 import time
 from uuid import uuid4
 
-from luna.test.assertion import assert_eq, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_not_eq,
+	assert_not_in,
+	assert_not_none,
+	assert_that,
+)
 import time_machine
 
 from helios.app import Application
@@ -92,9 +98,9 @@ def test_unused_and_empty_sessions_do_not_write():
 		_, unused_response = exercise(path, request(), resolve=False)
 		empty, empty_response = exercise(path, request())
 
-		assert_that("session_id" not in unused_response.cookies)
-		assert_that("session_id" not in empty_response.cookies)
-		assert_that(empty is not None)
+		assert_not_in("session_id", unused_response.cookies)
+		assert_not_in("session_id", empty_response.cookies)
+		assert_not_none(empty)
 		assert_eq(path.stat().st_mtime_ns, before)
 		assert_eq(read_sessions(path), {})
 
@@ -134,8 +140,8 @@ def test_reuses_touches_and_rotates_known_session():
 			)
 
 		stored = read_sessions(path)
-		assert_that(session.id != old_id)
-		assert_that(str(old_id) not in stored)
+		assert_not_eq(session.id, old_id)
+		assert_not_in(str(old_id), stored)
 		assert_eq(stored[str(session.id)]["items"], {"message": "Hello"})
 		assert_eq(stored[str(session.id)]["last_active_at"], now.isoformat())
 		assert_eq(response.cookies["session_id"].value, str(session.id))
@@ -149,8 +155,8 @@ def test_replaces_malformed_and_unknown_cookies():
 		unknown_id = uuid4()
 		unknown, _ = exercise(path, request(str(unknown_id)))
 
-		assert_that(malformed.id != unknown_id)
-		assert_that(unknown.id != unknown_id)
+		assert_not_eq(malformed.id, unknown_id)
+		assert_not_eq(unknown.id, unknown_id)
 		assert_eq(read_sessions(path), {})
 
 
@@ -175,7 +181,7 @@ def test_purges_expired_sessions_and_renews_boundary():
 		stored = read_sessions(path)
 		assert_eq(session.id, active_id)
 		assert_eq(stored[str(active_id)]["last_active_at"], now.isoformat())
-		assert_that(str(expired_id) not in stored)
+		assert_not_in(str(expired_id), stored)
 
 
 def test_clear_and_invalidate_remove_persisted_session():
@@ -257,7 +263,7 @@ def test_raised_http_error_discards_mutation():
 
 		assert_eq(response.status, Status.NOT_FOUND)
 		assert_eq(read_sessions(path), initial)
-		assert_that("session_id" not in response.cookies)
+		assert_not_in("session_id", response.cookies)
 
 
 def test_returned_error_response_saves_mutation():

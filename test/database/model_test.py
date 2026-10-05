@@ -1,7 +1,13 @@
 from typing import ClassVar
 from uuid import UUID, uuid4
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_in,
+	assert_is_instance,
+	assert_not_none,
+	assert_raises,
+)
 
 from helios.database import Codec, Model, ModelError, Scalar, generated
 
@@ -19,7 +25,7 @@ def test_constructs_model_with_table_defaults_and_nulls():
 	assert_eq(post.title, "Intro")
 	assert_eq(post.published, False)
 	assert_eq(post.summary, None)
-	assert_that(isinstance(post.id, UUID))
+	assert_is_instance(post.id, UUID)
 
 
 def test_constructed_model_has_no_created_at():
@@ -36,7 +42,7 @@ def test_preserves_explicit_null_instead_of_default():
 	class Post(Model):
 		title: str | None = "Untitled"
 
-	assert_that(Post(title=None).title is None)
+	assert_eq(Post(title=None).title, None)
 
 
 def test_assigning_a_column_raises_and_keeps_the_value():
@@ -52,9 +58,8 @@ def test_assigning_a_column_raises_and_keeps_the_value():
 		post.id = uuid4()
 
 	exception = raised.exception
-	assert exception is not None
-	assert_that("Post.title" in str(exception))
-	assert_that("store.update" in str(exception))
+	assert_in("Post.title", str(exception))
+	assert_in("store.update", str(exception))
 	assert_eq(post.title, "Intro")
 	assert_eq(post.id, original_id)
 
@@ -79,7 +84,7 @@ def test_requires_nullable_columns_without_defaults():
 
 	with assert_raises(TypeError):
 		Post()  # ty: ignore[missing-argument]
-	assert_that(Post(summary=None).summary is None)
+	assert_eq(Post(summary=None).summary, None)
 
 
 def test_declares_columns_only_from_instance_annotations():
@@ -138,8 +143,7 @@ def test_resolves_codecs_that_refer_to_the_model():
 
 	post = Post(slug=Post.Slug("intro"))
 
-	assert post.slug is not None
-	assert_eq(post.slug.text, "intro")
+	assert_eq(assert_not_none(post.slug).text, "intro")
 	with assert_raises(ModelError):
 		Post(slug="intro")  # ty: ignore[invalid-argument-type]
 
@@ -181,7 +185,7 @@ def test_resolves_each_column_when_it_is_read():
 		title: str
 		author: Author  # noqa: F821  # ty: ignore[unresolved-reference]
 
-	assert_that("author" in Post.columns)
+	assert_in("author", Post.columns)
 	assert_eq(Post.column("title").name, "title")
 	with assert_raises(ModelError):
 		Post.columns["author"]

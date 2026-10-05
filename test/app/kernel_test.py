@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-from luna.test.assertion import assert_eq, assert_that
+from luna.test.assertion import assert_eq, assert_is_instance
 
 from helios.app import Container, Kernel
 from helios.http import (
@@ -31,7 +31,7 @@ def test_records_raised_error_as_aborted_for_outer_middleware():
 	response = kernel.handle(request())
 
 	assert_eq(response.status, Status.NOT_FOUND)
-	assert_that(isinstance(seen[0], NotFoundError))
+	assert_is_instance(seen[0], NotFoundError)
 
 
 def test_records_error_raised_by_inner_middleware_as_aborted():
@@ -49,7 +49,7 @@ def test_records_error_raised_by_inner_middleware_as_aborted():
 	response = kernel.handle(request())
 
 	assert_eq(response.status, Status.CONTENT_TOO_LARGE)
-	assert_that(isinstance(seen[0], ContentTooLargeError))
+	assert_is_instance(seen[0], ContentTooLargeError)
 
 
 def test_unexpected_errors_skip_response_middleware_and_close_resources():

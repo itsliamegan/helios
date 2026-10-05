@@ -8,7 +8,12 @@ from tempfile import TemporaryDirectory
 from textwrap import dedent
 from uuid import UUID, uuid4
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_in,
+	assert_is,
+	assert_raises,
+)
 
 from helios.database import (
 	Config,
@@ -300,14 +305,14 @@ def test_resolves_targets_imported_only_for_type_checking():
 		str(unregistered.exception),
 		"Memoir.memoirist: unresolved annotation: Memoirist",
 	)
-	assert_that(memoirs is memoir)
-	assert_that(author is memoirist)
+	assert_is(memoirs, memoir)
+	assert_is(author, memoirist)
 
 
 def test_resolves_targets_declared_after_the_model():
-	assert_that(Post.relationships["taggings"].target is Tagging)
-	assert_that(Post.relationships["comments"].target is Comment)
-	assert_that(Author.relationships["profile"].target is Profile)
+	assert_eq(Post.relationships["taggings"].target, Tagging)
+	assert_eq(Post.relationships["comments"].target, Comment)
+	assert_eq(Author.relationships["profile"].target, Profile)
 
 
 def test_checks_each_relationship_when_it_is_read():
@@ -317,8 +322,8 @@ def test_checks_each_relationship_when_it_is_read():
 		post_id: UUID
 		post: Post = belongs_to("post_id")
 
-	assert_that("author" in Note.relationships)
-	assert_that(Note.relationships["post"].target is Post)
+	assert_in("author", Note.relationships)
+	assert_eq(Note.relationships["post"].target, Post)
 	with assert_raises(ModelError):
 		Note.relationships["author"]
 
@@ -347,7 +352,7 @@ def test_rejects_a_nullability_mismatch_on_first_use():
 		"Strict.author: annotation must include None exactly when "
 		"Strict.author_id is nullable",
 	)
-	assert_that(Draft.relationships["reviewer"].target is Author)
+	assert_eq(Draft.relationships["reviewer"].target, Author)
 
 
 def test_rejects_a_target_column_that_is_missing_or_not_a_uuid():

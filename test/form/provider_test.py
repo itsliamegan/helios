@@ -110,7 +110,7 @@ def test_resolves_empty_submission_without_flashes():
 
 	handle(session, Route.get("/", edit), Request(Method.GET, URL("/")))
 
-	assert_that(submissions[0].input is None)
+	assert_eq(submissions[0].input, None)
 	assert_eq(submissions[0].value("title", "Old title"), "Old title")
 	assert_that(not submissions[0].invalid("title"))
 

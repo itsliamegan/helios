@@ -1,7 +1,11 @@
 from datetime import UTC, datetime, timedelta, timezone
 from uuid import uuid4
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_is_instance,
+	assert_raises,
+)
 
 from helios import http
 from helios.database.codec import Bool, Codec, Date, Int, Scalar, Str, URL, UUID, encode
@@ -99,8 +103,8 @@ def test_finds_codecs_for_types():
 
 	found = Codec.for_type(Slug)
 
-	assert_that(isinstance(Codec.for_type(str), Str))
-	assert isinstance(found, Slug.Codec)
+	assert_is_instance(Codec.for_type(str), Str)
+	found = assert_is_instance(found, Slug.Codec)
 	assert_eq(encode(found, Slug("today")), "today")
 	assert_eq(Codec.for_type(list[str]), None)
 	assert_eq(Codec.for_type(object), None)

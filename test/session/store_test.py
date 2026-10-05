@@ -1,7 +1,13 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from luna.test.assertion import assert_eq, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_in,
+	assert_not_eq,
+	assert_not_in,
+	assert_that,
+)
 import time_machine
 
 from helios.session.store import Session, Store
@@ -36,10 +42,10 @@ def test_mapping_clear_and_delete():
 	assert_eq(session["message"], "Hello")
 
 	del session["message"]
-	assert_that("message" not in session)
+	assert_not_in("message", session)
 	session["message"] = "Again"
 	session.clear()
-	assert_that("message" not in session)
+	assert_not_in("message", session)
 
 
 def test_rotates_attached_session_preserving_values():
@@ -49,9 +55,9 @@ def test_rotates_attached_session_preserving_values():
 
 	session.rotate()
 
-	assert_that(session.id != old_id)
-	assert_that(old_id not in store)
-	assert_that(session.id in store)
+	assert_not_eq(session.id, old_id)
+	assert_not_in(old_id, store)
+	assert_in(session.id, store)
 	assert_eq(store.get(session.id)["message"], "Hello")
 
 
@@ -61,7 +67,7 @@ def test_invalidates_attached_session():
 
 	session.invalidate()
 
-	assert_that(session.id not in store)
+	assert_not_in(session.id, store)
 	assert_that(store.is_dirty())
 
 
@@ -76,8 +82,8 @@ def test_purges_sessions_using_configured_maximum_age():
 	with time_machine.travel(now, tick=False):
 		store.purge(MAXIMUM_AGE)
 
-	assert_that(expired.id not in store)
-	assert_that(active.id in store)
+	assert_not_in(expired.id, store)
+	assert_in(active.id, store)
 
 
 def test_does_not_rotate_detached_session():
@@ -88,5 +94,5 @@ def test_does_not_rotate_detached_session():
 
 	session.rotate()
 
-	assert_that(session.id != old_id)
-	assert_that(session.id not in store)
+	assert_not_eq(session.id, old_id)
+	assert_not_in(session.id, store)

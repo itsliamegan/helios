@@ -1,5 +1,5 @@
 from jinja2 import UndefinedError
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import assert_eq, assert_is, assert_raises
 from markupsafe import Markup
 
 from helios.view import (
@@ -102,7 +102,7 @@ def test_accepts_global_and_declared_attributes_from_python():
 
 	link = Link(url="/", attributes=attributes)
 
-	assert link.attributes is attributes
+	assert_is(link.attributes, attributes)
 
 
 def test_rejects_unknown_attributes_from_python():
@@ -449,7 +449,7 @@ def test_accepts_props_typed_with_later_classes():
 
 	card = Card(author=author)
 
-	assert_that(card.author is author)
+	assert_is(card.author, author)
 
 
 def test_rejects_undefined_annotations_on_construction():

@@ -1,6 +1,12 @@
 from concurrent.futures import ThreadPoolExecutor
 
-from luna.test.assertion import assert_eq, assert_raises
+from luna.test.assertion import (
+	assert_eq,
+	assert_in,
+	assert_is,
+	assert_raises,
+	assert_that,
+)
 
 from helios.app import Container, DependencyError
 
@@ -11,13 +17,13 @@ def test_reports_missing_and_scoped_dependencies():
 
 	with assert_raises(DependencyError) as raised:
 		container.get(str)
-	assert "int" in str(raised.exception)
+	assert_in("int", str(raised.exception))
 
 	container.scoped(str, lambda context: "value")
 
 	with assert_raises(DependencyError) as raised:
 		container.get(str)
-	assert "request context" in str(raised.exception)
+	assert_in("request context", str(raised.exception))
 
 
 def test_reports_bound_dependencies():
@@ -73,7 +79,7 @@ def test_constructs_one_singleton_across_threads():
 		values = list(executor.map(lambda _: container.get(object), range(32)))
 
 	assert_eq(len(calls), 1)
-	assert all(value is values[0] for value in values)
+	assert_that(all(value is values[0] for value in values))
 
 
 def test_resolves_parameterized_keys_by_their_class():
@@ -84,4 +90,4 @@ def test_resolves_parameterized_keys_by_their_class():
 		[container.bound(list), container.bound(list[str])],
 		[True, True],
 	)
-	assert container.get(list[str]) is container.get(list)
+	assert_is(container.get(list[str]), container.get(list))

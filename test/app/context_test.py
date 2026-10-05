@@ -1,4 +1,4 @@
-from luna.test.assertion import assert_eq
+from luna.test.assertion import assert_eq, assert_is, assert_is_not, assert_not_none
 
 from helios.app import Container, Context
 from helios.http import Method, Request, URL
@@ -19,10 +19,10 @@ def test_resolves_each_binding_lifetime():
 	second = Context(container, request())
 
 	assert_eq(first.get(str), "instance")
-	assert first.get(list) is first.get(list)
-	assert first.get(dict) is first.get(dict)
-	assert second.get(list) is first.get(list)
-	assert second.get(dict) is not first.get(dict)
+	assert_is(first.get(list), first.get(list))
+	assert_is(first.get(dict), first.get(dict))
+	assert_is(second.get(list), first.get(list))
+	assert_is_not(second.get(dict), first.get(dict))
 	assert_eq(len(created), 2)
 
 
@@ -46,7 +46,7 @@ def test_resolved_does_not_construct_lazy_services():
 	assert_eq(context.resolved(dict), None)
 	context.get(dict)
 
-	assert context.resolved(dict) is not None
+	assert_not_none(context.resolved(dict))
 	assert_eq(seen, ["scoped"])
 
 
@@ -58,5 +58,5 @@ def test_resolves_parameterized_keys_by_their_class():
 	assert_eq(context.resolved(dict[str, int]), None)
 	value = context.get(dict[str, int])
 
-	assert context.get(dict) is value
-	assert context.resolved(dict[str, str]) is value
+	assert_is(context.get(dict), value)
+	assert_is(context.resolved(dict[str, str]), value)

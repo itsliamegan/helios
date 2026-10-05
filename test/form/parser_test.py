@@ -1,6 +1,11 @@
 from uuid import uuid4
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_is_instance,
+	assert_raises,
+	assert_that,
+)
 
 from helios.form import parser
 from helios.form.parser import ParseError
@@ -46,7 +51,7 @@ def test_parses_url():
 
 	value = value_parser.parse([raw])
 	padded = value_parser.parse([f"  {raw} "])
-	assert_that(isinstance(value, URL))
+	assert_is_instance(value, URL)
 	assert_eq(str(value), raw)
 	assert_eq(str(padded), raw)
 	assert_parse_error(
@@ -59,8 +64,8 @@ def test_parses_url():
 def test_parses_checked_boolean_strictly():
 	value_parser = parser.Bool()
 
-	assert_that(value_parser.parse(["on"]) is True)
-	assert_that(value_parser.parse([" on "]) is True)
+	assert_eq(value_parser.parse(["on"]), True)
+	assert_eq(value_parser.parse([" on "]), True)
 	assert_parse_error(value_parser, ["true"], 'must be "on" or omitted')
 	assert_parse_error(value_parser, ["on", "on"], 'must be "on" or omitted')
 

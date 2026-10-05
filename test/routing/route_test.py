@@ -1,6 +1,11 @@
 from uuid import UUID
 
-from luna.test.assertion import assert_eq, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_is,
+	assert_is_not,
+	assert_not_none,
+)
 
 from helios.app import Container, Context
 from helios.http import Method, Request, Response, Status, URL
@@ -43,10 +48,10 @@ def test_group_without_prefix_or_guards_preserves_route_configuration():
 
 	effective = Router([Group(routes=[route])]).routes[0]
 
-	assert_that(effective is route)
-	assert_that(effective.method is Method.GET)
+	assert_is(effective, route)
+	assert_eq(effective.method, Method.GET)
 	assert_eq(effective.pattern, Pattern.parse("/articles"))
-	assert_that(effective.handler is handle)
+	assert_eq(effective.handler, handle)
 	assert_eq(effective.guards, [])
 
 
@@ -140,7 +145,7 @@ def test_inherits_group_guards_into_every_descendant():
 	)
 
 	assert_eq([route.guards for route in router.routes], [[guard], [guard]])
-	assert_that(router.routes[0].guards is not router.routes[1].guards)
+	assert_is_not(router.routes[0].guards, router.routes[1].guards)
 
 
 def test_runs_nested_and_route_guards_outermost_first():
@@ -235,7 +240,7 @@ def test_group_flattening_preserves_declaration_and_matching_order():
 
 	assert_eq([route.handler for route in router.routes], [first, second, third])
 	match = router.match(Method.GET, URL("/new"))
-	assert_that(match is not None and match.route.handler is first)
+	assert_is(assert_not_none(match).route.handler, first)
 
 
 def test_reusing_group_configuration_doesnt_mutate_sources():
@@ -268,4 +273,4 @@ def test_reusing_group_configuration_doesnt_mutate_sources():
 	)
 	assert_eq(router.routes[0].guards, [group_guard, route_guard])
 	assert_eq(router.routes[1].guards, [group_guard, route_guard])
-	assert_that(router.routes[0].guards is not router.routes[1].guards)
+	assert_is_not(router.routes[0].guards, router.routes[1].guards)

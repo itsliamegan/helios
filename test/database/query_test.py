@@ -2,7 +2,7 @@ from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import assert_eq, assert_raises
 
 from helios.database import Config, DatabaseError, Model, ModelError, Store
 from helios.database.sqlite import connect
@@ -172,8 +172,8 @@ def test_orders_limits_and_finds_first():
 			)
 			assert_eq(store.query(Item).limit(0).all(), [])
 			assert_eq(store.query(Item).order_by("rank").first().name, "Beta")
-			assert_that(store.query(Item).where({"name": "missing"}).first() is None)
-			assert_that(store.query(Item).limit(0).first() is None)
+			assert_eq(store.query(Item).where({"name": "missing"}).first(), None)
+			assert_eq(store.query(Item).limit(0).first(), None)
 		finally:
 			connection.close()
 

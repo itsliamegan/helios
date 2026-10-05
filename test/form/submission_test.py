@@ -61,13 +61,13 @@ def test_reads_first_errors():
 
 	assert_eq(submission.error("title"), "Title must be provided.")
 	assert_that(submission.invalid("title"))
-	assert_that(submission.error("note") is None)
+	assert_eq(submission.error("note"), None)
 	assert_that(not submission.invalid("note"))
 
 
 def test_starts_empty():
 	submission = Submission()
 
-	assert_that(submission.input is None)
+	assert_eq(submission.input, None)
 	assert_eq(submission.errors, Errors())
 	assert_that(not submission.invalid("title"))

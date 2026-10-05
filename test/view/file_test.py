@@ -41,7 +41,6 @@ def test_directory_rejects_syntax_errors_on_creation():
 			Engine(file.Driver(views_dir))
 
 		exception = raised.exception
-		assert exception is not None
 		assert_eq(exception.filename, str(broken_file))
 		assert_eq(exception.lineno, 2)
 

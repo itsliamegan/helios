@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import assert_eq, assert_not_in, assert_raises
 from werkzeug.datastructures import MultiDict
 from werkzeug.test import Client, EnvironBuilder
 
@@ -27,7 +27,7 @@ def test_adapts_method():
 
 	req = RequestAdapter(env).adapt()
 
-	assert_that(req.method is Method.GET)
+	assert_eq(req.method, Method.GET)
 
 
 def test_rejects_unsupported_method():
@@ -223,7 +223,7 @@ def test_adapts_stream_without_content_length():
 
 	ResponseAdapter(res, start_response).adapt()
 
-	assert_that("Content-Length" not in dict(seen))
+	assert_not_in("Content-Length", dict(seen))
 
 
 def test_adapts_binary_res():
@@ -395,7 +395,7 @@ def test_client_manages_cookies():
 
 	client.delete_cookie("token")
 
-	assert_that(client.get_cookie("token") is None)
+	assert_eq(client.get_cookie("token"), None)
 
 
 def test_client_follows_redirects():

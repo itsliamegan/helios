@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import assert_eq, assert_is_not, assert_raises, assert_that
 
 from helios.form import parser
 from helios.form.field import Field
@@ -62,4 +62,4 @@ def test_copies_the_default():
 	field = Field("tags", parser.List(parser.Str()), default)
 
 	assert_eq(field.initial, [])
-	assert_that(field.initial is not default)
+	assert_is_not(field.initial, default)

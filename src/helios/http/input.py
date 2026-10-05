@@ -24,5 +24,5 @@ class Input:
 	def __delitem__(self, name: str):
 		del self.items[name]
 
-	def __contains__(self, name: str) -> bool:
+	def __contains__(self, name: object) -> bool:
 		return name in self.items

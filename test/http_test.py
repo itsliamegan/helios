@@ -1,6 +1,13 @@
 from typing import cast
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_in,
+	assert_is,
+	assert_is_instance,
+	assert_not_in,
+	assert_raises,
+)
 
 from helios.http import (
 	Buffered,
@@ -71,7 +78,7 @@ def test_round_trips_parsed_urls():
 def test_parses_relative_url_query():
 	url = URL.parse("/search?q=today")
 
-	assert_that(url.host is None)
+	assert_eq(url.host, None)
 	assert_eq(url.path, "/search")
 	assert_eq(url.query.first("q"), "today")
 
@@ -121,7 +128,7 @@ def test_rejects_inconsistent_url_components():
 def test_reads_single_and_repeated_query_values():
 	query = Query({"q": "today", "tags": ["news", "politics"]})
 
-	assert_that("q" in query)
+	assert_in("q", query)
 	assert_eq(query.first("q"), "today")
 	assert_eq(query.all("q"), ["today"])
 	assert_eq(query.first("tags"), "news")
@@ -131,10 +138,10 @@ def test_reads_single_and_repeated_query_values():
 def test_reads_missing_query_values_as_empty():
 	query = Query({"tags": []})
 
-	assert_that("q" not in query)
-	assert_that(query.first("q") is None)
+	assert_not_in("q", query)
+	assert_eq(query.first("q"), None)
 	assert_eq(query.all("q"), [])
-	assert_that(query.first("tags") is None)
+	assert_eq(query.first("tags"), None)
 	assert_eq(query.all("tags"), [])
 
 
@@ -156,8 +163,8 @@ def test_encodes_text_and_binary_bodies():
 def test_creates_file_response():
 	response = Response.file(b"\x00\xff", "report.pdf", "application/pdf")
 
-	assert isinstance(response.body, Buffered)
-	assert_eq(response.body.to_bytes(), b"\x00\xff")
+	body = assert_is_instance(response.body, Buffered)
+	assert_eq(body.to_bytes(), b"\x00\xff")
 	assert_eq(str(response.headers["Content-Type"]), "application/pdf")
 	assert_eq(
 		str(response.headers["Content-Disposition"]),
@@ -186,14 +193,14 @@ def test_gets_request_referrer():
 def test_doesnt_get_empty_referrer():
 	request = Request(Method.GET, URL("/posts/example/edit"))
 
-	assert_that(request.referrer is None)
+	assert_eq(request.referrer, None)
 
 
 def test_queries_headers_without_case():
 	headers = Headers()
 	headers["content-type"] = "text/html"
 
-	assert_that("Content-Type" in headers)
+	assert_in("Content-Type", headers)
 	assert_eq(str(headers["Content-Type"]), "text/html")
 
 
@@ -233,7 +240,7 @@ def test_updates_header_through_reference():
 
 	header += "text/plain"
 
-	assert_that(header is headers["Accept"])
+	assert_is(header, headers["Accept"])
 	assert_eq(list(headers["Accept"]), ["text/html", "text/plain"])
 
 
@@ -287,9 +294,9 @@ def test_encodes_unsafe_cookie_value():
 
 
 def test_accepts_canonical_same_site_values():
-	assert_that("SameSite=Lax" in str(Cookie("id", "1", same_site="Lax")))
-	assert_that("SameSite=Strict" in str(Cookie("id", "1", same_site="Strict")))
-	assert_that("SameSite=None" in str(Cookie("id", "1", same_site="None")))
+	assert_in("SameSite=Lax", str(Cookie("id", "1", same_site="Lax")))
+	assert_in("SameSite=Strict", str(Cookie("id", "1", same_site="Strict")))
+	assert_in("SameSite=None", str(Cookie("id", "1", same_site="None")))
 
 
 def test_rejects_noncanonical_same_site_values():
@@ -337,7 +344,7 @@ def test_assigns_cookie_object():
 
 	cookies["session_id"] = cookie
 
-	assert_that(cookies["session_id"] is cookie)
+	assert_is(cookies["session_id"], cookie)
 
 
 def test_stores_uploaded_files():
@@ -348,25 +355,25 @@ def test_stores_uploaded_files():
 	]
 	files = Files({"avatar": avatar, "attachments": attachments})
 
-	assert_that("avatar" in files)
-	assert_that(files.first("avatar") is avatar)
+	assert_in("avatar", files)
+	assert_is(files.first("avatar"), avatar)
 	assert_eq(files.all("avatar"), [avatar])
-	assert_that(files.first("attachments") is attachments[0])
+	assert_is(files.first("attachments"), attachments[0])
 	assert_eq(files.all("attachments"), attachments)
 
 
 def test_reads_missing_files_as_empty():
 	files = Files()
 
-	assert_that("avatar" not in files)
-	assert_that(files.first("avatar") is None)
+	assert_not_in("avatar", files)
+	assert_eq(files.first("avatar"), None)
 	assert_eq(files.all("avatar"), [])
 
 
 def test_reads_single_and_repeated_input():
 	input = Input({"title": "Intro", "tags": ["art", "news"]})
 
-	assert_that("title" in input)
+	assert_in("title", input)
 	assert_eq(input.first("title"), "Intro")
 	assert_eq(input.all("title"), ["Intro"])
 	assert_eq(input.first("tags"), "art")
@@ -376,10 +383,10 @@ def test_reads_single_and_repeated_input():
 def test_reads_missing_input_as_empty():
 	input = Input({"tags": []})
 
-	assert_that("title" not in input)
-	assert_that(input.first("title") is None)
+	assert_not_in("title", input)
+	assert_eq(input.first("title"), None)
 	assert_eq(input.all("title"), [])
-	assert_that(input.first("tags") is None)
+	assert_eq(input.first("tags"), None)
 	assert_eq(input.all("tags"), [])
 
 
@@ -398,5 +405,5 @@ def test_removes_input():
 
 	del input["_method"]
 
-	assert_that("_method" not in input)
+	assert_not_in("_method", input)
 	assert_eq(input.first("title"), "Intro")

@@ -1,7 +1,7 @@
 from typing import ClassVar
 from uuid import UUID, uuid4
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import assert_eq, assert_in, assert_raises, assert_that
 
 from helios.form import (
 	Errors,
@@ -53,7 +53,7 @@ def test_fills_missing_optional_fields_with_defaults():
 	assert_that(not errors)
 	assert_eq(form.note, "")
 	assert_eq(form.tag_ids, [])
-	assert_that(form.return_to is None)
+	assert_eq(form.return_to, None)
 
 
 def test_copies_mutable_defaults():
@@ -89,7 +89,7 @@ def test_treats_blank_strings_as_missing():
 	form, errors = PostForm.validate(Input({"title": "   ", "return_to": ""}))
 
 	assert_eq(errors.messages["title"], ["Title must be provided."])
-	assert_that(form.return_to is None)
+	assert_eq(form.return_to, None)
 
 
 def test_trims_list_items_and_keeps_blank_ones():
@@ -187,10 +187,10 @@ def test_parses_checkboxes_and_other_scalar_types():
 	)
 
 	assert_that(not checked_errors)
-	assert_that(checked.open_in_new_tab is True)
+	assert_eq(checked.open_in_new_tab, True)
 	assert_eq(checked.page_size, 50)
 	assert_eq(str(checked.homepage), "https://example.com")
-	assert_that(unchecked.open_in_new_tab is False)
+	assert_eq(unchecked.open_in_new_tab, False)
 	assert_eq(unchecked.page_size, 20)
 	assert_eq(
 		invalid_errors.messages,
@@ -208,7 +208,7 @@ def test_constructs_with_fields():
 	assert_eq(form.title, "Intro")
 	assert_eq(form.note, "")
 	assert_eq(form.tag_ids, [tag_id])
-	assert_that(form.return_to is None)
+	assert_eq(form.return_to, None)
 
 
 def test_construction_rejects_missing_and_extra_fields():
@@ -534,7 +534,7 @@ def test_skips_filters_and_rules_after_a_parse_error():
 
 	_, errors = TagsForm.validate(Input({"tag_ids": ["not-a-uuid"]}))
 
-	assert_that("tag_ids" in errors)
+	assert_in("tag_ids", errors)
 	assert_eq(recorded, [])
 
 

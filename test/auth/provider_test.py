@@ -3,7 +3,13 @@ import sqlite3
 from tempfile import TemporaryDirectory
 from uuid import uuid4
 
-from luna.test.assertion import assert_eq, assert_not, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_not,
+	assert_not_in,
+	assert_not_none,
+	assert_that,
+)
 
 from helios.app import Application, Config, Container, Provider
 import helios.auth
@@ -99,8 +105,7 @@ def test_finds_user_from_session():
 		finally:
 			connection.close()
 
-	assert provided.user is not None
-	assert_eq(provided.user.id, user.id)
+	assert_eq(assert_not_none(provided.user).id, user.id)
 	assert_that(provided.is_signed_in())
 
 
@@ -115,7 +120,7 @@ def test_removes_stale_user_id():
 			connection.close()
 
 	assert_not(provided.is_signed_in())
-	assert_that("_user_id" not in session)
+	assert_not_in("_user_id", session)
 
 
 def test_removes_malformed_user_id():
@@ -129,7 +134,7 @@ def test_removes_malformed_user_id():
 			connection.close()
 
 	assert_not(provided.is_signed_in())
-	assert_that("_user_id" not in session)
+	assert_not_in("_user_id", session)
 
 
 def render_signed_in_user(store: Store, session: Session) -> str:

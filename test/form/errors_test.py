@@ -1,4 +1,4 @@
-from luna.test.assertion import assert_eq, assert_that
+from luna.test.assertion import assert_eq, assert_in, assert_not_in, assert_that
 
 from helios.form import Errors
 
@@ -7,7 +7,7 @@ def test_starts_empty():
 	errors = Errors()
 
 	assert_that(not errors)
-	assert_that("title" not in errors)
+	assert_not_in("title", errors)
 	assert_eq(errors.first("title"), None)
 
 
@@ -18,7 +18,7 @@ def test_adds_messages_in_order():
 	errors.add("title", "That title is taken.")
 
 	assert_that(errors)
-	assert_that("title" in errors)
+	assert_in("title", errors)
 	assert_eq(errors.first("title"), "Title must be provided.")
 	assert_eq(
 		errors.messages["title"], ["Title must be provided.", "That title is taken."]

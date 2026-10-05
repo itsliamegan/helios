@@ -31,7 +31,7 @@ class Query:
 	def all(self, name: str) -> list[str]:
 		return list(self.parameters.get(name, []))
 
-	def __contains__(self, name: str) -> bool:
+	def __contains__(self, name: object) -> bool:
 		return name in self.parameters
 
 	def __str__(self) -> str:

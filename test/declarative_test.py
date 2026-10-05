@@ -1,6 +1,12 @@
 from typing import ClassVar
 
-from luna.test.assertion import assert_eq, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_is,
+	assert_is_instance,
+	assert_raises,
+	assert_that,
+)
 
 from helios.declarative import (
 	DeclarationError,
@@ -34,7 +40,7 @@ def test_reads_annotations_with_defaults():
 	found = declarations(Post, ExampleError)
 
 	assert_eq([declaration.name for declaration in found], ["title", "note"])
-	assert_that(found[0].default is MISSING)
+	assert_is(found[0].default, MISSING)
 	assert_eq(found[1].default, "")
 	assert_eq([declaration.resolve() for declaration in found], [str, str])
 
@@ -46,7 +52,7 @@ def test_rejects_with_the_owner_error():
 	(declaration,) = declarations(Post, ExampleError)
 	rejected = declaration.reject(DeclarationError("title", "not allowed"))
 
-	assert_that(isinstance(rejected, ExampleError))
+	assert_is_instance(rejected, ExampleError)
 	assert_eq(str(rejected), "Post.title: not allowed")
 
 
@@ -77,7 +83,7 @@ def test_resolves_pending_annotations_on_first_use():
 
 	assert_that(pending)
 	assert_that(not declaration.pending)
-	assert_that(resolved is Author)
+	assert_eq(resolved, Author)
 
 
 def test_rejects_annotations_that_never_resolve():
@@ -106,7 +112,7 @@ def test_looks_up_unresolved_names_in_the_fallback():
 		pass
 
 	assert_eq(author.resolve(), biographer | None)
-	assert_that(editor.resolve() is Editor)
+	assert_eq(editor.resolve(), Editor)
 
 
 def test_resolves_each_annotation_on_its_own():
@@ -119,7 +125,7 @@ def test_resolves_each_annotation_on_its_own():
 	class Editor:
 		pass
 
-	assert_that(editor.resolve() is Editor)
+	assert_eq(editor.resolve(), Editor)
 	with assert_raises(ExampleError):
 		author.resolve()
 

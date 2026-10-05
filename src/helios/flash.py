@@ -43,7 +43,7 @@ class Flashes:
 	def __setitem__(self, name: str, value: Any):
 		self.flashes[name] = Flash(name, value, is_dirty=True)
 
-	def __contains__(self, name: str) -> bool:
+	def __contains__(self, name: object) -> bool:
 		return name in self.flashes
 
 
