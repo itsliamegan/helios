@@ -3,7 +3,7 @@ from collections.abc import Hashable, Iterable, Sized
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from luna.inflect import count
+from luna import inflect
 
 from .key import Key
 
@@ -65,11 +65,11 @@ class Length(Rule[Sized]):
 	def limit(self, unit: str) -> str:
 		match self.exactly, self.minimum, self.maximum:
 			case int(exactly), _, _:
-				return count(exactly, unit)
+				return inflect.count(exactly, unit)
 			case None, int(minimum), None:
-				return f"at least {count(minimum, unit)}"
+				return f"at least {inflect.count(minimum, unit)}"
 			case None, None, int(maximum):
-				return f"at most {count(maximum, unit)}"
+				return f"at most {inflect.count(maximum, unit)}"
 			case _, minimum, maximum:
 				return f"between {minimum} and {maximum} {unit}s"
 

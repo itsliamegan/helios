@@ -1,6 +1,6 @@
 from typing import Any, ClassVar, Self, dataclass_transform
 
-from luna.inflect import sentence, words
+from luna import inflect
 
 from helios.declarative import (
 	check_init_keywords,
@@ -91,9 +91,9 @@ class Form:
 		if str(key) in cls.messages:
 			return cls.messages[str(key)]
 		elif item:
-			return f"An item in {" ".join(words(key.name))} {message}."
+			return f"An item in {" ".join(inflect.words(key.name))} {message}."
 		else:
-			return f"{sentence(key.name)} {message}."
+			return f"{inflect.sentence(key.name)} {message}."
 
 	def __repr__(self) -> str:
 		values = ", ".join(

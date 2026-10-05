@@ -2,7 +2,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Self
 
-from luna.inflect import dash
+from luna import inflect
 from markupsafe import Markup
 
 GLOBAL_ATTRIBUTES = {"class", "id", "hidden"}
@@ -55,7 +55,7 @@ class Attributes:
 
 
 def html_name(name: str) -> str:
-	return dash(name)
+	return inflect.dash(name)
 
 
 def split_class_names(values: Mapping[str, Any]) -> dict[str, Any]:
