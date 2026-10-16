@@ -19,6 +19,7 @@ name = "helios"
 version = "0.1"
 source = { editable = "packages/framework" }
 dependencies = [
+    { name = "helios-url" },
     { name = "jinja2" },
     { name = "luna" },
     { name = "markupsafe" },
@@ -33,6 +34,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "helios-url", editable = "packages/url" },
     { name = "jinja2", specifier = "==3.1.*" },
     { name = "luna", git = "https://github.com/itsliamegan/luna?branch=main" },
     { name = "markupsafe", specifier = "==3.0.*" },
