@@ -16,6 +16,12 @@ nested-string-quote-style = "preferred"
 quote-style = "double"
 
 [tool.ruff.lint]
+extend-select = [
+	"D200",
+	"D205",
+	"D209",
+	"D212",
+]
 ignore = [
 	"BLE001",
 	"RUF012",

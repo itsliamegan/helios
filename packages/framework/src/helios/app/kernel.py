@@ -82,10 +82,10 @@ class Kernel:
 
 
 class Middlewares:
-	"""
-	An application's middleware kept in two tiers. Those its providers use wrap
-	those it was constructed with. Each tier keeps the order its middleware was
-	added in.
+	"""An application's middleware kept in two tiers.
+
+	Those its providers use wrap those it was constructed with. Each tier keeps
+	the order its middleware was added in.
 	"""
 
 	def __init__(self, middlewares: Sequence[Middleware]):
