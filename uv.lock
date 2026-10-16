@@ -5,6 +5,7 @@ requires-python = ">=3.14"
 [manifest]
 members = [
     "helios",
+    "helios-url",
 ]
 
 [manifest.dependency-groups]
@@ -18,6 +19,7 @@ name = "helios"
 version = "0.1"
 source = { editable = "packages/framework" }
 dependencies = [
+    { name = "helios-url" },
     { name = "jinja2" },
     { name = "luna" },
     { name = "markupsafe" },
@@ -32,6 +34,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "helios-url", editable = "packages/url" },
     { name = "jinja2", specifier = "==3.1.*" },
     { name = "luna", git = "https://github.com/itsliamegan/luna?branch=main" },
     { name = "markupsafe", specifier = "==3.0.*" },
@@ -41,6 +44,21 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [{ name = "time-machine", specifier = ">=3.5.1" }]
+
+[[package]]
+name = "helios-url"
+version = "0.1"
+source = { editable = "packages/url" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "luna" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [{ name = "luna", git = "https://github.com/itsliamegan/luna?branch=main" }]
 
 [[package]]
 name = "jinja2"

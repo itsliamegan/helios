@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 
+from helios.url import URL
+
 from .cookie import Cookies
 from .file import Files
 from .header import Headers
 from .input import Input
 from .method import Method
-from .url import URL
 
 
 @dataclass(init=False)
