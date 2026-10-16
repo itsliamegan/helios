@@ -121,7 +121,7 @@ class Parameter:
 		converter = Converter.for_name(converter_name)
 		if converter is None:
 			raise ValueError(f"Unknown pattern converter: {converter_name}")
-		return cls(name, converter, suffix)
+		return cls(name, converter, suffix=suffix)
 
 	@property
 	def expression(self) -> str:
