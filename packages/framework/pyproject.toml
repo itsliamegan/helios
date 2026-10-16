@@ -8,6 +8,7 @@ dependencies = [
 	"luna",
 	"markupsafe==3.0.*",
 	"python-dotenv>=1.2.2",
+	"watchfiles==1.3.*",
 	"werkzeug==3.1.*",
 ]
 
