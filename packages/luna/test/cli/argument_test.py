@@ -1,4 +1,5 @@
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 from luna.cli import HelpRequested, ParseError, Program, argument
@@ -122,24 +123,52 @@ def test_accepts_supported_types():
 		text: str = argument()
 		number: int = argument()
 		mode: Mode = argument()
+		path: Path = argument()
 		maybe_text: str | None = argument(default=None)
 		maybe_number: int | None = argument(default=None)
 		maybe_mode: Mode | None = argument(default=None)
+		maybe_path: Path | None = argument(default=None)
 
 		def run(self):
 			pass
 
 	assert_eq(
-		parse(Supported, ["a", "1", "fast", "b", "2", "safe"]).values,
+		parse(Supported, ["a", "1", "fast", "c", "b", "2", "safe", "d"]).values,
 		{
 			"text": "a",
 			"number": 1,
 			"mode": Mode.FAST,
+			"path": Path("c"),
 			"maybe_text": "b",
 			"maybe_number": 2,
 			"maybe_mode": Mode.SAFE,
+			"maybe_path": Path("d"),
 		},
 	)
+
+
+def test_makes_paths_as_written():
+	class Open(Program):
+		name = "open"
+		source: Path = argument()
+
+		def run(self):
+			pass
+
+	source = parse(Open, ["../missing/file.txt"]).values["source"]
+
+	assert_eq(str(source), "../missing/file.txt")
+
+
+def test_accepts_path_defaults():
+	class Open(Program):
+		name = "open"
+		source: Path = argument(default=Path("input.txt"))
+
+		def run(self):
+			pass
+
+	assert_eq(parse(Open, []).values, {"source": Path("input.txt")})
 
 
 def test_rejects_unsupported_types():
@@ -165,6 +194,7 @@ def test_rejects_mismatched_defaults():
 		(int, "1"),
 		(str, 1),
 		(Mode, "safe"),
+		(Path, "input.txt"),
 		(int | None, "1"),
 	]:
 		assert_that(

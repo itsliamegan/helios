@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, get_args, get_origin
 
 from luna.declarative import Declaration, DeclarationError, MISSING
@@ -12,7 +13,12 @@ class Conversion:
 
 
 def scalar(annotation: object) -> bool:
-	return annotation is str or annotation is int or choices(annotation)
+	return (
+		annotation is str
+		or annotation is int
+		or annotation is Path
+		or choices(annotation)
+	)
 
 
 def choices(annotation: object) -> bool:
@@ -43,7 +49,15 @@ def matches(annotation: Any, default: object) -> bool:
 	if get_origin(annotation) is list:
 		(item_type,) = get_args(annotation)
 		return type(default) is list and all(
-			type(item) is item_type for item in default
+			matches_scalar(item_type, item) for item in default
 		)
+	else:
+		return matches_scalar(annotation, default)
+
+
+def matches_scalar(annotation: Any, default: object) -> bool:
+	# A Path is constructed as the platform's own subclass of it.
+	if annotation is Path:
+		return isinstance(default, Path)
 	else:
 		return type(default) is annotation
