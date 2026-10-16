@@ -20,7 +20,7 @@ def choices(annotation: object) -> bool:
 
 
 def check_default(
-	declaration: Declaration[Conversion],
+	declaration: Declaration,
 	conversion: Conversion,
 	default: object,
 ):

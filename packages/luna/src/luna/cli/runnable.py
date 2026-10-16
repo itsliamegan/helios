@@ -5,9 +5,8 @@ import string
 from typing import Any, ClassVar, dataclass_transform, get_origin
 
 from luna.cli.argument import Argument, argument
-from luna.cli.conversion import Conversion
 from luna.cli.option import Option, option
-from luna.declarative import Declaration, check_init_keywords, declarations
+from luna.declarative import check_init_keywords, declarations
 
 RESERVED_NAMES = {"run", "main", "name", "commands", "help"}
 RESERVED_SHORTS = {"h"}
@@ -41,10 +40,14 @@ class Runnable(ABC):
 		check_reserved(cls)
 
 		declared = {}
-		for declaration in declarations(cls, settle, ValueError):
+		for declaration in declarations(cls, ValueError):
 			value = declared_value(declaration.default)
 			value.bind(declaration)
 			declared[declaration.name] = value
+
+		for value in declared.values():
+			if not value.declaration.pending:
+				value.resolve()
 
 		check_arguments(cls, declared)
 		check_shorts(cls, declared)
@@ -55,7 +58,7 @@ class Runnable(ABC):
 	@classmethod
 	def settled(cls) -> dict[str, Argument | Option]:
 		for value in cls.declared.values():
-			value.declaration.resolve()
+			value.resolve()
 		return cls.declared
 
 	@abstractmethod
@@ -67,10 +70,6 @@ def declared_value(default: object) -> Argument | Option:
 		return default
 	else:
 		return Option(default)
-
-
-def settle(declaration: Declaration[Conversion]) -> Conversion:
-	return declared_value(declaration.default).settle(declaration)
 
 
 def description(owner: type) -> str | None:
