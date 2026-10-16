@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Literal, TYPE_CHECKING, TypeIs, cast, get_args, get_origin
 
-from helios.declarative import Declaration, DeclarationError, split_nullable
+from luna.declarative import Declaration, DeclarationError, split_nullable
 
 from .codec import UUID
 from .error import ModelError

@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from luna.declarative import (
-	Declaration,
 	DeclarationError,
 	MISSING,
 	check_init_keywords,
@@ -9,19 +8,25 @@ from luna.declarative import (
 	declarations,
 	split_nullable,
 )
-from luna.test.assertion import assert_eq, assert_is, assert_raises, assert_that
+from luna.test.assertion import (
+	assert_eq,
+	assert_is,
+	assert_is_instance,
+	assert_raises,
+	assert_that,
+)
 
 
 class ExampleError(TypeError):
 	pass
 
 
-def annotation_of(declaration: Declaration[object]) -> object:
-	return declaration.annotation
+class Lookup:
+	def __init__(self, *held: type):
+		self.held = {each.__name__: each for each in held}
 
-
-def reject(declaration: Declaration[object]) -> object:
-	raise DeclarationError(declaration.name, "not allowed")
+	def find(self, name: str) -> type | None:
+		return self.held.get(name)
 
 
 def test_reads_annotations_with_defaults():
@@ -29,24 +34,25 @@ def test_reads_annotations_with_defaults():
 		limit: ClassVar[int] = 10
 
 		title: str
-		body: str = ""
+		note: str = ""
 
-	found = declarations(Post, annotation_of, ExampleError)
+	found = declarations(Post, ExampleError)
 
-	assert_eq([declaration.name for declaration in found], ["title", "body"])
+	assert_eq([declaration.name for declaration in found], ["title", "note"])
 	assert_is(found[0].default, MISSING)
 	assert_eq(found[1].default, "")
 	assert_eq([declaration.resolve() for declaration in found], [str, str])
 
 
-def test_settles_resolved_annotations_when_declared():
+def test_rejects_with_the_owner_error():
 	class Post:
 		title: str
 
-	with assert_raises(ExampleError) as raised:
-		declarations(Post, reject, ExampleError)
+	(declaration,) = declarations(Post, ExampleError)
+	rejected = declaration.reject(DeclarationError("title", "not allowed"))
 
-	assert_eq(str(raised.exception), "Post.title: not allowed")
+	assert_is_instance(rejected, ExampleError)
+	assert_eq(str(rejected), "Post.title: not allowed")
 
 
 def test_rejects_string_annotations():
@@ -54,7 +60,7 @@ def test_rejects_string_annotations():
 		title: "str"  # noqa: UP037
 
 	with assert_raises(ExampleError) as raised:
-		declarations(Post, annotation_of, ExampleError)
+		declarations(Post, ExampleError)
 
 	assert_eq(
 		str(raised.exception),
@@ -66,7 +72,7 @@ def test_resolves_pending_annotations_on_first_use():
 	class Post:
 		author: Author
 
-	(declaration,) = declarations(Post, annotation_of, ExampleError)
+	(declaration,) = declarations(Post, ExampleError)
 	pending = declaration.pending
 
 	class Author:
@@ -83,12 +89,57 @@ def test_rejects_annotations_that_never_resolve():
 	class Post:
 		author: Author  # noqa: F821  # ty: ignore[unresolved-reference]
 
-	(declaration,) = declarations(Post, annotation_of, ExampleError)
+	(declaration,) = declarations(Post, ExampleError)
 
 	with assert_raises(ExampleError) as raised:
 		declaration.resolve()
 
 	assert_eq(str(raised.exception), "Post.author: unresolved annotation: Author")
+
+
+def test_looks_up_unresolved_names_in_the_fallback():
+	biographer = type("Biographer", (), {})
+
+	class Post:
+		author: Biographer | None  # noqa: F821  # ty: ignore[unresolved-reference]
+		editor: Editor
+
+	author, editor = declarations(Post, ExampleError)
+	author.fallback = Lookup(biographer)
+
+	class Editor:
+		pass
+
+	assert_eq(author.resolve(), biographer | None)
+	assert_eq(editor.resolve(), Editor)
+
+
+def test_resolves_each_annotation_on_its_own():
+	class Post:
+		author: Biographer  # noqa: F821  # ty: ignore[unresolved-reference]
+		editor: Editor
+
+	author, editor = declarations(Post, ExampleError)
+
+	class Editor:
+		pass
+
+	assert_eq(editor.resolve(), Editor)
+	with assert_raises(ExampleError):
+		author.resolve()
+
+
+def test_rejects_names_the_fallback_does_not_hold():
+	class Post:
+		author: Biographer  # noqa: F821  # ty: ignore[unresolved-reference]
+
+	(declaration,) = declarations(Post, ExampleError)
+	declaration.fallback = Lookup()
+
+	with assert_raises(ExampleError) as raised:
+		declaration.resolve()
+
+	assert_eq(str(raised.exception), "Post.author: unresolved annotation: Biographer")
 
 
 def test_splits_nullable_annotations():

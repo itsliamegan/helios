@@ -1,8 +1,9 @@
 from annotationlib import Format, ForwardRef, get_annotations
-from collections.abc import Callable, Collection
-from dataclasses import dataclass
+from collections.abc import Collection, Mapping
+from functools import reduce
+from operator import or_
 from types import NoneType
-from typing import ClassVar, Union, get_args, get_origin
+from typing import ClassVar, Protocol, Union, get_args, get_origin
 
 MISSING: object = object()
 
@@ -14,68 +15,66 @@ class DeclarationError(Exception):
 		self.detail = detail
 
 
-@dataclass(init=False, eq=False)
-class Declaration[T]:
-	owner: type
-	name: str
-	annotation: object
-	default: object
-	settle: Callable[[Declaration[T]], T]
-	error: type[Exception]
-	settled: bool
+class Namespace(Protocol):
+	def find(self, name: str) -> type | None: ...
 
+
+class Declaration:
 	def __init__(
 		self,
 		owner: type,
 		name: str,
 		annotation: object,
 		default: object,
-		settle: Callable[[Declaration[T]], T],
 		error: type[Exception],
 	):
 		self.owner = owner
 		self.name = name
 		self.annotation = annotation
 		self.default = default
-		self.settle = settle
 		self.error = error
-		self.settled = False
-		if not self.pending:
-			self.resolve()
+		self.fallback: Namespace | None = None
 
 	@property
 	def pending(self) -> bool:
 		return forward_reference(self.annotation) is not None
 
-	def resolve(self) -> T:
-		if not self.settled:
+	def resolve(self) -> object:
+		if self.pending:
 			try:
-				if self.pending:
-					self.annotation = self.evaluate()
-				self.value = self.settle(self)
+				self.annotation = self.evaluate()
 			except DeclarationError as error:
-				raise self.error(f"{self.owner.__name__}.{error}") from error
-			self.settled = True
-		return self.value
+				raise self.reject(error) from error
+		return self.annotation
 
 	def evaluate(self) -> object:
-		try:
-			return get_annotations(self.owner)[self.name]
-		except NameError as error:
-			raise DeclarationError(
-				self.name,
-				f"unresolved annotation: {error.name}",
-			) from error
+		supplied: dict[str, type] = {}
+		while True:
+			try:
+				return evaluate_annotation(self.annotation, self.owner, supplied)
+			except NameError as error:
+				missing = error.name
+				if missing is None or missing in supplied:
+					raise self.unresolved(missing) from error
+				supplied[missing] = self.lookup(missing)
+
+	def lookup(self, missing: str) -> type:
+		found = None if self.fallback is None else self.fallback.find(missing)
+		if found is None:
+			raise self.unresolved(missing)
+		return found
+
+	def unresolved(self, missing: str | None) -> DeclarationError:
+		return DeclarationError(self.name, f"unresolved annotation: {missing}")
+
+	def reject(self, error: DeclarationError) -> Exception:
+		return self.error(f"{self.owner.__name__}.{error}")
 
 
-def declarations[T](
-	owner: type,
-	settle: Callable[[Declaration[T]], T],
-	error: type[Exception],
-) -> list[Declaration[T]]:
+def declarations(owner: type, error: type[Exception]) -> list[Declaration]:
 	found = []
 	for name, annotation in get_annotations(owner, format=Format.FORWARDREF).items():
-		if annotation is ClassVar or get_origin(annotation) is ClassVar:
+		if is_class_variable(annotation):
 			continue
 		if isinstance(annotation, str):
 			raise error(
@@ -84,8 +83,28 @@ def declarations[T](
 			)
 
 		default = vars(owner).get(name, MISSING)
-		found.append(Declaration(owner, name, annotation, default, settle, error))
+		found.append(Declaration(owner, name, annotation, default, error))
 	return found
+
+
+def evaluate_annotation(
+	annotation: object,
+	owner: type,
+	supplied: Mapping[str, type],
+) -> object:
+	if isinstance(annotation, ForwardRef):
+		return annotation.evaluate(locals={**vars(owner), **supplied})
+	origin = get_origin(annotation)
+	if origin is None or forward_reference(annotation) is None:
+		return annotation
+
+	evaluated = tuple(
+		evaluate_annotation(argument, owner, supplied)
+		for argument in get_args(annotation)
+	)
+	if origin is Union:
+		return reduce(or_, evaluated)
+	return origin[evaluated]
 
 
 def forward_reference(annotation: object) -> ForwardRef | None:
@@ -134,3 +153,33 @@ def check_init_keywords(
 def check_single_base(owner: type, base: type, error: type[Exception]):
 	if owner.__bases__ != (base,):
 		raise error(f"{owner.__name__} must inherit only from {base.__name__}")
+
+
+def check_reserved_names(
+	owner: type,
+	base: type,
+	metadata: Collection[str],
+	error: type[Exception],
+):
+	base_annotations = get_annotations(base, format=Format.FORWARDREF)
+	reserved = {*vars(base), *base_annotations}
+	configuration = set()
+	for name, annotation in base_annotations.items():
+		if is_class_variable(annotation) and name not in metadata:
+			configuration.add(name)
+
+	annotations = get_annotations(owner, format=Format.FORWARDREF)
+	for name in [*annotations, *vars(owner)]:
+		if is_special(name) or name not in reserved:
+			continue
+		declared = name in annotations and not is_class_variable(annotations[name])
+		if declared or name not in configuration:
+			raise error(f"{owner.__name__}.{name} is reserved by {base.__name__}")
+
+
+def is_class_variable(annotation: object) -> bool:
+	return annotation is ClassVar or get_origin(annotation) is ClassVar
+
+
+def is_special(name: str) -> bool:
+	return name.startswith("__") and name.endswith("__")
