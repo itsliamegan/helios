@@ -1,6 +1,6 @@
 from typing import Any, TYPE_CHECKING
 
-from helios.declarative import Declaration, DeclarationError, MISSING, split_nullable
+from luna.declarative import Declaration, DeclarationError, MISSING, split_nullable
 
 from .codec import Codec, Scalar, encode
 from .error import ModelError

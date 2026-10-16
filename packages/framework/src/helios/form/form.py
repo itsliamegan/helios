@@ -1,13 +1,13 @@
 from typing import Any, ClassVar, Self, dataclass_transform
 
 from luna import inflect
-
-from helios.declarative import (
+from luna.declarative import (
 	check_init_keywords,
 	check_reserved_names,
 	check_single_base,
 	declarations,
 )
+
 from helios.http import Input
 
 from .error import FormError
