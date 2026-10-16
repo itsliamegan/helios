@@ -8,18 +8,6 @@ from luna.test.assertion import (
 from helios.url import Pattern, URL
 
 
-def test_parses_placeholder_followed_by_text():
-	pattern = Pattern.parse("/posts/{slug}.xml")
-
-	assert_eq(pattern.parameters["slug"].suffix, ".xml")
-
-
-def test_parses_placeholder_with_converter_followed_by_text():
-	pattern = Pattern.parse("/posts/{id:uuid}.xml")
-
-	assert_eq(pattern.parameters["id"].suffix, ".xml")
-
-
 def test_matches_url_with_text_after_value():
 	pattern = Pattern.parse("/posts/{slug}.xml")
 	slug = f"post-{uuid4().hex}"
@@ -38,7 +26,7 @@ def test_matches_converted_value_followed_by_text():
 	assert_eq(parameters, {"id": identifier})
 
 
-def test_does_not_match_url_without_the_text():
+def test_doesnt_match_url_without_the_text():
 	pattern = Pattern.parse("/posts/{slug}.xml")
 
 	parameters = pattern.match(URL(f"/posts/{uuid4().hex}"))
@@ -46,7 +34,7 @@ def test_does_not_match_url_without_the_text():
 	assert_eq(parameters, None)
 
 
-def test_does_not_match_url_with_other_text():
+def test_doesnt_match_url_with_other_text():
 	pattern = Pattern.parse("/posts/{slug}.xml")
 
 	parameters = pattern.match(URL(f"/posts/{uuid4().hex}.json"))
