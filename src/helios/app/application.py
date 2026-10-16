@@ -28,10 +28,12 @@ class Application:
 		providers: Sequence[Provider],
 		middlewares: Sequence[Middleware] | None = None,
 	):
+		middlewares = middlewares or []
+
 		self.container = Container()
 		self.providers = list(providers)
-		self.middlewares: list[Middleware] = []
-		middlewares = middlewares or []
+		self.middlewares = list(middlewares)
+		self.used: list[Middleware] = []
 		try:
 			for key, value in (
 				(Application, self),
@@ -45,16 +47,25 @@ class Application:
 
 			for provider in self.providers:
 				provider.register(self.container)
+		except BaseException:
+			self.container.close()
+			raise
+
+	def boot(self):
+		try:
 			for provider in self.providers:
 				provider.boot(self)
-			self.middlewares.extend(middlewares)
-			self.kernel = Kernel(self.container, router, self.middlewares)
+			self.kernel = Kernel(
+				self.container,
+				self.container.get(Router),
+				self.used + self.middlewares,
+			)
 		except BaseException:
 			self.container.close()
 			raise
 
 	def use(self, middleware: Middleware):
-		self.middlewares.append(middleware)
+		self.used.append(middleware)
 
 	def handle(self, request: Request) -> Response:
 		return self.kernel.handle(request)
