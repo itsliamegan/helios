@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from luna.test.assertion import (
 	assert_eq,
+	assert_in,
 	assert_not,
 	assert_raises,
 	assert_that,
@@ -65,3 +66,129 @@ def test_raises_for_entries_without_esbuild():
 				minify=False,
 				sourcemap=False,
 			)
+
+
+def test_compiles_script_entry():
+	with TemporaryDirectory() as directory:
+		root = project(directory)
+		output = Path(root, "public", "assets")
+		message = uuid4().hex
+		write(Path(root, "assets", "scripts", "main.js"), f'console.log("{message}");')
+		bundler = Bundler(root)
+
+		compiled = bundler.compile(
+			Path(root, "assets"),
+			output=output,
+			scripts=["main"],
+			styles=[],
+			minify=False,
+			sourcemap=False,
+		)
+
+		script = compiled.manifest.scripts["main"]
+		assert_that(script.startswith("scripts/main-"))
+		assert_eq(compiled.files, [Path(script)])
+		assert_in(message, Path(output, script).read_text())
+
+
+def test_compiles_style_entry():
+	with TemporaryDirectory() as directory:
+		root = project(directory)
+		output = Path(root, "public", "assets")
+		write(Path(root, "assets", "styles", "main.css"), "body { color: red; }")
+		bundler = Bundler(root)
+
+		compiled = bundler.compile(
+			Path(root, "assets"),
+			output=output,
+			scripts=[],
+			styles=["main"],
+			minify=False,
+			sourcemap=False,
+		)
+
+		style = compiled.manifest.styles["main"]
+		assert_that(style.startswith("styles/main-"))
+		assert_eq(compiled.files, [Path(style)])
+		assert_in("color: red", Path(output, style).read_text())
+
+
+def test_bundles_imported_script():
+	with TemporaryDirectory() as directory:
+		root = project(directory)
+		output = Path(root, "public", "assets")
+		message = uuid4().hex
+		write(
+			Path(root, "assets", "scripts", "main.js"),
+			'import { message } from "./message.js";\nconsole.log(message);',
+		)
+		write(
+			Path(root, "assets", "scripts", "message.js"),
+			f'export const message = "{message}";',
+		)
+		bundler = Bundler(root)
+
+		compiled = bundler.compile(
+			Path(root, "assets"),
+			output=output,
+			scripts=["main"],
+			styles=[],
+			minify=False,
+			sourcemap=False,
+		)
+
+		script = compiled.manifest.scripts["main"]
+		assert_in(message, Path(output, script).read_text())
+
+
+def test_writes_source_maps():
+	with TemporaryDirectory() as directory:
+		root = project(directory)
+		write(Path(root, "assets", "scripts", "main.js"), "console.log(1);")
+		bundler = Bundler(root)
+
+		compiled = bundler.compile(
+			Path(root, "assets"),
+			output=Path(root, "public", "assets"),
+			scripts=["main"],
+			styles=[],
+			minify=False,
+			sourcemap=True,
+		)
+
+	script = compiled.manifest.scripts["main"]
+	assert_eq(compiled.files, [Path(script), Path(f"{script}.map")])
+
+
+def test_minifies_entries():
+	with TemporaryDirectory() as directory:
+		root = project(directory)
+		output = Path(root, "public", "assets")
+		write(Path(root, "assets", "styles", "main.css"), "body {\n\tcolor: red;\n}")
+		bundler = Bundler(root)
+
+		compiled = bundler.compile(
+			Path(root, "assets"),
+			output=output,
+			scripts=[],
+			styles=["main"],
+			minify=True,
+			sourcemap=False,
+		)
+
+		style = compiled.manifest.styles["main"]
+		assert_eq(Path(output, style).read_text(), "body{color:red}\n")
+
+
+def project(directory: str) -> Path:
+	root = Path(directory)
+	Path(root, "node_modules").symlink_to(Path(MEMBER, "node_modules"))
+	return root
+
+
+def write(path: Path, text: str):
+	path.parent.mkdir(parents=True, exist_ok=True)
+	path.write_text(text)
+
+
+MEMBER = Path(__file__).parents[1]

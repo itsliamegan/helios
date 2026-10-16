@@ -1,6 +1,9 @@
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import shutil
+import subprocess
+from tempfile import TemporaryDirectory
 
 from .error import BundlerNotFoundError
 from .manifest import Manifest
@@ -8,8 +11,8 @@ from .manifest import Manifest
 
 @dataclass
 class Bundler:
-	"""Compiles a project's scripts and styles with the esbuild installed in
-	its root's node_modules.
+	"""Compiles a project's assets using esbuild, which must be installed in the
+	project's node_modules.
 	"""
 
 	root: Path
@@ -35,7 +38,55 @@ class Bundler:
 		if not esbuild.exists():
 			raise BundlerNotFoundError(f"esbuild not found: {esbuild}")
 
-		raise NotImplementedError
+		script_entries = {}
+		for name in scripts:
+			script_entries[Path(source, "scripts", f"{name}.js").resolve()] = name
+
+		style_entries = {}
+		for name in styles:
+			style_entries[Path(source, "styles", f"{name}.css").resolve()] = name
+
+		with TemporaryDirectory() as directory:
+			metafile = Path(directory, "meta.json")
+
+			command = [str(esbuild)]
+			for entry in [*script_entries, *style_entries]:
+				command.append(str(entry))
+			command.extend(
+				[
+					"--bundle",
+					"--format=esm",
+					"--entry-names=[dir]/[name]-[hash]",
+					f"--outbase={source}",
+					f"--outdir={output}",
+					f"--metafile={metafile}",
+					"--log-level=error",
+				]
+			)
+			if minify:
+				command.append("--minify")
+			if sourcemap:
+				command.append("--sourcemap")
+
+			subprocess.run(command, cwd=self.root, capture_output=True, check=True)
+			outputs = json.loads(metafile.read_text())["outputs"]
+
+		manifest = Manifest(scripts={}, styles={})
+		files = []
+		for key, value in outputs.items():
+			# esbuild reports outputs and entry points relative to its working
+			# directory, which is the root.
+			file = Path(self.root, key).resolve().relative_to(output.resolve())
+			files.append(file)
+
+			if "entryPoint" in value:
+				entry = Path(self.root, value["entryPoint"]).resolve()
+				if entry in script_entries:
+					manifest.scripts[script_entries[entry]] = file.as_posix()
+				else:
+					manifest.styles[style_entries[entry]] = file.as_posix()
+
+		return Compiled(manifest=manifest, files=sorted(files))
 
 
 @dataclass
