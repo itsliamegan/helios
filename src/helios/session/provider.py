@@ -17,6 +17,7 @@ class Provider(Provider):
 		self.driver = driver
 
 	def register(self, container: Container):
+		container.instance(Config, self.config)
 		container.scoped(Store, self.store)
 		container.scoped(Session, self.session)
 

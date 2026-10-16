@@ -16,7 +16,7 @@ TRUE_VALUES = {"true", "yes", "on", "1"}
 FALSE_VALUES = {"false", "no", "off", "0"}
 
 
-class Config:
+class Environment:
 	def __init__(self, values: Mapping[str, str]):
 		self.values = values
 

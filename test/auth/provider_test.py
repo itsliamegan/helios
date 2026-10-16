@@ -75,6 +75,7 @@ def resolve(store: Store, session: Session) -> Authenticator[User]:
 		Router([Route.get("/", index)]),
 		[Values(store, session), helios.auth.Provider(User)],
 	)
+	app.boot()
 	try:
 		app.handle(Request(Method.GET, URL("/")))
 	finally:
@@ -156,6 +157,7 @@ def render_signed_in_user(store: Store, session: Session) -> str:
 				helios.view.Provider(helios.view.Config(views_dir)),
 			],
 		)
+		app.boot()
 		try:
 			response = app.handle(Request(Method.GET, URL("/")))
 		finally:
@@ -218,6 +220,7 @@ def test_shares_authenticator_with_components():
 					),
 				],
 			)
+			app.boot()
 			try:
 				response = app.handle(Request(Method.GET, URL("/")))
 			finally:

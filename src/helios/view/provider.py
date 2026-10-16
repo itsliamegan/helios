@@ -18,12 +18,12 @@ class Provider(Provider):
 		helpers: Helpers | None = None,
 		components: Sequence[type[Component]] | None = None,
 	):
-		self.directory = config.directory
-		self.reload = config.reload
+		self.config = config
 		self.helpers = helpers
 		self.components = components
 
 	def register(self, container: Container):
+		container.instance(Config, self.config)
 		container.singleton(Engine, self.engine)
 		container.scoped(Views, self.views)
 
@@ -35,7 +35,12 @@ class Provider(Provider):
 		if container.bound(URLs):
 			helpers.globals["urls"] = container.get(URLs)
 		helpers.update(self.helpers or Helpers())
-		return Engine(Driver(self.directory), helpers, self.reload, self.components)
+		return Engine(
+			Driver(self.config.directory),
+			helpers,
+			self.config.reload,
+			self.components,
+		)
 
 	def views(self, context: Context) -> Views:
 		return Views(context.get(Engine), context)

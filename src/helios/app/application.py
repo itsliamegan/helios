@@ -4,7 +4,7 @@ from helios.http import Request, Response, URL
 from helios.routing import Router, URLs
 
 from .container import Container
-from .kernel import Kernel, Middleware
+from .kernel import Kernel, Middleware, Middlewares
 
 
 class Config:
@@ -28,10 +28,11 @@ class Application:
 		providers: Sequence[Provider],
 		middlewares: Sequence[Middleware] | None = None,
 	):
+		middlewares = middlewares or []
+
 		self.container = Container()
 		self.providers = list(providers)
-		self.middlewares: list[Middleware] = []
-		middlewares = middlewares or []
+		self.middlewares = Middlewares(middlewares)
 		try:
 			for key, value in (
 				(Application, self),
@@ -45,16 +46,25 @@ class Application:
 
 			for provider in self.providers:
 				provider.register(self.container)
+		except BaseException:
+			self.container.close()
+			raise
+
+	def boot(self):
+		try:
 			for provider in self.providers:
 				provider.boot(self)
-			self.middlewares.extend(middlewares)
-			self.kernel = Kernel(self.container, router, self.middlewares)
+			self.kernel = Kernel(
+				self.container,
+				self.container.get(Router),
+				list(self.middlewares),
+			)
 		except BaseException:
 			self.container.close()
 			raise
 
 	def use(self, middleware: Middleware):
-		self.middlewares.append(middleware)
+		self.middlewares.use(middleware)
 
 	def handle(self, request: Request) -> Response:
 		return self.kernel.handle(request)

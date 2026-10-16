@@ -2,7 +2,7 @@ import importlib.util
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq, assert_not_none
+from luna.test.assertion import assert_eq, assert_is, assert_not_none
 
 from helios.app import Application, Config
 from helios.http import Method, Request, URL
@@ -35,6 +35,7 @@ def test_provider_shares_urls_with_templates():
 			),
 			[helios.view.Provider(helios.view.Config(views_dir))],
 		)
+		app.boot()
 		try:
 			response = app.handle(Request(Method.GET, URL("/")))
 		finally:
@@ -85,6 +86,7 @@ def test_provider_registers_components():
 				)
 			],
 		)
+		app.boot()
 		try:
 			response = app.handle(Request(Method.GET, URL("/")))
 		finally:
@@ -94,3 +96,12 @@ def test_provider_registers_components():
 		str(response.body),
 		'<span class="chip">Travel</span><span class="chip">Food</span>',
 	)
+
+
+def test_provider_registers_config_before_boot():
+	with TemporaryDirectory() as dir:
+		config = helios.view.Config(Path(dir))
+
+		app = Application(Config(), Router([]), [helios.view.Provider(config)])
+
+		assert_is(app.container.get(helios.view.Config), config)

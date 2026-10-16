@@ -16,6 +16,7 @@ class Provider(Provider):
 		self.registry = Registry(model_types)
 
 	def register(self, container: Container):
+		container.instance(Config, self.config)
 		container.scoped(Store, self.store)
 
 	def boot(self, application: Application):

@@ -267,7 +267,9 @@ def test_renders_adaptation_errors_like_the_kernel():
 			Status.CONTENT_TOO_LARGE,
 		),
 	]
-	client = Client(Application(helios.app.Config(), Router([]), []))
+	app = Application(helios.app.Config(), Router([]), [])
+	app.boot()
+	client = Client(app)
 
 	for builder, status in builders:
 		res = client.open(builder)
@@ -438,4 +440,5 @@ def test_client_submits_method_override():
 
 def make_client(routes):
 	app = Application(helios.app.Config(), Router(routes), [])
+	app.boot()
 	return TestClient(app)

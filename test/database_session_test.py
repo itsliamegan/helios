@@ -29,7 +29,7 @@ def request(session_id: str | None = None) -> Request:
 
 
 def application(database_path: Path, session_path: Path, handler):
-	return helios.app.Application(
+	app = helios.app.Application(
 		helios.app.Config(),
 		Router([Route.get("/", handler)]),
 		[
@@ -44,6 +44,8 @@ def application(database_path: Path, session_path: Path, handler):
 			helios.auth.Provider(User),
 		],
 	)
+	app.boot()
+	return app
 
 
 def user_names(path: Path) -> list[str]:
