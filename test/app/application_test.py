@@ -26,9 +26,10 @@ def test_registers_all_providers_before_booting_in_order():
 		def boot(self, application):
 			events.append(f"boot {self.name} {application.container.get(str)}")
 
-	Application(
+	app = Application(
 		Config(), Router([]), [RecordingProvider("first"), RecordingProvider("second")]
 	)
+	app.boot()
 
 	assert_eq(
 		events,
@@ -70,6 +71,7 @@ def test_closes_request_and_application_resources_in_reverse_order():
 		return Response.empty(Status.OK)
 
 	app = Application(Config(), Router([Route.get("/", index)]), [Resources()])
+	app.boot()
 	app.handle(request())
 	app.close()
 	app.close()
@@ -121,6 +123,7 @@ def test_runs_provider_then_standalone_middleware_in_order():
 		[Middlewares("one"), Middlewares("two")],
 		[standalone],
 	)
+	app.boot()
 	app.handle(request())
 
 	assert_eq(
@@ -144,5 +147,6 @@ def test_provides_framework_bindings():
 
 	router = Router([Route.get("/", index, name="home")])
 	app = Application(Config(URL.parse("https://example.com:8443")), router, [])
+	app.boot()
 
 	assert_eq(str(app.handle(request()).body), "https://example.com:8443/")

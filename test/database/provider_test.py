@@ -29,11 +29,13 @@ def request() -> Request:
 
 
 def application(path: Path, handler, model_types=None) -> Application:
-	return Application(
+	app = Application(
 		helios.app.Config(),
 		Router([Route.get("/", handler)]),
 		[Provider(Config(path), model_types or [Post])],
 	)
+	app.boot()
+	return app
 
 
 def create_schema(path: Path, schema: str = ""):

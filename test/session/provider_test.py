@@ -70,6 +70,7 @@ def exercise(
 			)
 		],
 	)
+	app.boot()
 	try:
 		response = app.handle(request)
 	finally:
@@ -224,6 +225,7 @@ def test_unexpected_exception_does_not_save_and_releases_lock():
 			Router([Route.get("/", fail)]),
 			[helios.session.Provider(helios.session.Config(), driver)],
 		)
+		app.boot()
 		try:
 			response = app.handle(request(str(id)))
 		finally:
@@ -256,6 +258,7 @@ def test_raised_http_error_discards_mutation():
 				)
 			],
 		)
+		app.boot()
 		try:
 			response = app.handle(request(str(id)))
 		finally:
@@ -285,6 +288,7 @@ def test_returned_error_response_saves_mutation():
 				)
 			],
 		)
+		app.boot()
 		try:
 			response = app.handle(request())
 		finally:

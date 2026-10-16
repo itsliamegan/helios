@@ -187,6 +187,7 @@ def handle(session, route, request, providers=None):
 			*(providers or []),
 		],
 	)
+	app.boot()
 	try:
 		return app.handle(request)
 	finally:

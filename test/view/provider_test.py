@@ -35,6 +35,7 @@ def test_provider_shares_urls_with_templates():
 			),
 			[helios.view.Provider(helios.view.Config(views_dir))],
 		)
+		app.boot()
 		try:
 			response = app.handle(Request(Method.GET, URL("/")))
 		finally:
@@ -85,6 +86,7 @@ def test_provider_registers_components():
 				)
 			],
 		)
+		app.boot()
 		try:
 			response = app.handle(Request(Method.GET, URL("/")))
 		finally:

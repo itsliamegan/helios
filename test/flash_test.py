@@ -60,6 +60,7 @@ def test_shares_flash_with_views():
 				helios.view.Provider(helios.view.Config(views_dir)),
 			],
 		)
+		app.boot()
 		try:
 			response = app.handle(Request(Method.GET, URL("/")))
 		finally:
@@ -92,6 +93,7 @@ def test_shares_flash_with_components():
 				),
 			],
 		)
+		app.boot()
 		try:
 			response = app.handle(Request(Method.GET, URL("/")))
 		finally:
@@ -113,6 +115,7 @@ def test_boots_without_views():
 		Router([Route.get("/", index)]),
 		[Values(session), helios.flash.Provider()],
 	)
+	app.boot()
 	try:
 		app.handle(Request(Method.GET, URL("/")))
 	finally:

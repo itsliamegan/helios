@@ -49,12 +49,14 @@ def application(signed_in: bool = False, limit_config: Config | None = None):
 	def index(request, context):
 		return Response.empty(Status.OK)
 
-	return Application(
+	app = Application(
 		AppConfig(),
 		Router([Route.get("/", index)]),
 		[Authentication(signed_in)],
 		[helios.limit.Middleware(limit_config or config())],
 	)
+	app.boot()
+	return app
 
 
 def test_limits_unauthenticated_requests():
