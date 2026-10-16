@@ -30,4 +30,7 @@ jobs:
         run: uv run ty check
 
       - name: "Test"
-        run: uv run luna test
+        run: |
+          for member in packages/*/; do
+            (cd "$member" && uv run luna test)
+          done
