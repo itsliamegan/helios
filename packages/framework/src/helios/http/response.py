@@ -2,12 +2,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Self
 
+from helios.url import URL
+
 from .body import Body, Buffered, Stream
 from .cookie import Cookies
 from .error import HTTPError
 from .header import Headers
 from .status import Status
-from .url import URL
 
 
 @dataclass(init=False)

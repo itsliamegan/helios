@@ -5,9 +5,8 @@ import re
 from typing import Any, ClassVar, Self
 from urllib.parse import quote
 
-from helios.http import URL
-
 from .convert import Converter
+from .url import URL
 
 
 @dataclass
