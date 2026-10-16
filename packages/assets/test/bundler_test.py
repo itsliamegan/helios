@@ -10,7 +10,13 @@ from luna.test.assertion import (
 	assert_that,
 )
 
-from helios.assets import Bundler, BundlerNotFoundError, Compiled, Manifest
+from helios.assets import (
+	Bundler,
+	BundlerNotFoundError,
+	CompileError,
+	Compiled,
+	Manifest,
+)
 
 
 def test_compiles_nothing_without_entries():
@@ -178,6 +184,41 @@ def test_minifies_entries():
 
 		style = compiled.manifest.styles["main"]
 		assert_eq(Path(output, style).read_text(), "body{color:red}\n")
+
+
+def test_raises_for_script_importing_stylesheet():
+	with TemporaryDirectory() as directory:
+		root = project(directory)
+		write(Path(root, "assets", "scripts", "main.js"), 'import "./theme.css";')
+		write(Path(root, "assets", "scripts", "theme.css"), "body { color: red; }")
+		bundler = Bundler(root)
+
+		with assert_raises(CompileError):
+			bundler.compile(
+				Path(root, "assets"),
+				output=Path(root, "public", "assets"),
+				scripts=["main"],
+				styles=[],
+				minify=False,
+				sourcemap=False,
+			)
+
+
+def test_raises_for_entry_that_fails_to_compile():
+	with TemporaryDirectory() as directory:
+		root = project(directory)
+		write(Path(root, "assets", "scripts", "main.js"), 'import "./missing.js";')
+		bundler = Bundler(root)
+
+		with assert_raises(CompileError):
+			bundler.compile(
+				Path(root, "assets"),
+				output=Path(root, "public", "assets"),
+				scripts=["main"],
+				styles=[],
+				minify=False,
+				sourcemap=False,
+			)
 
 
 def project(directory: str) -> Path:

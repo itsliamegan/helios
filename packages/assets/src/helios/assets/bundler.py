@@ -5,7 +5,7 @@ import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 
-from .error import BundlerNotFoundError
+from .error import BundlerNotFoundError, CompileError
 from .manifest import Manifest
 
 
@@ -68,7 +68,16 @@ class Bundler:
 			if sourcemap:
 				command.append("--sourcemap")
 
-			subprocess.run(command, cwd=self.root, capture_output=True, check=True)
+			result = subprocess.run(
+				command,
+				cwd=self.root,
+				capture_output=True,
+				text=True,
+				check=False,
+			)
+			if result.returncode != 0:
+				raise CompileError(result.stderr)
+
 			outputs = json.loads(metafile.read_text())["outputs"]
 
 		manifest = Manifest(scripts={}, styles={})
@@ -81,6 +90,12 @@ class Bundler:
 
 			if "entryPoint" in value:
 				entry = Path(self.root, value["entryPoint"]).resolve()
+
+				# esbuild writes a script's imported stylesheets to a file of
+				# their own, so the script no longer compiles to one file.
+				if "cssBundle" in value:
+					raise CompileError(f"script imports a stylesheet: {entry}")
+
 				if entry in script_entries:
 					manifest.scripts[script_entries[entry]] = file.as_posix()
 				else:
