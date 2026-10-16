@@ -18,8 +18,15 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+      - name: "Install Node"
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
       - name: "Install"
-        run: uv sync --locked
+        run: |
+          uv sync --locked
+          npm ci --prefix packages/assets
 
       - name: "Lint"
         run: |

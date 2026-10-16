@@ -1,5 +1,6 @@
 [tools]
 uv = "latest"
+node = "26"
 python = "3.14"
 
 [settings]
