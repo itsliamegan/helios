@@ -6,7 +6,12 @@ python = "3.14"
 python.uv_venv_auto = "create|source"
 
 [tasks]
-test = "uv run luna test"
+test = """
+set -e
+for member in packages/*/; do
+	(cd "$member" && uv run luna test)
+done
+"""
 lint = [
 	"ruff format",
 	"ruff check --fix",

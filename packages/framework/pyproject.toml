@@ -1,0 +1,27 @@
+[project]
+name = "helios"
+version = "0.1"
+requires-python = ">=3.14"
+dependencies = [
+	"jinja2==3.1.*",
+	"luna",
+	"markupsafe==3.0.*",
+	"python-dotenv>=1.2.2",
+	"werkzeug==3.1.*",
+]
+
+[dependency-groups]
+dev = [
+	"time-machine>=3.5.1",
+]
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+luna = { git = "https://github.com/itsliamegan/luna", branch = "main" }
+
+[tool.uv.build-backend]
+module-name = "helios"
+namespace = true
