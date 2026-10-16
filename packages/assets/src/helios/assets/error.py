@@ -1,0 +1,2 @@
+class EntryNotFoundError(LookupError):
+	pass
