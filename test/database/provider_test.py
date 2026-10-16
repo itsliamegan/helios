@@ -2,7 +2,7 @@ from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq, assert_that
+from luna.test.assertion import assert_eq, assert_is, assert_that
 
 import helios.app
 from helios.app import Application
@@ -216,3 +216,12 @@ def test_commit_failure_returns_error_and_leaves_no_row():
 			connection.close()
 		assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
 		assert_eq(count, (0,))
+
+
+def test_provider_registers_config_before_boot():
+	with TemporaryDirectory() as dir:
+		config = Config(Path(dir, "database.sqlite3"))
+
+		app = Application(helios.app.Config(), Router([]), [Provider(config, [Post])])
+
+		assert_is(app.container.get(Config), config)

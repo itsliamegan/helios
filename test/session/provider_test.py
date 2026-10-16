@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from luna.test.assertion import (
 	assert_eq,
+	assert_is,
 	assert_not_eq,
 	assert_not_in,
 	assert_not_none,
@@ -334,3 +335,17 @@ def test_file_driver_serializes_processes():
 			[event[0] for event in events], ["entered", "leaving", "entered", "leaving"]
 		)
 		assert_that(events[2][1] >= events[1][1])
+
+
+def test_provider_registers_config_before_boot():
+	with TemporaryDirectory() as dir:
+		path = Path(dir, "sessions.json")
+		config = helios.session.Config()
+
+		app = Application(
+			AppConfig(),
+			Router([]),
+			[helios.session.Provider(config, Driver(path, path.with_suffix(".lock")))],
+		)
+
+		assert_is(app.container.get(helios.session.Config), config)

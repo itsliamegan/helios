@@ -150,3 +150,18 @@ def test_provides_framework_bindings():
 	app.boot()
 
 	assert_eq(str(app.handle(request()).body), "https://example.com:8443/")
+
+
+def test_registers_providers_without_booting_them():
+	events = []
+
+	class RecordingProvider(Provider):
+		def register(self, container):
+			events.append("register")
+
+		def boot(self, application):
+			events.append("boot")
+
+	Application(Config(), Router([]), [RecordingProvider()])
+
+	assert_eq(events, ["register"])
