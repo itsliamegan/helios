@@ -239,6 +239,26 @@ def test_main_passes_further_arguments_to_the_command():
 	assert_eq(run_main(Tools, ["seed", "--count=2"], database)[0], (database, 2))
 
 
+def test_main_passes_further_arguments_to_a_direct_program():
+	class Database:
+		pass
+
+	class Seed(Program):
+		name = "seed"
+		count: int = option(default=1)
+
+		def __init__(self, database: Database, **values: Any):
+			super().__init__(**values)
+			self.database = database
+
+		def run(self) -> object:
+			return (self.database, self.count)
+
+	database = Database()
+
+	assert_eq(run_main(Seed, ["--count=2"], database)[0], (database, 2))
+
+
 def test_main_fails_when_the_command_takes_no_further_arguments():
 	with assert_raises(TypeError):
 		Migrate.main(["status"], object())
