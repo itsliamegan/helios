@@ -1,0 +1,22 @@
+[project]
+name = "helios-assets"
+version = "0.1"
+requires-python = ">=3.14"
+dependencies = [
+	"markupsafe==3.0.*",
+]
+
+[dependency-groups]
+dev = [
+	"luna",
+]
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+luna = { git = "https://github.com/itsliamegan/luna", branch = "main" }
+
+[tool.uv.build-backend]
+module-name = "helios.assets"
