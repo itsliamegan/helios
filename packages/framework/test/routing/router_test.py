@@ -127,7 +127,7 @@ def test_matches_pattern_text_literally():
 
 def test_rejects_segments_mixing_text_and_parameters():
 	with assert_raises(ValueError):
-		Pattern.parse("/posts/{id}.json")
+		Pattern.parse("/posts/draft-{id}")
 
 
 def test_builds_routes_for_each_method():
