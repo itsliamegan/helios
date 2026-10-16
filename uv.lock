@@ -7,6 +7,7 @@ members = [
     "helios",
     "helios-assets",
     "helios-url",
+    "luna",
 ]
 
 [manifest.dependency-groups]
@@ -37,7 +38,7 @@ dev = [
 requires-dist = [
     { name = "helios-url", editable = "packages/url" },
     { name = "jinja2", specifier = "==3.1.*" },
-    { name = "luna", git = "https://github.com/itsliamegan/luna?branch=main" },
+    { name = "luna", editable = "packages/luna" },
     { name = "markupsafe", specifier = "==3.0.*" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "werkzeug", specifier = "==3.1.*" },
@@ -63,7 +64,7 @@ dev = [
 requires-dist = [{ name = "markupsafe", specifier = "==3.0.*" }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "luna", git = "https://github.com/itsliamegan/luna?branch=main" }]
+dev = [{ name = "luna", editable = "packages/luna" }]
 
 [[package]]
 name = "helios-url"
@@ -78,7 +79,7 @@ dev = [
 [package.metadata]
 
 [package.metadata.requires-dev]
-dev = [{ name = "luna", git = "https://github.com/itsliamegan/luna?branch=main" }]
+dev = [{ name = "luna", editable = "packages/luna" }]
 
 [[package]]
 name = "jinja2"
@@ -95,7 +96,7 @@ wheels = [
 [[package]]
 name = "luna"
 version = "0.1.0"
-source = { git = "https://github.com/itsliamegan/luna?branch=main#aa1fcfc954ff1dfa0d19d6fb4b26a0f36dcb03c2" }
+source = { editable = "packages/luna" }
 
 [[package]]
 name = "markupsafe"
