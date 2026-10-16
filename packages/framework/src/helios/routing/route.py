@@ -2,8 +2,7 @@ from collections.abc import Callable, Iterator, Sequence
 from typing import Any, Concatenate, Self, TYPE_CHECKING
 
 from helios.http import Method, Request, Response, URL
-
-from .pattern import Pattern
+from helios.url import Pattern
 
 if TYPE_CHECKING:
 	from helios.app import Context

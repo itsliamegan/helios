@@ -1,3 +1,5 @@
+from helios.url import Query, URL
+
 from . import error
 from .body import Body, Buffered, Stream, body
 from .cookie import Cookie, Cookies, SameSite
@@ -6,11 +8,9 @@ from .file import File, Files
 from .header import Headers
 from .input import Input
 from .method import Method
-from .query import Query
 from .request import Request
 from .response import Response
 from .status import Status
-from .url import URL
 
 __all__ = [
 	"URL",
