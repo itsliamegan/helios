@@ -103,11 +103,12 @@ class Text:
 
 @dataclass
 class Parameter:
-	syntax: ClassVar[re.Pattern[str]] = re.compile(r"{(\w+)(?::(\w+))?}")
+	syntax: ClassVar[re.Pattern[str]] = re.compile(r"{(\w+)(?::(\w+))?}([^{}]*)")
 	value_syntax: ClassVar[re.Pattern[str]] = re.compile(r"[\w-]+")
 
 	name: str
 	converter: Converter[Any]
+	suffix: str = ""
 
 	@classmethod
 	def parse(cls, text: str) -> Self | None:
@@ -115,19 +116,19 @@ class Parameter:
 		if match is None:
 			return None
 
-		name, converter_name = match.groups()
+		name, converter_name, suffix = match.groups()
 		converter_name = converter_name or "str"
 		converter = Converter.for_name(converter_name)
 		if converter is None:
 			raise ValueError(f"Unknown pattern converter: {converter_name}")
-		return cls(name, converter)
+		return cls(name, converter, suffix)
 
 	@property
 	def expression(self) -> str:
-		return f"(?P<{self.name}>{self.value_syntax.pattern})"
+		return f"(?P<{self.name}>{self.value_syntax.pattern}){re.escape(self.suffix)}"
 
 	def format(self, value: Any) -> str:
 		encoded = quote(self.converter.format(value), safe="")
 		if self.value_syntax.fullmatch(encoded) is None:
 			raise ValueError(f"invalid route parameter: {self.name}")
-		return encoded
+		return encoded + self.suffix
