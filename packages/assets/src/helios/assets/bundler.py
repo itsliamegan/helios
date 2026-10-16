@@ -11,8 +11,9 @@ from .manifest import Manifest
 
 @dataclass
 class Bundler:
-	"""Compiles a project's assets using esbuild, which must be installed in the
-	project's node_modules.
+	"""Compiles a project's assets using esbuild.
+
+	esbuild must be installed in the project's node_modules.
 	"""
 
 	root: Path
@@ -106,8 +107,9 @@ class Bundler:
 
 @dataclass
 class Compiled:
-	"""A compile's manifest and the files it wrote, relative to its output
-	directory.
+	"""A compile's manifest and the files it wrote.
+
+	The files are relative to the output directory.
 	"""
 
 	manifest: Manifest
