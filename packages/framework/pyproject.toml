@@ -21,3 +21,7 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 luna = { git = "https://github.com/itsliamegan/luna", branch = "main" }
+
+[tool.uv.build-backend]
+module-name = "helios"
+namespace = true
