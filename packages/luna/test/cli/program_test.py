@@ -264,6 +264,77 @@ def test_main_fails_when_the_command_takes_no_extra_arguments():
 		Migrate.main(["status"], object())
 
 
+def test_main_reports_a_failure_from_a_command():
+	class Check(Command):
+		name = "check"
+		target: str = argument()
+
+		def run(self):
+			self.fail(f"nothing to check in {self.target}")
+
+	class Tools(Program):
+		name = "tools"
+		commands = (Check,)
+
+	stdout = StringIO()
+	stderr = StringIO()
+	with (
+		redirect_stdout(stdout),
+		redirect_stderr(stderr),
+		assert_raises(SystemExit) as raised,
+	):
+		Tools.main(["check", "notes"])
+
+	assert_eq(raised.exception.code, 1)
+	assert_eq(stdout.getvalue(), "")
+	assert_eq(stderr.getvalue(), "tools: error: nothing to check in notes\n")
+
+
+def test_main_reports_a_failure_from_a_direct_program():
+	class Check(Program):
+		name = "check"
+
+		def run(self):
+			self.fail("nothing to check")
+
+	stderr = StringIO()
+	with redirect_stderr(stderr), assert_raises(SystemExit) as raised:
+		Check.main([])
+
+	assert_eq(raised.exception.code, 1)
+	assert_eq(stderr.getvalue(), "check: error: nothing to check\n")
+
+
+def test_main_reports_a_failure_from_a_constructor():
+	class Check(Program):
+		name = "check"
+
+		def __init__(self, **values: Any):
+			super().__init__(**values)
+			self.fail("nothing to check")
+
+		def run(self):
+			pass
+
+	stderr = StringIO()
+	with redirect_stderr(stderr), assert_raises(SystemExit) as raised:
+		Check.main([])
+
+	assert_eq(raised.exception.code, 1)
+	assert_eq(stderr.getvalue(), "check: error: nothing to check\n")
+
+
+def test_main_lets_unanticipated_errors_propagate():
+	class Check(Program):
+		name = "check"
+
+		def run(self):
+			raise LookupError
+
+	with assert_raises(LookupError):
+		Check.main([])
+
+
 def test_main_prints_help():
 	for program, argv, usage in [
 		(Backup, ["--help"], "usage: backup"),

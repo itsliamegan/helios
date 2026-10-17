@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 from annotationlib import Format, get_annotations
 import inspect
 import string
-from typing import Any, ClassVar, dataclass_transform, get_origin
+from typing import Any, ClassVar, Never, dataclass_transform, get_origin
 
 from luna.cli.argument import Argument, argument
 from luna.cli.option import Option, option
 from luna.declarative import check_init_keywords, declarations
 
-RESERVED_NAMES = {"run", "main", "name", "commands", "help"}
+RESERVED_NAMES = {"run", "fail", "main", "name", "commands", "help"}
 RESERVED_SHORTS = {"h"}
 
 
@@ -63,6 +63,15 @@ class Runnable(ABC):
 
 	@abstractmethod
 	def run(self) -> object: ...
+
+	def fail(self, message: str) -> Never:
+		raise Failure(message)
+
+
+class Failure(Exception):
+	def __init__(self, message: str):
+		super().__init__(message)
+		self.message = message
 
 
 def declared_value(default: object) -> Argument | Option:
