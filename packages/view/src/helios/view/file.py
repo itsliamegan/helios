@@ -17,7 +17,7 @@ class Driver(Driver):
 				path = folder.joinpath(file)
 				if file.startswith(".") or path.suffix != ".html":
 					continue
-				names.append(".".join(parts + (path.stem,)))
+				names.append("/".join(parts + (path.stem,)))
 		return sorted(names)
 
 	def source(self, name: str) -> Source | None:
@@ -36,10 +36,10 @@ class Driver(Driver):
 			return path.stat().st_mtime_ns == source.version
 
 	def locate(self, name: str) -> Path | None:
-		parts = name.split(".")
+		parts = name.split("/")
 		if any(part == "" or part.startswith(".") for part in parts):
 			return None
-		path = self.directory.joinpath(*parts).with_suffix(".html")
+		path = self.directory.joinpath(*parts[:-1], parts[-1] + ".html")
 		if not path.is_file():
 			return None
 		else:

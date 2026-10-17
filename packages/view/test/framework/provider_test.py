@@ -54,7 +54,7 @@ def test_provider_registers_components():
 			"\n"
 			"\n"
 			"class TagChip(Component):\n"
-			'\ttemplate = "tags.chip"\n'
+			'\ttemplate = "tags/chip"\n'
 			"\n"
 			"\tname: str\n"
 		)

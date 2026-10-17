@@ -99,9 +99,9 @@ def test_renders_markup_helper_output_unescaped():
 
 
 def test_escapes_assigns():
-	engine = Engine(memory.Driver({"posts.index": "<h1>{{ title }}</h1>"}))
+	engine = Engine(memory.Driver({"posts/index": "<h1>{{ title }}</h1>"}))
 
-	html = engine.render(View("posts.index"), {"title": "<script>alert(1)</script>"})
+	html = engine.render(View("posts/index"), {"title": "<script>alert(1)</script>"})
 
 	assert_eq(html, "<h1>&lt;script&gt;alert(1)&lt;/script&gt;</h1>")
 
@@ -114,7 +114,7 @@ def test_escapes_assigns_in_loaded_templates():
 
 		engine = Engine(file.Driver(views_dir))
 
-		assert_eq(engine.render(View("posts.index"), {"title": "<b>"}), "&lt;b&gt;")
+		assert_eq(engine.render(View("posts/index"), {"title": "<b>"}), "&lt;b&gt;")
 
 
 def test_rejects_undefined_variables():

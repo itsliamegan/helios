@@ -26,7 +26,27 @@ def test_renders_nested_directory_templates():
 
 		engine = Engine(file.Driver(views_dir))
 
-		assert_eq(engine.render(View("posts.index")), "<h1>Posts</h1>")
+		assert_eq(engine.render(View("posts/index")), "<h1>Posts</h1>")
+
+
+def test_directory_lists_nested_templates_by_slashed_name():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("posts").mkdir()
+		views_dir.joinpath("posts", "index.html").write_text("<h1>Posts</h1>")
+
+		assert_eq(file.Driver(views_dir).names(), ["posts/index"])
+
+
+def test_directory_rejects_dotted_names_for_nested_templates():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("posts").mkdir()
+		views_dir.joinpath("posts", "index.html").write_text("<h1>Posts</h1>")
+		engine = Engine(file.Driver(views_dir))
+
+		with assert_raises(TemplateNotFound):
+			engine.render(View("posts.index"))
 
 
 def test_directory_rejects_syntax_errors_on_creation():
@@ -53,7 +73,7 @@ def test_directory_rejects_names_outside_directory():
 		engine = Engine(file.Driver(views_dir))
 
 		with assert_raises(TemplateNotFound):
-			engine.render(View("..secret"))
+			engine.render(View("../secret"))
 
 
 def test_directory_reloads_changed_templates_when_reloading():
