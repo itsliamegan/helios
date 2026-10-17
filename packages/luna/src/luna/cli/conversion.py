@@ -56,8 +56,9 @@ def matches(annotation: Any, default: object) -> bool:
 
 
 def matches_scalar(annotation: Any, default: object) -> bool:
-	# A Path is constructed as the platform's own subclass of it.
 	if annotation is Path:
+		# Path() returns an instance of a subclass for the current platform,
+		# such as PosixPath, so a Path default's type is never Path itself.
 		return isinstance(default, Path)
 	else:
 		return type(default) is annotation
