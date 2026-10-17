@@ -23,7 +23,7 @@ class Engine:
 			extensions=[RenderExtension],
 			autoescape=True,
 			undefined=StrictUndefined,
-			finalize=print_nothing_as_empty,
+			finalize=finalize,
 			auto_reload=reload,
 			cache_size=-1,
 		)
@@ -74,13 +74,6 @@ class Engine:
 				rendering.reset(token)
 
 
-def print_nothing_as_empty(value: Any) -> Any:
-	if value is None:
-		return ""
-	else:
-		return value
-
-
 class Loader(BaseLoader):
 	def __init__(self, driver: Driver):
 		self.driver = driver
@@ -102,6 +95,13 @@ class Loader(BaseLoader):
 
 	def list_templates(self) -> list[str]:
 		return self.driver.names()
+
+
+def finalize(value: Any) -> Any:
+	if value is None:
+		return ""
+	else:
+		return value
 
 
 def check_registration(
