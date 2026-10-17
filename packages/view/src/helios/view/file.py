@@ -25,15 +25,7 @@ class Driver(Driver):
 		if path is None:
 			return None
 		else:
-			version = path.stat().st_mtime_ns
-			return Source(path.read_text(), str(path), version)
-
-	def is_current(self, name: str, source: Source) -> bool:
-		path = self.locate(name)
-		if path is None:
-			return False
-		else:
-			return path.stat().st_mtime_ns == source.version
+			return Source(path.read_text(), str(path))
 
 	def locate(self, name: str) -> Path | None:
 		parts = name.split("/")

@@ -287,18 +287,3 @@ def test_compiles_fallback_templates_when_made():
 			memory.Driver({"index": "own"}),
 			fallbacks=[memory.Driver({"broken": "{% if %}"})],
 		)
-
-
-def test_reloads_changed_fallback_templates():
-	templates = {"about": "before"}
-	engine = Engine(
-		memory.Driver({"index": "own"}),
-		reload=True,
-		fallbacks=[memory.Driver(templates)],
-	)
-	engine.render(View("about"))
-
-	templates["about"] = "after"
-	html = engine.render(View("about"))
-
-	assert_eq(html, "after")

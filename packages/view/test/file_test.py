@@ -76,34 +76,7 @@ def test_directory_rejects_names_outside_directory():
 			engine.render(View("../secret"))
 
 
-def test_directory_reloads_changed_templates_when_reloading():
-	with TemporaryDirectory() as dir:
-		views_dir = Path(dir)
-		template_file = views_dir.joinpath("index.html")
-		template_file.write_text("Before")
-		os.utime(template_file, (1_000_000, 1_000_000))
-		engine = Engine(file.Driver(views_dir), reload=True)
-
-		template_file.write_text("After")
-		os.utime(template_file, (2_000_000, 2_000_000))
-
-		assert_eq(engine.render(View("index")), "After")
-
-
-def test_directory_rejects_deleted_templates_when_reloading():
-	with TemporaryDirectory() as dir:
-		views_dir = Path(dir)
-		template_file = views_dir.joinpath("index.html")
-		template_file.write_text("Index")
-		engine = Engine(file.Driver(views_dir), reload=True)
-
-		template_file.unlink()
-
-		with assert_raises(TemplateNotFound):
-			engine.render(View("index"))
-
-
-def test_directory_keeps_compiled_templates_when_not_reloading():
+def test_directory_keeps_compiled_templates():
 	with TemporaryDirectory() as dir:
 		views_dir = Path(dir)
 		template_file = views_dir.joinpath("index.html")
