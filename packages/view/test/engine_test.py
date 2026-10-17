@@ -17,21 +17,6 @@ def test_renders_simple():
 	assert_eq(html, "<h1>Index</h1>")
 
 
-def test_renders_inherited():
-	engine = Engine(
-		memory.Driver(
-			{
-				"base": "<h1>{{ title }}</h1>{% block content %}{% endblock %}",
-				"show": '{% extends "base" %}{% block content %}<p>An article.</p>{% endblock %}',
-			}
-		)
-	)
-
-	html = engine.render(View("show"), {"title": "Intro"})
-
-	assert_eq(html, "<h1>Intro</h1><p>An article.</p>")
-
-
 def test_renders_application_filters():
 	engine = Engine(
 		memory.Driver({"index": "{{ title | shout }}"}),

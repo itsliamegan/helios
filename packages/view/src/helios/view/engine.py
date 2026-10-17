@@ -1,11 +1,19 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, overload
 
-from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
+from jinja2 import (
+	BaseLoader,
+	Environment,
+	StrictUndefined,
+	TemplateNotFound,
+	TemplateRuntimeError,
+)
+from markupsafe import Markup
 
-from .component import Component, Rendering, rendering
-from .extension import RenderExtension
+from .component import Component
+from .extension import LayoutExtension, RenderExtension
 from .helpers import Helpers
+from .rendering import Rendering, Sections, rendering
 from .source import Driver
 from .view import View
 
@@ -22,7 +30,7 @@ class Engine:
 
 		self.jinja = Environment(
 			loader=Loader(driver, fallbacks),
-			extensions=[RenderExtension],
+			extensions=[RenderExtension, LayoutExtension],
 			autoescape=True,
 			undefined=StrictUndefined,
 			finalize=finalize,
@@ -67,11 +75,31 @@ class Engine:
 				rendering.reset(token)
 		else:
 			view = renderable
-			token = rendering.set(Rendering(self, view.shared))
+			current = Rendering(self, view.shared)
+			token = rendering.set(current)
 			try:
 				assigns = assigns or {}
-				template = self.jinja.get_template(view.name)
-				return template.render({**view.shared, **assigns})
+				context = {**view.shared, **assigns}
+				html = self.jinja.get_template(view.name).render(context)
+
+				chain = [view.name]
+				while current.layout is not None:
+					layout = current.layout
+					if layout in chain:
+						raise TemplateRuntimeError(
+							f'The layouts of "{view.name}" form a loop'
+						)
+					chain.append(layout)
+
+					current.layout = None
+					html = self.jinja.get_template(layout).render(
+						{
+							**context,
+							"content": Markup(html),
+							"sections": Sections(current.sections),
+						}
+					)
+				return html
 			finally:
 				rendering.reset(token)
 

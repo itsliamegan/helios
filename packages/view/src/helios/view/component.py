@@ -1,6 +1,4 @@
-from contextvars import ContextVar
-from dataclasses import dataclass
-from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform
+from typing import Any, ClassVar, dataclass_transform
 
 from luna.declarative import (
 	MISSING,
@@ -14,19 +12,8 @@ from markupsafe import Markup
 from .attributes import Attributes, html_name
 from .error import ComponentError
 from .prop import Prop
+from .rendering import rendering
 from .view import View
-
-if TYPE_CHECKING:
-	from .engine import Engine
-
-
-@dataclass
-class Rendering:
-	engine: Engine
-	shared: dict[str, Any]
-
-
-rendering: ContextVar[Rendering] = ContextVar("rendering")
 
 
 @dataclass_transform(kw_only_default=True, eq_default=False)
