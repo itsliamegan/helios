@@ -23,6 +23,7 @@ class Engine:
 			extensions=[RenderExtension],
 			autoescape=True,
 			undefined=StrictUndefined,
+			finalize=finalize,
 			auto_reload=reload,
 			cache_size=-1,
 		)
@@ -94,6 +95,13 @@ class Loader(BaseLoader):
 
 	def list_templates(self) -> list[str]:
 		return self.driver.names()
+
+
+def finalize(value: Any) -> Any:
+	if value is None:
+		return ""
+	else:
+		return value
 
 
 def check_registration(
