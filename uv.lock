@@ -7,6 +7,7 @@ members = [
     "helios",
     "helios-assets",
     "helios-url",
+    "helios-view",
     "luna",
 ]
 
@@ -35,9 +36,8 @@ version = "0.1"
 source = { editable = "packages/framework" }
 dependencies = [
     { name = "helios-url" },
-    { name = "jinja2" },
+    { name = "helios-view" },
     { name = "luna" },
-    { name = "markupsafe" },
     { name = "python-dotenv" },
     { name = "watchfiles" },
     { name = "werkzeug" },
@@ -51,9 +51,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "helios-url", editable = "packages/url" },
-    { name = "jinja2", specifier = "==3.1.*" },
+    { name = "helios-view", editable = "packages/view" },
     { name = "luna", editable = "packages/luna" },
-    { name = "markupsafe", specifier = "==3.0.*" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "watchfiles", specifier = "==1.3.*" },
     { name = "werkzeug", specifier = "==3.1.*" },
@@ -95,6 +94,31 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [{ name = "luna", editable = "packages/luna" }]
+
+[[package]]
+name = "helios-view"
+version = "0.1"
+source = { editable = "packages/view" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "luna" },
+    { name = "markupsafe" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "helios" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jinja2", specifier = "==3.1.*" },
+    { name = "luna", editable = "packages/luna" },
+    { name = "markupsafe", specifier = "==3.0.*" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "helios", editable = "packages/framework" }]
 
 [[package]]
 name = "idna"

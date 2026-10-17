@@ -3,8 +3,9 @@ from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Container, Context
 from helios.http import Method, Request, Status, URL
-from helios.view import Component, Engine, Views, memory
+from helios.view import Component, Engine, memory
 from helios.view.composer import Composers
+from helios.view.views import Views
 
 
 class Greeting(Component):

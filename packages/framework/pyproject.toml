@@ -4,9 +4,8 @@ version = "0.1"
 requires-python = ">=3.14"
 dependencies = [
 	"helios-url",
-	"jinja2==3.1.*",
+	"helios-view",
 	"luna",
-	"markupsafe==3.0.*",
 	"python-dotenv>=1.2.2",
 	"watchfiles==1.3.*",
 	"werkzeug==3.1.*",
@@ -23,6 +22,7 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 helios-url = { workspace = true }
+helios-view = { workspace = true }
 luna = { workspace = true }
 
 [tool.uv.build-backend]

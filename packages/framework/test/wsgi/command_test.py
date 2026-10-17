@@ -12,7 +12,8 @@ import helios.app
 from helios.console import Program
 from helios.http import URL
 from helios.routing import Router
-import helios.view
+import helios.view.config
+import helios.view.provider
 from helios.wsgi import Application
 from helios.wsgi.command import Filter, Serve
 
@@ -33,7 +34,9 @@ def application(
 ) -> Application:
 	providers = []
 	if views is not None:
-		providers.append(helios.view.Provider(helios.view.Config(views)))
+		providers.append(
+			helios.view.provider.Provider(helios.view.config.Config(views))
+		)
 	return Application(helios.app.Config(base_url), Router([]), providers)
 
 

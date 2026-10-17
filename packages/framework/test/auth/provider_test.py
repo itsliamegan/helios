@@ -20,8 +20,10 @@ from helios.database.sqlite import connect
 from helios.http import Method, Request, Response, URL
 from helios.routing import Route, Router
 from helios.session.store import Session
-import helios.view
-from helios.view import Component, Views
+from helios.view import Component
+import helios.view.config
+import helios.view.provider
+from helios.view.views import Views
 
 
 class User(Model):
@@ -154,7 +156,7 @@ def render_signed_in_user(store: Store, session: Session) -> str:
 			[
 				Values(store, session),
 				helios.auth.Provider(User),
-				helios.view.Provider(helios.view.Config(views_dir)),
+				helios.view.provider.Provider(helios.view.config.Config(views_dir)),
 			],
 		)
 		app.boot()
@@ -214,8 +216,8 @@ def test_shares_authenticator_with_components():
 				[
 					Values(store, session),
 					helios.auth.Provider(User),
-					helios.view.Provider(
-						helios.view.Config(views_dir),
+					helios.view.provider.Provider(
+						helios.view.config.Config(views_dir),
 						components=[Greeting],
 					),
 				],

@@ -1,0 +1,25 @@
+[project]
+name = "helios-view"
+version = "0.1"
+requires-python = ">=3.14"
+dependencies = [
+	"jinja2==3.1.*",
+	"luna",
+	"markupsafe==3.0.*",
+]
+
+[dependency-groups]
+dev = [
+	"helios",
+]
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+helios = { workspace = true }
+luna = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "helios.view"
