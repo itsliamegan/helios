@@ -154,6 +154,46 @@ def test_prints_nothing_as_empty():
 	assert_eq(html, "<p></p>")
 
 
+def test_yields_nothing_to_or():
+	engine = Engine(memory.Driver({"index": '{{ value or "fallback" }}'}))
+
+	html = engine.render(View("index"), {"value": None})
+
+	assert_eq(html, "fallback")
+
+
+def test_nothing_equals_no_empty_string():
+	engine = Engine(memory.Driver({"index": '{{ value == "" }}'}))
+
+	html = engine.render(View("index"), {"value": None})
+
+	assert_eq(html, "False")
+
+
+def test_nothing_equals_no_word():
+	engine = Engine(memory.Driver({"index": '{{ value == "None" }}'}))
+
+	html = engine.render(View("index"), {"value": None})
+
+	assert_eq(html, "False")
+
+
+def test_rejects_members_of_nothing():
+	engine = Engine(memory.Driver({"index": "{{ value.title }}"}))
+
+	with assert_raises(UndefinedError):
+		engine.render(View("index"), {"value": None})
+
+
+def test_rejects_looping_over_nothing():
+	engine = Engine(
+		memory.Driver({"index": "{% for item in value %}{{ item }}{% endfor %}"})
+	)
+
+	with assert_raises(TypeError):
+		engine.render(View("index"), {"value": None})
+
+
 def test_renders_shared_values():
 	engine = Engine(memory.Driver({"index": "{{ title }}"}))
 
