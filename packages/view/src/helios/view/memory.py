@@ -15,6 +15,3 @@ class Driver(Driver):
 			return None
 		else:
 			return Source(self.templates[name], None, 0)
-
-	def is_current(self, name: str, source: Source) -> bool:
-		return self.templates.get(name) == source.text

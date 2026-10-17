@@ -15,6 +15,3 @@ class Driver(ABC):
 
 	@abstractmethod
 	def source(self, name: str) -> Source | None: ...
-
-	@abstractmethod
-	def is_current(self, name: str, source: Source) -> bool: ...
