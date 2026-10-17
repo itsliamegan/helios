@@ -1,9 +1,7 @@
 from annotationlib import Format, ForwardRef, get_annotations
 from collections.abc import Collection, Mapping
-from functools import reduce
-from operator import or_
 from types import NoneType
-from typing import ClassVar, Protocol, Union, get_args, get_origin
+from typing import Any, ClassVar, Protocol, Union, get_args, get_origin
 
 MISSING: object = object()
 
@@ -94,6 +92,7 @@ def evaluate_annotation(
 ) -> object:
 	if isinstance(annotation, ForwardRef):
 		return annotation.evaluate(locals={**vars(owner), **supplied})
+
 	origin = get_origin(annotation)
 	if origin is None or forward_reference(annotation) is None:
 		return annotation
@@ -103,7 +102,11 @@ def evaluate_annotation(
 		for argument in get_args(annotation)
 	)
 	if origin is Union:
-		return reduce(or_, evaluated)
+		union: Any = evaluated[0]
+		for member in evaluated[1:]:
+			union = union | member
+		return union
+
 	return origin[evaluated]
 
 
@@ -115,6 +118,7 @@ def forward_reference(annotation: object) -> ForwardRef | None:
 		reference = forward_reference(argument)
 		if reference is not None:
 			return reference
+
 	return None
 
 
