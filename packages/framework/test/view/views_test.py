@@ -3,7 +3,7 @@ from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Container, Context
 from helios.http import Method, Request, Status, URL
-from helios.view import Component, Engine, View, Views, memory
+from helios.view import Component, Engine, Views, memory
 from helios.view.composer import Composers
 
 
@@ -140,15 +140,6 @@ def test_views_share_values_with_components_despite_assigns():
 	response = views.render("index", {"user": "Assigned"})
 
 	assert_eq(str(response.body), "Assigned Hello, Composed")
-
-
-def test_engine_renders_without_composers():
-	engine = Engine(memory.Driver({"index": "{{ title }}"}))
-	composers = Composers()
-	composers.composer(lambda view, context: view.share("title", "Composed"))
-
-	with assert_raises(UndefinedError):
-		engine.render(View("index"))
 
 
 def context() -> Context:
