@@ -35,6 +35,7 @@ name = "helios"
 version = "0.1"
 source = { editable = "packages/framework" }
 dependencies = [
+    { name = "helios-assets" },
     { name = "helios-url" },
     { name = "helios-view" },
     { name = "luna" },
@@ -50,6 +51,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "helios-assets", editable = "packages/assets" },
     { name = "helios-url", editable = "packages/url" },
     { name = "helios-view", editable = "packages/view" },
     { name = "luna", editable = "packages/luna" },
@@ -71,6 +73,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "helios" },
     { name = "luna" },
 ]
 
@@ -78,7 +81,10 @@ dev = [
 requires-dist = [{ name = "markupsafe", specifier = "==3.0.*" }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "luna", editable = "packages/luna" }]
+dev = [
+    { name = "helios", editable = "packages/framework" },
+    { name = "luna", editable = "packages/luna" },
+]
 
 [[package]]
 name = "helios-url"

@@ -8,3 +8,7 @@ class EntryNotFoundError(LookupError):
 
 class BundlerNotFoundError(LookupError):
 	pass
+
+
+class ManifestNotFoundError(LookupError):
+	pass

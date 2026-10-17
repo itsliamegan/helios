@@ -5,6 +5,9 @@ from tempfile import TemporaryDirectory
 from luna.test.assertion import assert_eq, assert_is, assert_not_none
 
 from helios.app import Application, Config
+from helios.assets import Manifest
+import helios.assets.config
+import helios.assets.provider
 from helios.http import Method, Request, URL
 from helios.routing import Route, Router
 import helios.view.config
@@ -43,6 +46,43 @@ def test_provider_shares_urls_with_templates():
 			app.close()
 
 	assert_eq(str(response.body), '<a href="/posts/7">Post</a>')
+
+
+def test_provider_shares_assets_with_templates():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir, "views")
+		views_dir.mkdir()
+		views_dir.joinpath("index.html").write_text('{{ assets.script("main") }}')
+		assets = helios.assets.config.Config(
+			Path(dir, "assets"),
+			Path(dir, "public", "assets"),
+			scripts=["main"],
+			styles=[],
+		)
+		assets.manifest.parent.mkdir(parents=True)
+		Manifest(scripts={"main": "scripts/main.js"}, styles={}).save(assets.manifest)
+
+		def index(request, context):
+			return context.get(Views).render("index")
+
+		app = Application(
+			Config(),
+			Router([Route.get("/", index)]),
+			[
+				helios.assets.provider.Provider(assets),
+				helios.view.provider.Provider(helios.view.config.Config(views_dir)),
+			],
+		)
+		app.boot()
+		try:
+			response = app.handle(Request(Method.GET, URL("/")))
+		finally:
+			app.close()
+
+	assert_eq(
+		str(response.body),
+		'<script type="module" src="/assets/scripts/main.js"></script>',
+	)
 
 
 def test_provider_registers_components():

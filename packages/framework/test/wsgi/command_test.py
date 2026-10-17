@@ -9,6 +9,8 @@ from luna.test.assertion import assert_eq, assert_raises, assert_that
 from watchfiles import Change
 
 import helios.app
+import helios.assets.config
+import helios.assets.provider
 from helios.console import Program
 from helios.http import URL
 from helios.routing import Router
@@ -31,8 +33,20 @@ def command_line(argv: list[str]) -> Iterator[None]:
 def application(
 	base_url: URL | None = None,
 	views: Path | None = None,
+	assets: Path | None = None,
 ) -> Application:
 	providers = []
+	if assets is not None:
+		providers.append(
+			helios.assets.provider.Provider(
+				helios.assets.config.Config(
+					assets,
+					Path("public", "assets"),
+					scripts=[],
+					styles=[],
+				)
+			)
+		)
 	if views is not None:
 		providers.append(
 			helios.view.provider.Provider(helios.view.config.Config(views))
@@ -92,6 +106,15 @@ def test_serve_watches_the_views_directory_under_the_root():
 	filter = serve.filter(root)
 
 	assert_eq(filter.directories, [Path(root, "app", "views")])
+
+
+def test_serve_watches_the_assets_directory_under_the_root():
+	root = Path("/", uuid4().hex)
+	serve = Serve(application(assets=Path("app", "assets")))
+
+	filter = serve.filter(root)
+
+	assert_eq(filter.directories, [Path(root, "app", "assets")])
 
 
 def test_serve_watches_no_directory_without_views():

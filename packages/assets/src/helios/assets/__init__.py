@@ -1,6 +1,11 @@
 from .assets import Assets
 from .bundler import Bundler, Compiled
-from .error import BundlerNotFoundError, CompileError, EntryNotFoundError
+from .error import (
+	BundlerNotFoundError,
+	CompileError,
+	EntryNotFoundError,
+	ManifestNotFoundError,
+)
 from .manifest import Manifest
 
 __all__ = [
@@ -11,4 +16,5 @@ __all__ = [
 	"Compiled",
 	"EntryNotFoundError",
 	"Manifest",
+	"ManifestNotFoundError",
 ]

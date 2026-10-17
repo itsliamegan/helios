@@ -8,6 +8,8 @@ from watchfiles import Change, DefaultFilter, run_process
 from werkzeug.serving import run_simple
 
 import helios.app
+from helios.assets import Bundler, BundlerNotFoundError, CompileError
+import helios.assets.config
 import helios.view.config
 
 from .application import Application
@@ -16,8 +18,8 @@ from .application import Application
 class Serve(Command):
 	"""Serve the application for development.
 
-	Restarts the application in a new process whenever a Python file or a
-	view changes.
+	Restarts the application in a new process whenever a Python file, a view,
+	or an asset changes. Each start compiles the assets again.
 	"""
 
 	name = "serve"
@@ -43,6 +45,8 @@ class Serve(Command):
 			self.watch(root)
 
 	def serve(self, root: Path, host: str, port: int):
+		if self.application.container.bound(helios.assets.config.Config):
+			self.compile(root)
 		self.application.boot()
 		run_simple(
 			host,
@@ -50,6 +54,21 @@ class Serve(Command):
 			self.application,
 			static_files={"/": str(Path(root, "public"))},
 		)
+
+	def compile(self, root: Path):
+		config = self.application.container.get(helios.assets.config.Config)
+		try:
+			compiled = Bundler(root).compile(
+				Path(root, config.directory),
+				Path(root, config.output),
+				config.scripts,
+				config.styles,
+				minify=False,
+				sourcemap=True,
+			)
+		except (BundlerNotFoundError, CompileError) as error:
+			self.fail(str(error))
+		compiled.manifest.save(Path(root, config.manifest))
 
 	def watch(self, root: Path):
 		run_process(
@@ -70,6 +89,9 @@ class Serve(Command):
 		if container.bound(helios.view.config.Config):
 			views = container.get(helios.view.config.Config)
 			directories.append(Path(root, views.directory))
+		if container.bound(helios.assets.config.Config):
+			assets = container.get(helios.assets.config.Config)
+			directories.append(Path(root, assets.directory))
 		return Filter(directories)
 
 
