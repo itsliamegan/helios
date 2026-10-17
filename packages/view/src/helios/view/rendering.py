@@ -42,14 +42,17 @@ class Rendering:
 			self.sections[name] = None
 
 
+@dataclass(init=False)
 class Sections:
 	"""The named sections set by a view.
 
-	Sections can be read by attribute or item lookup. An unset section and an
-	empty section are both None.
+	An unset section and an empty section are both None.
 	"""
 
-	def __init__(self, sections: Mapping[str, Markup | None]):
+	_sections: dict[str, Markup | None]
+
+	def __init__(self, sections: Mapping[str, Markup | None] | None = None):
+		sections = sections or {}
 		self._sections = dict(sections)
 
 	def __getitem__(self, name: str) -> Markup | None:
