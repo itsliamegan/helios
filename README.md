@@ -7,7 +7,7 @@ Helios is a small Python web framework. It includes:
 - [Application, dependency container, and request contexts](packages/framework/src/helios/app/)
 - [WSGI adapter and test client](packages/framework/src/helios/wsgi/)
 - [SQLite-backed models and queries](packages/framework/src/helios/database/)
-- [View rendering](packages/framework/src/helios/view/)
+- [View rendering](packages/view/src/helios/view/)
 - [Form validation](packages/framework/src/helios/form/)
 - [File-backed sessions](packages/framework/src/helios/session/)
 - [Authentication](packages/framework/src/helios/auth/)
