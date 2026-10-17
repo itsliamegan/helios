@@ -75,11 +75,15 @@ def help_for(program: type[Program], argv: list[str]) -> str:
 	return raised.exception.help
 
 
-def run_main(program: type[Program], argv: list[str]) -> tuple[object, str, str]:
+def run_main(
+	program: type[Program],
+	argv: list[str],
+	*extra: object,
+) -> tuple[object, str, str]:
 	stdout = StringIO()
 	stderr = StringIO()
 	with redirect_stdout(stdout), redirect_stderr(stderr):
-		result = program.main(argv)
+		result = program.main(argv, *extra)
 	return result, stdout.getvalue(), stderr.getvalue()
 
 
@@ -209,6 +213,55 @@ def test_main_runs_selected_command():
 
 def test_main_drops_program_path_from_argv():
 	assert_eq(run_main(Backup, [sys.argv[0], "-k", "2"])[0], ("backup", 2))
+
+
+def test_main_passes_extra_arguments_to_the_command():
+	class Database:
+		pass
+
+	class Seed(Command):
+		name = "seed"
+		count: int = option(default=1)
+
+		def __init__(self, database: Database, **values: Any):
+			super().__init__(**values)
+			self.database = database
+
+		def run(self) -> object:
+			return (self.database, self.count)
+
+	class Tools(Program):
+		name = "tools"
+		commands = (Seed,)
+
+	database = Database()
+
+	assert_eq(run_main(Tools, ["seed", "--count=2"], database)[0], (database, 2))
+
+
+def test_main_passes_extra_arguments_to_a_direct_program():
+	class Database:
+		pass
+
+	class Seed(Program):
+		name = "seed"
+		count: int = option(default=1)
+
+		def __init__(self, database: Database, **values: Any):
+			super().__init__(**values)
+			self.database = database
+
+		def run(self) -> object:
+			return (self.database, self.count)
+
+	database = Database()
+
+	assert_eq(run_main(Seed, ["--count=2"], database)[0], (database, 2))
+
+
+def test_main_fails_when_the_command_takes_no_extra_arguments():
+	with assert_raises(TypeError):
+		Migrate.main(["status"], object())
 
 
 def test_main_prints_help():
