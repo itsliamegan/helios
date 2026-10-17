@@ -10,6 +10,10 @@ def test_splits_names_into_words():
 	assert_eq(words("title"), ["title"])
 
 
+def test_splits_text_into_words():
+	assert_eq(words("What's new, in 2.0?"), ["What", "s", "new", "in", "2", "0"])
+
+
 def test_writes_names_as_sentences():
 	assert_eq(sentence("open_in_new_tab"), "Open in new tab")
 	assert_eq(sentence("class_"), "Class")
@@ -40,6 +44,22 @@ def test_joins_names_with_dashes():
 	assert_eq(dash("_private"), "private")
 	assert_eq(dash("a__b"), "a-b")
 	assert_eq(dash("title"), "title")
+
+
+def test_joins_text_with_dashes():
+	assert_eq(dash("What's new, in 2.0?"), "what-s-new-in-2-0")
+
+
+def test_lowercases_dashed_text():
+	assert_eq(dash("Getting Started"), "getting-started")
+
+
+def test_keeps_letters_outside_ascii_when_dashing():
+	assert_eq(dash("Café"), "café")
+
+
+def test_dashes_text_without_words_to_nothing():
+	assert_eq(dash("..."), "")
 
 
 def test_counts_with_a_singular_or_plural_unit():
