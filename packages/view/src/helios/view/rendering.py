@@ -55,6 +55,4 @@ class Sections:
 		self.sections = dict(sections or {})
 
 	def __getitem__(self, name: str) -> Markup | None:
-		# Jinja reads sections.title through this too, after attribute lookup
-		# finds nothing.
 		return self.sections.get(name)
