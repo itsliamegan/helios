@@ -23,6 +23,7 @@ class Engine:
 			extensions=[RenderExtension],
 			autoescape=True,
 			undefined=StrictUndefined,
+			finalize=print_nothing_as_empty,
 			auto_reload=reload,
 			cache_size=-1,
 		)
@@ -71,6 +72,13 @@ class Engine:
 				return template.render({**view.shared, **assigns})
 			finally:
 				rendering.reset(token)
+
+
+def print_nothing_as_empty(value: Any) -> Any:
+	if value is None:
+		return ""
+	else:
+		return value
 
 
 class Loader(BaseLoader):

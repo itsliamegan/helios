@@ -146,6 +146,14 @@ def test_renders_none_variables_in_conditions():
 	assert_eq(html, "")
 
 
+def test_prints_nothing_as_empty():
+	engine = Engine(memory.Driver({"index": "<p>{{ value }}</p>"}))
+
+	html = engine.render(View("index"), {"value": None})
+
+	assert_eq(html, "<p></p>")
+
+
 def test_renders_shared_values():
 	engine = Engine(memory.Driver({"index": "{{ title }}"}))
 
