@@ -28,6 +28,5 @@ class Helpers:
 		self.globals.update(other.globals)
 
 
-def date(date: datetime, format: str | None = None) -> str:
-	format = format or "%b %-d, %Y"
+def date(date: datetime, format: str = "%b %-d, %Y") -> str:
 	return date.strftime(format)
