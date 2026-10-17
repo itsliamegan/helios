@@ -17,9 +17,12 @@ class Engine:
 		helpers: Helpers | None = None,
 		reload: bool = False,
 		components: Sequence[type[Component]] | None = None,
+		fallbacks: Sequence[Driver] | None = None,
 	):
+		fallbacks = fallbacks or []
+
 		self.jinja = Environment(
-			loader=Loader(driver),
+			loader=Loader(driver, fallbacks),
 			extensions=[RenderExtension],
 			autoescape=True,
 			undefined=StrictUndefined,
@@ -75,26 +78,31 @@ class Engine:
 
 
 class Loader(BaseLoader):
-	def __init__(self, driver: Driver):
-		self.driver = driver
+	def __init__(self, driver: Driver, fallbacks: Sequence[Driver]):
+		self.drivers = [driver, *fallbacks]
 
 	def get_source(
 		self,
 		environment: Environment,
 		template: str,
 	) -> tuple[str, str | None, Callable[[], bool]]:
-		source = self.driver.source(template)
-		if source is None:
-			raise TemplateNotFound(template)
-		else:
-			return (
-				source.text,
-				source.path,
-				lambda: self.driver.is_current(template, source),
-			)
+		for driver in self.drivers:
+			source = driver.source(template)
+			if source is not None:
+				return (
+					source.text,
+					source.path,
+					lambda: driver.is_current(template, source),  # noqa: B023
+				)
+		raise TemplateNotFound(template)
 
 	def list_templates(self) -> list[str]:
-		return self.driver.names()
+		names: list[str] = []
+		for driver in self.drivers:
+			for name in driver.names():
+				if name not in names:
+					names.append(name)
+		return names
 
 
 def finalize(value: Any) -> Any:

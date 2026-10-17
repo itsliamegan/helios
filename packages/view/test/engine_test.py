@@ -2,11 +2,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from jinja2 import UndefinedError
+from jinja2 import TemplateNotFound, TemplateSyntaxError, UndefinedError
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
 
-from helios.view import Engine, Helpers, View, file, memory
+from helios.view import Component, Engine, Helpers, View, file, memory
 
 
 def test_renders_simple():
@@ -208,3 +208,87 @@ def test_prefers_assigns_over_shared_values():
 	html = engine.render(View("index", {"title": "Shared"}), {"title": "Assigned"})
 
 	assert_eq(html, "Assigned")
+
+
+def test_renders_templates_only_a_fallback_has():
+	engine = Engine(
+		memory.Driver({"index": "own"}),
+		fallbacks=[memory.Driver({"about": "fallback"})],
+	)
+
+	html = engine.render(View("about"))
+
+	assert_eq(html, "fallback")
+
+
+def test_prefers_own_templates_over_fallback_templates():
+	engine = Engine(
+		memory.Driver({"index": "own"}),
+		fallbacks=[memory.Driver({"index": "fallback"})],
+	)
+
+	html = engine.render(View("index"))
+
+	assert_eq(html, "own")
+
+
+def test_tries_fallbacks_in_order():
+	engine = Engine(
+		memory.Driver({}),
+		fallbacks=[
+			memory.Driver({"index": "first"}),
+			memory.Driver({"index": "second"}),
+		],
+	)
+
+	html = engine.render(View("index"))
+
+	assert_eq(html, "first")
+
+
+def test_rejects_templates_no_driver_has_with_fallbacks():
+	engine = Engine(
+		memory.Driver({"index": "own"}),
+		fallbacks=[memory.Driver({"about": "fallback"})],
+	)
+
+	with assert_raises(TemplateNotFound):
+		engine.render(View("missing"))
+
+
+def test_registers_components_whose_templates_only_a_fallback_has():
+	class Chip(Component):
+		template = "chip"
+
+	engine = Engine(
+		memory.Driver({"index": "{{ Chip() }}"}),
+		components=[Chip],
+		fallbacks=[memory.Driver({"chip": "<i></i>"})],
+	)
+
+	html = engine.render(View("index"))
+
+	assert_eq(html, "<i></i>")
+
+
+def test_compiles_fallback_templates_when_made():
+	with assert_raises(TemplateSyntaxError):
+		Engine(
+			memory.Driver({"index": "own"}),
+			fallbacks=[memory.Driver({"broken": "{% if %}"})],
+		)
+
+
+def test_reloads_changed_fallback_templates():
+	templates = {"about": "before"}
+	engine = Engine(
+		memory.Driver({"index": "own"}),
+		reload=True,
+		fallbacks=[memory.Driver(templates)],
+	)
+	engine.render(View("about"))
+
+	templates["about"] = "after"
+	html = engine.render(View("about"))
+
+	assert_eq(html, "after")
