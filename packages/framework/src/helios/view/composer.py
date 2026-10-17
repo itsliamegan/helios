@@ -7,13 +7,13 @@ from .view import View
 
 class Composers:
 	def __init__(self):
-		self.items: list[Composer] = []
+		self.composers: list[Composer] = []
 
 	def composer(self, composer: Composer):
-		self.items.append(composer)
+		self.composers.append(composer)
 
 	def compose(self, view: View, context: Context):
-		for composer in self.items:
+		for composer in self.composers:
 			composer(view, context)
 
 
