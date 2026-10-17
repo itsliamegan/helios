@@ -4,6 +4,7 @@ from helios.app import Application, Container, Context, Provider
 from helios.routing import URLs
 
 from .component import Component
+from .composer import Composers
 from .config import Config
 from .engine import Engine
 from .file import Driver
@@ -24,6 +25,7 @@ class Provider(Provider):
 
 	def register(self, container: Container):
 		container.instance(Config, self.config)
+		container.instance(Composers, Composers())
 		container.singleton(Engine, self.engine)
 		container.scoped(Views, self.views)
 
@@ -43,4 +45,8 @@ class Provider(Provider):
 		)
 
 	def views(self, context: Context) -> Views:
-		return Views(context.get(Engine), context)
+		return Views(
+			context.get(Engine),
+			context.get(Composers),
+			context,
+		)

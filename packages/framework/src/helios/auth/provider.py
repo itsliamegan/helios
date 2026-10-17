@@ -3,7 +3,8 @@ from uuid import UUID
 from helios.app import Application, Container, Context, Provider
 from helios.database import Model, NotFoundError, Store
 from helios.session.store import Session
-from helios.view import Engine, View
+from helios.view import View
+from helios.view.composer import Composers
 
 from .state import Authenticator, SESSION_KEY
 
@@ -16,8 +17,8 @@ class Provider[U: Model](Provider):
 		container.scoped(Authenticator, self.authenticator)
 
 	def boot(self, application: Application):
-		if application.container.bound(Engine):
-			application.container.get(Engine).composer(self.compose)
+		if application.container.bound(Composers):
+			application.container.get(Composers).add(self.compose)
 
 	def compose(self, view: View, context: Context):
 		view.share("auth", context.get(Authenticator))

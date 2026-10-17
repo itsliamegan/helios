@@ -160,11 +160,3 @@ def test_prefers_assigns_over_shared_values():
 	html = engine.render(View("index", {"title": "Shared"}), {"title": "Assigned"})
 
 	assert_eq(html, "Assigned")
-
-
-def test_engine_renders_without_composers():
-	engine = Engine(memory.Driver({"index": "{{ title }}"}))
-	engine.composer(lambda view, context: view.share("title", "Composed"))
-
-	with assert_raises(UndefinedError):
-		engine.render(View("index"))
