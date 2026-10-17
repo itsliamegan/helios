@@ -78,12 +78,12 @@ def help_for(program: type[Program], argv: list[str]) -> str:
 def run_main(
 	program: type[Program],
 	argv: list[str],
-	*arguments: object,
+	*extra: object,
 ) -> tuple[object, str, str]:
 	stdout = StringIO()
 	stderr = StringIO()
 	with redirect_stdout(stdout), redirect_stderr(stderr):
-		result = program.main(argv, *arguments)
+		result = program.main(argv, *extra)
 	return result, stdout.getvalue(), stderr.getvalue()
 
 
@@ -215,7 +215,7 @@ def test_main_drops_program_path_from_argv():
 	assert_eq(run_main(Backup, [sys.argv[0], "-k", "2"])[0], ("backup", 2))
 
 
-def test_main_passes_further_arguments_to_the_command():
+def test_main_passes_extra_arguments_to_the_command():
 	class Database:
 		pass
 
@@ -239,7 +239,7 @@ def test_main_passes_further_arguments_to_the_command():
 	assert_eq(run_main(Tools, ["seed", "--count=2"], database)[0], (database, 2))
 
 
-def test_main_passes_further_arguments_to_a_direct_program():
+def test_main_passes_extra_arguments_to_a_direct_program():
 	class Database:
 		pass
 
@@ -259,7 +259,7 @@ def test_main_passes_further_arguments_to_a_direct_program():
 	assert_eq(run_main(Seed, ["--count=2"], database)[0], (database, 2))
 
 
-def test_main_fails_when_the_command_takes_no_further_arguments():
+def test_main_fails_when_the_command_takes_no_extra_arguments():
 	with assert_raises(TypeError):
 		Migrate.main(["status"], object())
 
