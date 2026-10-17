@@ -16,7 +16,7 @@ class Provider(Provider):
 
 	def boot(self, application: Application):
 		if application.container.bound(Composers):
-			application.container.get(Composers).composer(self.compose)
+			application.container.get(Composers).add(self.compose)
 
 	def submissions(self, context: Context) -> Submissions:
 		return Submissions(context.get(Flashes))
