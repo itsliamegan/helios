@@ -49,13 +49,12 @@ class Sections:
 	An unset section and an empty section are both None.
 	"""
 
-	_sections: dict[str, Markup | None]
+	sections: dict[str, Markup | None]
 
 	def __init__(self, sections: Mapping[str, Markup | None] | None = None):
-		sections = sections or {}
-		self._sections = dict(sections)
+		self.sections = dict(sections or {})
 
 	def __getitem__(self, name: str) -> Markup | None:
 		# Jinja reads sections.title through this too, after attribute lookup
 		# finds nothing.
-		return self._sections.get(name)
+		return self.sections.get(name)
