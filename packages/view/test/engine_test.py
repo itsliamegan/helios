@@ -65,6 +65,16 @@ def test_keeps_default_filters_alongside_application_filters():
 	assert_eq(html, "Apr 7, 2026")
 
 
+def test_date_filter_takes_an_optional_format():
+	engine = Engine(
+		memory.Driver({"index": '{{ day | date }} / {{ day | date("%B %-d, %Y") }}'}),
+	)
+
+	html = engine.render(View("index"), {"day": datetime(2026, 4, 7, tzinfo=UTC)})
+
+	assert_eq(html, "Apr 7, 2026 / April 7, 2026")
+
+
 def test_application_filters_override_defaults():
 	engine = Engine(
 		memory.Driver({"index": "{{ day | date }}"}),
