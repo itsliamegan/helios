@@ -26,7 +26,7 @@ class Program(Runnable):
 			raise ValueError(f"{cls.__name__} must declare commands or override run()")
 
 	@classmethod
-	def main(cls, argv: list[str], *arguments: object) -> object:
+	def main(cls, argv: list[str], *extra: object) -> object:
 		# If the provided argv includes the current program, drop it.
 		if argv and argv[0] == sys.argv[0]:
 			argv = argv[1:]
@@ -46,9 +46,9 @@ class Program(Runnable):
 
 		try:
 			if result.command is not None:
-				return result.command(*arguments, **result.values).run()
+				return result.command(*extra, **result.values).run()
 			else:
-				return result.program(*arguments, **result.values).run()
+				return result.program(*extra, **result.values).run()
 		except Failure as failure:
 			print(f"{cls.name}: error: {failure.message}", file=sys.stderr)
 			raise SystemExit(1) from None
