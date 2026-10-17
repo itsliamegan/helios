@@ -35,7 +35,7 @@ class Declaration:
 
 	@property
 	def pending(self) -> bool:
-		return find_first_forward_reference(self.annotation) is not None
+		return has_forward_references(self.annotation)
 
 	def resolve(self) -> object:
 		if self.pending:
@@ -96,7 +96,7 @@ def evaluate_forward_references(
 		return annotation.evaluate(locals={**vars(owner), **supplied})
 
 	origin = get_origin(annotation)
-	if origin is None or find_first_forward_reference(annotation) is None:
+	if origin is None or not has_forward_references(annotation):
 		return annotation
 
 	evaluated = tuple(
@@ -112,16 +112,15 @@ def evaluate_forward_references(
 	return origin[evaluated]
 
 
-def find_first_forward_reference(annotation: object) -> ForwardRef | None:
+def has_forward_references(annotation: object) -> bool:
 	if isinstance(annotation, ForwardRef):
-		return annotation
+		return True
 
 	for argument in get_args(annotation):
-		reference = find_first_forward_reference(argument)
-		if reference is not None:
-			return reference
+		if has_forward_references(argument):
+			return True
 
-	return None
+	return False
 
 
 def split_nullable(name: str, annotation: object) -> tuple[object, bool]:
