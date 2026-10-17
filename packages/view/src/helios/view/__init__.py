@@ -6,7 +6,6 @@ from .error import ComponentError
 from .extension import RenderExtension
 from .helpers import Helpers
 from .prop import Prop
-from .rendering import current
 from .source import Driver, Source
 from .view import View
 
@@ -22,7 +21,6 @@ __all__ = [
 	"RenderExtension",
 	"Source",
 	"View",
-	"current",
 	"file",
 	"memory",
 ]

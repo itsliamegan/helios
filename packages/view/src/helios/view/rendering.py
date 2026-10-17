@@ -9,6 +9,8 @@ from markupsafe import Markup
 if TYPE_CHECKING:
 	from .engine import Engine
 
+current: ContextVar[Rendering] = ContextVar("current")
+
 
 @dataclass(init=False)
 class Rendering:
@@ -38,9 +40,6 @@ class Rendering:
 			self.sections[name] = content
 		else:
 			self.sections[name] = None
-
-
-current: ContextVar[Rendering] = ContextVar("current")
 
 
 class Sections:
