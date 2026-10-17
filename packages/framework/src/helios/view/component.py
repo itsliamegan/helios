@@ -2,15 +2,14 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, ClassVar, TYPE_CHECKING, dataclass_transform
 
-from markupsafe import Markup
-
-from helios.declarative import (
+from luna.declarative import (
 	MISSING,
 	check_init_keywords,
 	check_reserved_names,
 	check_single_base,
 	declarations,
 )
+from markupsafe import Markup
 
 from .attributes import Attributes, html_name
 from .error import ComponentError

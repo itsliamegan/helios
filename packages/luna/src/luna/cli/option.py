@@ -7,7 +7,8 @@ from luna.declarative import Declaration, DeclarationError, MISSING, split_nulla
 
 class Option:
 	name: str
-	declaration: Declaration[Conversion]
+	declaration: Declaration
+	_conversion: Conversion
 
 	def __init__(
 		self,
@@ -18,34 +19,46 @@ class Option:
 		self.default = default
 		self.short = short
 		self.help = help
+		self.resolved = False
 
-	def bind(self, declaration: Declaration[Conversion]):
+	def bind(self, declaration: Declaration):
 		self.name = declaration.name
 		self.declaration = declaration
 
-	def settle(self, declaration: Declaration[Conversion]) -> Conversion:
-		value_type, nullable = split_nullable(declaration.name, declaration.annotation)
-		if not accepts(value_type, nullable):
-			raise DeclarationError(
-				declaration.name,
-				f"unsupported option type: {declaration.annotation!r}",
+	def resolve(self):
+		if self.resolved:
+			return
+		try:
+			value_type, nullable = split_nullable(
+				self.name,
+				self.declaration.resolve(),
 			)
+			if not accepts(value_type, nullable):
+				raise DeclarationError(
+					self.name,
+					f"unsupported option type: {self.declaration.annotation!r}",
+				)
 
-		if self.default is MISSING and (
-			value_type is bool or get_origin(value_type) is list
-		):
-			raise DeclarationError(
-				declaration.name,
-				f"option requires a declared default: {declaration.annotation!r}",
-			)
+			if self.default is MISSING and (
+				value_type is bool or get_origin(value_type) is list
+			):
+				raise DeclarationError(
+					self.name,
+					"option requires a declared default: "
+					f"{self.declaration.annotation!r}",
+				)
 
-		conversion = Conversion(value_type, nullable)
-		check_default(declaration, conversion, self.default)
-		return conversion
+			conversion = Conversion(value_type, nullable)
+			check_default(self.declaration, conversion, self.default)
+		except DeclarationError as error:
+			raise self.declaration.reject(error) from error
+		self._conversion = conversion
+		self.resolved = True
 
 	@property
 	def type(self) -> Any:
-		return self.declaration.resolve().type
+		self.resolve()
+		return self._conversion.type
 
 	@property
 	def flag(self) -> bool:
