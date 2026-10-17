@@ -1,7 +1,8 @@
 from helios.app import Application, Container, Context, Provider
 from helios.flash import Flashes
 from helios.http import Input
-from helios.view import Engine, View
+from helios.view import View
+from helios.view.composer import Composers
 
 from .errors import Errors
 from .submission import Submission
@@ -14,8 +15,8 @@ class Provider(Provider):
 		container.scoped(Submission, self.submission)
 
 	def boot(self, application: Application):
-		if application.container.bound(Engine):
-			application.container.get(Engine).composer(self.compose)
+		if application.container.bound(Composers):
+			application.container.get(Composers).composer(self.compose)
 
 	def submissions(self, context: Context) -> Submissions:
 		return Submissions(context.get(Flashes))

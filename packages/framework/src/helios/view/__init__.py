@@ -2,8 +2,9 @@ from markupsafe import Markup
 
 from .attributes import Attributes
 from .component import Component
+from .composer import Composer
 from .config import Config
-from .engine import Composer, Engine
+from .engine import Engine
 from .error import ComponentError
 from .helpers import Helpers
 from .provider import Provider

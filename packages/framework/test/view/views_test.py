@@ -3,7 +3,8 @@ from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Container, Context
 from helios.http import Method, Request, Status, URL
-from helios.view import Component, Engine, Views, memory
+from helios.view import Component, Engine, View, Views, memory
+from helios.view.composer import Composers
 
 
 class Greeting(Component):
@@ -13,7 +14,11 @@ class Greeting(Component):
 
 
 def test_views_render_html_responses():
-	views = Views(Engine(memory.Driver({"index": "<h1>{{ title }}</h1>"})), context())
+	views = Views(
+		Engine(memory.Driver({"index": "<h1>{{ title }}</h1>"})),
+		Composers(),
+		context(),
+	)
 
 	response = views.render("index", {"title": "Index"})
 
@@ -23,7 +28,11 @@ def test_views_render_html_responses():
 
 
 def test_views_render_responses_with_status():
-	views = Views(Engine(memory.Driver({"missing": "<h1>Not found</h1>"})), context())
+	views = Views(
+		Engine(memory.Driver({"missing": "<h1>Not found</h1>"})),
+		Composers(),
+		context(),
+	)
 
 	response = views.render("missing", status=Status.NOT_FOUND)
 
@@ -33,8 +42,9 @@ def test_views_render_responses_with_status():
 
 def test_views_render_shared_values():
 	engine = Engine(memory.Driver({"index": "<h1>{{ title }}</h1>"}))
-	engine.composer(lambda view, context: view.share("title", "Composed"))
-	views = Views(engine, context())
+	composers = Composers()
+	composers.composer(lambda view, context: view.share("title", "Composed"))
+	views = Views(engine, composers, context())
 
 	response = views.render("index")
 
@@ -43,9 +53,12 @@ def test_views_render_shared_values():
 
 def test_views_pass_context_and_view_to_composers():
 	engine = Engine(memory.Driver({"index": "{{ name }} {{ path }}"}))
-	engine.composer(lambda view, context: view.share("name", view.name))
-	engine.composer(lambda view, context: view.share("path", str(context.request.url)))
-	views = Views(engine, context())
+	composers = Composers()
+	composers.composer(lambda view, context: view.share("name", view.name))
+	composers.composer(
+		lambda view, context: view.share("path", str(context.request.url))
+	)
+	views = Views(engine, composers, context())
 
 	response = views.render("index")
 
@@ -54,9 +67,10 @@ def test_views_pass_context_and_view_to_composers():
 
 def test_views_run_composers_in_registration_order():
 	engine = Engine(memory.Driver({"index": "{{ title }}"}))
-	engine.composer(lambda view, context: view.share("title", "First"))
-	engine.composer(lambda view, context: view.share("title", "Second"))
-	views = Views(engine, context())
+	composers = Composers()
+	composers.composer(lambda view, context: view.share("title", "First"))
+	composers.composer(lambda view, context: view.share("title", "Second"))
+	views = Views(engine, composers, context())
 
 	response = views.render("index")
 
@@ -65,8 +79,9 @@ def test_views_run_composers_in_registration_order():
 
 def test_views_prefer_assigns_over_shared_values():
 	engine = Engine(memory.Driver({"index": "{{ title }}"}))
-	engine.composer(lambda view, context: view.share("title", "Composed"))
-	views = Views(engine, context())
+	composers = Composers()
+	composers.composer(lambda view, context: view.share("title", "Composed"))
+	views = Views(engine, composers, context())
 
 	response = views.render("index", {"title": "Assigned"})
 
@@ -83,8 +98,9 @@ def test_views_share_values_with_components():
 		),
 		components=[Greeting],
 	)
-	engine.composer(lambda view, context: view.share("user", "Ada"))
-	views = Views(engine, context())
+	composers = Composers()
+	composers.composer(lambda view, context: view.share("user", "Ada"))
+	views = Views(engine, composers, context())
 
 	response = views.render("index")
 
@@ -101,7 +117,7 @@ def test_views_hide_assigns_from_components():
 		),
 		components=[Greeting],
 	)
-	views = Views(engine, context())
+	views = Views(engine, Composers(), context())
 
 	with assert_raises(UndefinedError):
 		views.render("index", {"user": "Ada"})
@@ -117,12 +133,22 @@ def test_views_share_values_with_components_despite_assigns():
 		),
 		components=[Greeting],
 	)
-	engine.composer(lambda view, context: view.share("user", "Composed"))
-	views = Views(engine, context())
+	composers = Composers()
+	composers.composer(lambda view, context: view.share("user", "Composed"))
+	views = Views(engine, composers, context())
 
 	response = views.render("index", {"user": "Assigned"})
 
 	assert_eq(str(response.body), "Assigned Hello, Composed")
+
+
+def test_engine_renders_without_composers():
+	engine = Engine(memory.Driver({"index": "{{ title }}"}))
+	composers = Composers()
+	composers.composer(lambda view, context: view.share("title", "Composed"))
+
+	with assert_raises(UndefinedError):
+		engine.render(View("index"))
 
 
 def context() -> Context:

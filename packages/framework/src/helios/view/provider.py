@@ -45,4 +45,8 @@ class Provider(Provider):
 		)
 
 	def views(self, context: Context) -> Views:
-		return Views(context.get(Engine), context)
+		return Views(
+			context.get(Engine),
+			context.get(Composers),
+			context,
+		)

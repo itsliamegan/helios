@@ -4,13 +4,15 @@ from typing import Any
 from helios.app import Context
 from helios.http import Response, Status
 
+from .composer import Composers
 from .engine import Engine
 from .view import View
 
 
 class Views:
-	def __init__(self, engine: Engine, context: Context):
+	def __init__(self, engine: Engine, composers: Composers, context: Context):
 		self.engine = engine
+		self.composers = composers
 		self.context = context
 
 	def render(
@@ -20,8 +22,7 @@ class Views:
 		status: Status = Status.OK,
 	) -> Response:
 		view = View(name)
-		for composer in self.engine.composers:
-			composer(view, self.context)
+		self.composers.compose(view, self.context)
 		return Response.html(
 			self.engine.render(view, assigns),
 			status,

@@ -5,7 +5,8 @@ from typing import Any
 from helios.app import Application, Container, Context, Next, Provider
 from helios.http import Request, Response
 from helios.session.store import Session
-from helios.view import Engine, View
+from helios.view import View
+from helios.view.composer import Composers
 
 
 @dataclass(init=False)
@@ -60,8 +61,8 @@ class Provider(Provider):
 
 	def boot(self, application: Application):
 		application.use(self.middleware)
-		if application.container.bound(Engine):
-			application.container.get(Engine).composer(self.compose)
+		if application.container.bound(Composers):
+			application.container.get(Composers).composer(self.compose)
 
 	def flashes(self, context: Context) -> Flashes:
 		session = context.get(Session)

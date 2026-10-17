@@ -3,8 +3,6 @@ from typing import Any, overload
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
 
-from helios.app import Context
-
 from .component import Component, Rendering, rendering
 from .extension import RenderExtension
 from .helpers import Helpers
@@ -33,7 +31,6 @@ class Engine:
 		self.helpers.update(helpers or Helpers())
 		self.jinja.filters.update(self.helpers.filters)
 		self.jinja.globals.update(self.helpers.globals)
-		self.composers: list[Composer] = []
 
 		templates = self.jinja.list_templates()
 		for name in templates:
@@ -44,9 +41,6 @@ class Engine:
 			check_registration(component, registered, self.helpers, templates)
 			registered[component.__name__] = component
 		self.jinja.globals.update(registered)
-
-	def composer(self, composer: Composer):
-		self.composers.append(composer)
 
 	@overload
 	def render(
@@ -118,6 +112,3 @@ def check_registration(
 			f'Component {name} uses the template "{component.template}", '
 			"which does not exist"
 		)
-
-
-type Composer = Callable[[View, Context], None]
