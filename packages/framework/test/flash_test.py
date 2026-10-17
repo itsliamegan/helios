@@ -10,8 +10,10 @@ from helios.flash import Flashes
 from helios.http import Method, Request, Response, URL
 from helios.routing import Route, Router
 from helios.session.store import Session
-import helios.view
-from helios.view import Component, Views
+from helios.view import Component
+import helios.view.config
+import helios.view.provider
+from helios.view.views import Views
 
 
 class Notice(Component):
@@ -57,7 +59,7 @@ def test_shares_flash_with_views():
 			[
 				Values(session),
 				helios.flash.Provider(),
-				helios.view.Provider(helios.view.Config(views_dir)),
+				helios.view.provider.Provider(helios.view.config.Config(views_dir)),
 			],
 		)
 		app.boot()
@@ -87,8 +89,8 @@ def test_shares_flash_with_components():
 			[
 				Values(session),
 				helios.flash.Provider(),
-				helios.view.Provider(
-					helios.view.Config(views_dir),
+				helios.view.provider.Provider(
+					helios.view.config.Config(views_dir),
 					components=[Notice],
 				),
 			],

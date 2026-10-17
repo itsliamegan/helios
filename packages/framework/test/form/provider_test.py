@@ -11,8 +11,10 @@ from helios.form import Errors, Submission, Submissions
 from helios.http import Input, Method, Request, Response, URL
 from helios.routing import Route, Router
 from helios.session.store import Session
-import helios.view
-from helios.view import Component, Views
+from helios.view import Component
+import helios.view.config
+import helios.view.provider
+from helios.view.views import Views
 
 
 class Field(Component):
@@ -140,7 +142,7 @@ def test_shares_submission_with_views():
 			session,
 			Route.get("/", edit),
 			Request(Method.GET, URL("/")),
-			[helios.view.Provider(helios.view.Config(views_dir))],
+			[helios.view.provider.Provider(helios.view.config.Config(views_dir))],
 		)
 
 	assert_eq(str(response.body), "|Title must be provided.|False")
@@ -166,8 +168,8 @@ def test_shares_submission_with_components():
 			Route.get("/", edit),
 			Request(Method.GET, URL("/")),
 			[
-				helios.view.Provider(
-					helios.view.Config(views_dir),
+				helios.view.provider.Provider(
+					helios.view.config.Config(views_dir),
 					components=[Field],
 				)
 			],

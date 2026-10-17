@@ -7,8 +7,9 @@ from luna.test.assertion import assert_eq, assert_is, assert_not_none
 from helios.app import Application, Config
 from helios.http import Method, Request, URL
 from helios.routing import Route, Router
-import helios.view
-from helios.view import Views
+import helios.view.config
+import helios.view.provider
+from helios.view.views import Views
 
 
 def test_provider_shares_urls_with_templates():
@@ -33,7 +34,7 @@ def test_provider_shares_urls_with_templates():
 					),
 				]
 			),
-			[helios.view.Provider(helios.view.Config(views_dir))],
+			[helios.view.provider.Provider(helios.view.config.Config(views_dir))],
 		)
 		app.boot()
 		try:
@@ -80,8 +81,8 @@ def test_provider_registers_components():
 			Config(URL.parse("https://example.com")),
 			Router([Route.get("/", index)]),
 			[
-				helios.view.Provider(
-					helios.view.Config(views_dir),
+				helios.view.provider.Provider(
+					helios.view.config.Config(views_dir),
 					components=[chip.TagChip],
 				)
 			],
@@ -100,8 +101,8 @@ def test_provider_registers_components():
 
 def test_provider_registers_config_before_boot():
 	with TemporaryDirectory() as dir:
-		config = helios.view.Config(Path(dir))
+		config = helios.view.config.Config(Path(dir))
 
-		app = Application(Config(), Router([]), [helios.view.Provider(config)])
+		app = Application(Config(), Router([]), [helios.view.provider.Provider(config)])
 
-		assert_is(app.container.get(helios.view.Config), config)
+		assert_is(app.container.get(helios.view.config.Config), config)
