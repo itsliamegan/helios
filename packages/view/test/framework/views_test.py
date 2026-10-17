@@ -44,7 +44,7 @@ def test_views_render_responses_with_status():
 def test_views_render_shared_values():
 	engine = Engine(memory.Driver({"index": "<h1>{{ title }}</h1>"}))
 	composers = Composers()
-	composers.composer(lambda view, context: view.share("title", "Composed"))
+	composers.add(lambda view, context: view.share("title", "Composed"))
 	views = Views(engine, composers, context())
 
 	response = views.render("index")
@@ -55,10 +55,8 @@ def test_views_render_shared_values():
 def test_views_pass_context_and_view_to_composers():
 	engine = Engine(memory.Driver({"index": "{{ name }} {{ path }}"}))
 	composers = Composers()
-	composers.composer(lambda view, context: view.share("name", view.name))
-	composers.composer(
-		lambda view, context: view.share("path", str(context.request.url))
-	)
+	composers.add(lambda view, context: view.share("name", view.name))
+	composers.add(lambda view, context: view.share("path", str(context.request.url)))
 	views = Views(engine, composers, context())
 
 	response = views.render("index")
@@ -69,8 +67,8 @@ def test_views_pass_context_and_view_to_composers():
 def test_views_run_composers_in_registration_order():
 	engine = Engine(memory.Driver({"index": "{{ title }}"}))
 	composers = Composers()
-	composers.composer(lambda view, context: view.share("title", "First"))
-	composers.composer(lambda view, context: view.share("title", "Second"))
+	composers.add(lambda view, context: view.share("title", "First"))
+	composers.add(lambda view, context: view.share("title", "Second"))
 	views = Views(engine, composers, context())
 
 	response = views.render("index")
@@ -81,7 +79,7 @@ def test_views_run_composers_in_registration_order():
 def test_views_prefer_assigns_over_shared_values():
 	engine = Engine(memory.Driver({"index": "{{ title }}"}))
 	composers = Composers()
-	composers.composer(lambda view, context: view.share("title", "Composed"))
+	composers.add(lambda view, context: view.share("title", "Composed"))
 	views = Views(engine, composers, context())
 
 	response = views.render("index", {"title": "Assigned"})
@@ -100,7 +98,7 @@ def test_views_share_values_with_components():
 		components=[Greeting],
 	)
 	composers = Composers()
-	composers.composer(lambda view, context: view.share("user", "Ada"))
+	composers.add(lambda view, context: view.share("user", "Ada"))
 	views = Views(engine, composers, context())
 
 	response = views.render("index")
@@ -135,7 +133,7 @@ def test_views_share_values_with_components_despite_assigns():
 		components=[Greeting],
 	)
 	composers = Composers()
-	composers.composer(lambda view, context: view.share("user", "Composed"))
+	composers.add(lambda view, context: view.share("user", "Composed"))
 	views = Views(engine, composers, context())
 
 	response = views.render("index", {"user": "Assigned"})

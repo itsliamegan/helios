@@ -18,7 +18,7 @@ class Provider[U: Model](Provider):
 
 	def boot(self, application: Application):
 		if application.container.bound(Composers):
-			application.container.get(Composers).composer(self.compose)
+			application.container.get(Composers).add(self.compose)
 
 	def compose(self, view: View, context: Context):
 		view.share("auth", context.get(Authenticator))

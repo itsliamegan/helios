@@ -62,7 +62,7 @@ class Provider(Provider):
 	def boot(self, application: Application):
 		application.use(self.middleware)
 		if application.container.bound(Composers):
-			application.container.get(Composers).composer(self.compose)
+			application.container.get(Composers).add(self.compose)
 
 	def flashes(self, context: Context) -> Flashes:
 		session = context.get(Session)
