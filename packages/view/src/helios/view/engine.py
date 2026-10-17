@@ -1,11 +1,19 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, overload
 
-from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
+from jinja2 import (
+	BaseLoader,
+	Environment,
+	StrictUndefined,
+	TemplateNotFound,
+	TemplateRuntimeError,
+)
+from markupsafe import Markup
 
-from .component import Component, Rendering, rendering
-from .extension import RenderExtension
+from .component import Component
+from .extension import LayoutExtension, RenderExtension
 from .helpers import Helpers
+from .rendering import Rendering, Sections, current
 from .source import Driver
 from .view import View
 
@@ -22,7 +30,7 @@ class Engine:
 
 		self.jinja = Environment(
 			loader=Loader(driver, fallbacks),
-			extensions=[RenderExtension],
+			extensions=[RenderExtension, LayoutExtension],
 			autoescape=True,
 			undefined=StrictUndefined,
 			finalize=finalize,
@@ -60,20 +68,39 @@ class Engine:
 	) -> str:
 		if isinstance(renderable, Component):
 			component = renderable
-			token = rendering.set(Rendering(self, {}))
+			token = current.set(Rendering(self, {}))
 			try:
 				return str(component)
 			finally:
-				rendering.reset(token)
+				current.reset(token)
 		else:
 			view = renderable
-			token = rendering.set(Rendering(self, view.shared))
+			state = Rendering(self, view.shared)
+			token = current.set(state)
 			try:
-				assigns = assigns or {}
-				template = self.jinja.get_template(view.name)
-				return template.render({**view.shared, **assigns})
+				assigns = {**view.shared, **(assigns or {})}
+				html = self.jinja.get_template(view.name).render(assigns)
+
+				chain = [view.name]
+				while state.layout is not None:
+					layout = state.layout
+					if layout in chain:
+						raise TemplateRuntimeError(
+							f'Layouts of "{view.name}" form a loop'
+						)
+					chain.append(layout)
+
+					state.layout = None
+					html = self.jinja.get_template(layout).render(
+						{
+							**assigns,
+							"content": Markup(html),
+							"sections": Sections(state.sections),
+						}
+					)
+				return html
 			finally:
-				rendering.reset(token)
+				current.reset(token)
 
 
 class Loader(BaseLoader):

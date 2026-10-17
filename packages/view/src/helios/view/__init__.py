@@ -1,6 +1,6 @@
 from . import file, memory
 from .attributes import Attributes
-from .component import Component, rendering
+from .component import Component
 from .engine import Engine, Loader
 from .error import ComponentError
 from .extension import RenderExtension
@@ -23,5 +23,4 @@ __all__ = [
 	"View",
 	"file",
 	"memory",
-	"rendering",
 ]
