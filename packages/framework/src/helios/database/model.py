@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any, ClassVar, Self, dataclass_transform
 from uuid import UUID, uuid4
 
-from helios.declarative import (
+from luna.declarative import (
 	Namespace,
 	check_init_keywords,
 	check_reserved_names,

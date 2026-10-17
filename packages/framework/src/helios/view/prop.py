@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
-from helios.declarative import Declaration, MISSING
+from luna.declarative import Declaration, MISSING
 
 if TYPE_CHECKING:
 	from .component import Component
