@@ -1,4 +1,5 @@
 from collections.abc import Callable, Mapping, Sequence
+from functools import partial
 from typing import Any, overload
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
@@ -6,7 +7,7 @@ from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
 from .component import Component, Rendering, rendering
 from .extension import RenderExtension
 from .helpers import Helpers
-from .source import Driver, Source
+from .source import Driver
 from .view import View
 
 
@@ -86,18 +87,14 @@ class Loader(BaseLoader):
 		environment: Environment,
 		template: str,
 	) -> tuple[str, str | None, Callable[[], bool]]:
-		driver, source = self.supplier(template)
-		return (
-			source.text,
-			source.path,
-			lambda: driver.is_current(template, source),
-		)
-
-	def supplier(self, template: str) -> tuple[Driver, Source]:
 		for driver in self.drivers:
 			source = driver.source(template)
 			if source is not None:
-				return driver, source
+				return (
+					source.text,
+					source.path,
+					partial(driver.is_current, template, source),
+				)
 		raise TemplateNotFound(template)
 
 	def list_templates(self) -> list[str]:
