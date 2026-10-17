@@ -12,7 +12,7 @@ from markupsafe import Markup
 from .attributes import Attributes, html_name
 from .error import ComponentError
 from .prop import Prop
-from .rendering import rendering
+from .rendering import current
 from .view import View
 
 
@@ -84,15 +84,15 @@ class Component:
 					)
 
 	def __html__(self) -> Markup:
-		current = rendering.get(None)
-		if current is None:
+		rendering = current.get(None)
+		if rendering is None:
 			raise RuntimeError(f"{type(self).__name__} was rendered outside a view")
 		assigns = {}
 		for name in type(self).props:
 			assigns[name] = getattr(self, name)
 		assigns["component"] = self
 		return Markup(
-			current.engine.render(View(self.template, current.shared), assigns)
+			rendering.engine.render(View(self.template, rendering.shared), assigns)
 		)
 
 	def __str__(self) -> str:

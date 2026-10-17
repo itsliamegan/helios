@@ -12,11 +12,7 @@ if TYPE_CHECKING:
 
 @dataclass(init=False)
 class Rendering:
-	"""The state of one view's render, through its chain of layouts.
-
-	The template rendering now names its layout at most once, and each section
-	is set once in the whole chain.
-	"""
+	"""A single view being rendered, updated as the layout chain is walked."""
 
 	engine: Engine
 	shared: dict[str, Any]
@@ -36,7 +32,7 @@ class Rendering:
 
 	def set_section(self, name: str, content: Markup):
 		if name in self.sections:
-			raise TemplateRuntimeError(f'The section "{name}" is set twice')
+			raise TemplateRuntimeError(f'Section "{name}" is set twice')
 
 		if content.strip():
 			self.sections[name] = content
@@ -44,24 +40,20 @@ class Rendering:
 			self.sections[name] = None
 
 
-rendering: ContextVar[Rendering] = ContextVar("rendering")
+current: ContextVar[Rendering] = ContextVar("current")
 
 
 class Sections:
-	"""The sections set below a layout, read by name as attributes or keys.
+	"""The named sections set by a view.
 
-	An unset section is nothing, and so is an empty one.
+	Sections can be read by attribute or item lookup. An unset section and an
+	empty section are both None.
 	"""
 
 	def __init__(self, sections: Mapping[str, Markup | None]):
-		for name, content in sections.items():
-			setattr(self, name, content)
-
-	def __getattr__(self, name: str):
-		# Lookup finds a section that is set before reaching here, but special
-		# names such as __html__ must stay missing for MarkupSafe and copying.
-		if name.startswith("__"):
-			raise AttributeError(name)
+		self._sections = dict(sections)
 
 	def __getitem__(self, name: str) -> Markup | None:
-		return getattr(self, name)
+		# Jinja reads sections.title through this too, after attribute lookup
+		# finds nothing.
+		return self._sections.get(name)

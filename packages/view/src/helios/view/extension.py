@@ -7,7 +7,7 @@ from jinja2.lexer import Token, TokenStream
 from jinja2.parser import Parser
 from markupsafe import Markup
 
-from .rendering import rendering
+from .rendering import current
 
 
 class RenderExtension(Extension):
@@ -36,7 +36,7 @@ class RenderExtension(Extension):
 
 
 class LayoutExtension(Extension):
-	"""Adds the layout and section tags, and disables Jinja's extends and block."""
+	"""Adds the layout and section tags. Disables Jinja's extends and block."""
 
 	tags = {"layout", "section"}
 
@@ -77,10 +77,10 @@ class LayoutExtension(Extension):
 		return nodes.CallBlock(call, [], [], body).set_lineno(lineno)
 
 	def set_layout(self, name: str):
-		rendering.get().set_layout(name)
+		current.get().set_layout(name)
 
 	def set_section(self, name: str, caller: Callable[[], str]) -> str:
-		rendering.get().set_section(name, Markup(caller()))
+		current.get().set_section(name, Markup(caller()))
 		return ""
 
 

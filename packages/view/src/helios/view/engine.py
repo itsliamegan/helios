@@ -13,7 +13,7 @@ from markupsafe import Markup
 from .component import Component
 from .extension import LayoutExtension, RenderExtension
 from .helpers import Helpers
-from .rendering import Rendering, Sections, rendering
+from .rendering import Rendering, Sections, current
 from .source import Driver
 from .view import View
 
@@ -68,40 +68,40 @@ class Engine:
 	) -> str:
 		if isinstance(renderable, Component):
 			component = renderable
-			token = rendering.set(Rendering(self, {}))
+			token = current.set(Rendering(self, {}))
 			try:
 				return str(component)
 			finally:
-				rendering.reset(token)
+				current.reset(token)
 		else:
 			view = renderable
-			current = Rendering(self, view.shared)
-			token = rendering.set(current)
+			state = Rendering(self, view.shared)
+			token = current.set(state)
 			try:
 				assigns = assigns or {}
-				context = {**view.shared, **assigns}
-				html = self.jinja.get_template(view.name).render(context)
+				assigns = {**view.shared, **assigns}
+				html = self.jinja.get_template(view.name).render(assigns)
 
 				chain = [view.name]
-				while current.layout is not None:
-					layout = current.layout
+				while state.layout is not None:
+					layout = state.layout
 					if layout in chain:
 						raise TemplateRuntimeError(
-							f'The layouts of "{view.name}" form a loop'
+							f'Layouts of "{view.name}" form a loop'
 						)
 					chain.append(layout)
 
-					current.layout = None
+					state.layout = None
 					html = self.jinja.get_template(layout).render(
 						{
-							**context,
+							**assigns,
 							"content": Markup(html),
-							"sections": Sections(current.sections),
+							"sections": Sections(state.sections),
 						}
 					)
 				return html
 			finally:
-				rendering.reset(token)
+				current.reset(token)
 
 
 class Loader(BaseLoader):
