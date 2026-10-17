@@ -35,7 +35,7 @@ class Declaration:
 
 	@property
 	def pending(self) -> bool:
-		return forward_reference(self.annotation) is not None
+		return find_first_forward_reference(self.annotation) is not None
 
 	def resolve(self) -> object:
 		if self.pending:
@@ -49,7 +49,9 @@ class Declaration:
 		supplied: dict[str, type] = {}
 		while True:
 			try:
-				return evaluate_annotation(self.annotation, self.owner, supplied)
+				return evaluate_forward_references(
+					self.annotation, self.owner, supplied
+				)
 			except NameError as error:
 				missing = error.name
 				if missing is None or missing in supplied:
@@ -85,7 +87,7 @@ def declarations(owner: type, error: type[Exception]) -> list[Declaration]:
 	return found
 
 
-def evaluate_annotation(
+def evaluate_forward_references(
 	annotation: object,
 	owner: type,
 	supplied: Mapping[str, type],
@@ -94,11 +96,11 @@ def evaluate_annotation(
 		return annotation.evaluate(locals={**vars(owner), **supplied})
 
 	origin = get_origin(annotation)
-	if origin is None or forward_reference(annotation) is None:
+	if origin is None or find_first_forward_reference(annotation) is None:
 		return annotation
 
 	evaluated = tuple(
-		evaluate_annotation(argument, owner, supplied)
+		evaluate_forward_references(argument, owner, supplied)
 		for argument in get_args(annotation)
 	)
 	if origin is Union:
@@ -110,12 +112,12 @@ def evaluate_annotation(
 	return origin[evaluated]
 
 
-def forward_reference(annotation: object) -> ForwardRef | None:
+def find_first_forward_reference(annotation: object) -> ForwardRef | None:
 	if isinstance(annotation, ForwardRef):
 		return annotation
 
 	for argument in get_args(annotation):
-		reference = forward_reference(argument)
+		reference = find_first_forward_reference(argument)
 		if reference is not None:
 			return reference
 
