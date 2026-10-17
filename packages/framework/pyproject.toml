@@ -3,6 +3,7 @@ name = "helios"
 version = "0.1"
 requires-python = ">=3.14"
 dependencies = [
+	"helios-assets",
 	"helios-url",
 	"helios-view",
 	"luna",
@@ -21,6 +22,7 @@ requires = ["uv_build"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
+helios-assets = { workspace = true }
 helios-url = { workspace = true }
 helios-view = { workspace = true }
 luna = { workspace = true }

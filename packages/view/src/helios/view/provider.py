@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 
 from helios.app import Application, Container, Context, Provider
+from helios.assets import Assets
 from helios.routing import URLs
 
 from .component import Component
@@ -36,6 +37,8 @@ class Provider(Provider):
 		helpers = Helpers()
 		if container.bound(URLs):
 			helpers.globals["urls"] = container.get(URLs)
+		if container.bound(Assets):
+			helpers.globals["assets"] = container.get(Assets)
 		helpers.update(self.helpers or Helpers())
 		return Engine(
 			Driver(self.config.directory),
