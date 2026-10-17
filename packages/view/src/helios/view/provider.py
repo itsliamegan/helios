@@ -40,8 +40,7 @@ class Provider(Provider):
 		return Engine(
 			Driver(self.config.directory),
 			helpers,
-			self.config.reload,
-			self.components,
+			components=self.components,
 		)
 
 	def views(self, context: Context) -> Views:

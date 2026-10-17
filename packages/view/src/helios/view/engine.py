@@ -1,5 +1,4 @@
-from collections.abc import Callable, Mapping, Sequence
-from functools import partial
+from collections.abc import Mapping, Sequence
 from typing import Any, overload
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
@@ -16,7 +15,6 @@ class Engine:
 		self,
 		driver: Driver,
 		helpers: Helpers | None = None,
-		reload: bool = False,
 		components: Sequence[type[Component]] | None = None,
 		fallbacks: Sequence[Driver] | None = None,
 	):
@@ -28,7 +26,7 @@ class Engine:
 			autoescape=True,
 			undefined=StrictUndefined,
 			finalize=finalize,
-			auto_reload=reload,
+			auto_reload=False,
 			cache_size=-1,
 		)
 
@@ -86,15 +84,11 @@ class Loader(BaseLoader):
 		self,
 		environment: Environment,
 		template: str,
-	) -> tuple[str, str | None, Callable[[], bool]]:
+	) -> tuple[str, str | None, None]:
 		for driver in self.drivers:
 			source = driver.source(template)
 			if source is not None:
-				return (
-					source.text,
-					source.path,
-					partial(driver.is_current, template, source),
-				)
+				return source.text, source.path, None
 		raise TemplateNotFound(template)
 
 	def list_templates(self) -> list[str]:
