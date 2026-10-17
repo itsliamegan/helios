@@ -9,7 +9,7 @@ class Composers:
 	def __init__(self):
 		self.composers: list[Composer] = []
 
-	def composer(self, composer: Composer):
+	def add(self, composer: Composer):
 		self.composers.append(composer)
 
 	def compose(self, view: View, context: Context):
