@@ -1,5 +1,4 @@
 from collections.abc import Callable, Mapping, Sequence
-from functools import partial
 from typing import Any, overload
 
 from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateNotFound
@@ -93,7 +92,7 @@ class Loader(BaseLoader):
 				return (
 					source.text,
 					source.path,
-					partial(driver.is_current, template, source),
+					lambda: driver.is_current(template, source),  # noqa: B023
 				)
 		raise TemplateNotFound(template)
 
