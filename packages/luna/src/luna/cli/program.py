@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 
 from luna.cli.command import Command
 from luna.cli.parse import CommandMissing, HelpRequested, ParseError, parse
-from luna.cli.runnable import Runnable
+from luna.cli.runnable import Failure, Runnable
 from luna.declarative import check_single_base
 
 
@@ -44,10 +44,14 @@ class Program(Runnable):
 			print(f"{cls.name}: error: {error.message}", file=sys.stderr)
 			raise SystemExit(2) from None
 
-		if result.command is not None:
-			return result.command(*extra, **result.values).run()
-		else:
-			return result.program(*extra, **result.values).run()
+		try:
+			if result.command is not None:
+				return result.command(*extra, **result.values).run()
+			else:
+				return result.program(*extra, **result.values).run()
+		except Failure as failure:
+			print(f"{cls.name}: error: {failure.message}", file=sys.stderr)
+			raise SystemExit(1) from None
 
 
 def check_commands(program: type[Program]):
