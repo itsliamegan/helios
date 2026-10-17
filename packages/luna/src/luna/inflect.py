@@ -1,5 +1,15 @@
+import re
+
+SEPARATORS = re.compile(r"[\W_]+")
+
+
 def words(name: str) -> list[str]:
-	return [word for word in name.split("_") if word]
+	result: list[str] = []
+	for word in SEPARATORS.split(name):
+		if word:
+			result.append(word)
+
+	return result
 
 
 def sentence(name: str) -> str:
@@ -12,7 +22,7 @@ def title(name: str) -> str:
 
 
 def dash(name: str) -> str:
-	return "-".join(words(name))
+	return "-".join(words(name)).lower()
 
 
 def count(number: int, singular: str, plural: str | None = None) -> str:
