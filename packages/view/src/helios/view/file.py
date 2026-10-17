@@ -25,8 +25,7 @@ class Driver(Driver):
 		if path is None:
 			return None
 		else:
-			version = path.stat().st_mtime_ns
-			return Source(path.read_text(), str(path), version)
+			return Source(path.read_text(), str(path))
 
 	def locate(self, name: str) -> Path | None:
 		parts = name.split("/")

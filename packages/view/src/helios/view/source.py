@@ -6,7 +6,6 @@ from dataclasses import dataclass
 class Source:
 	text: str
 	path: str | None
-	version: int
 
 
 class Driver(ABC):

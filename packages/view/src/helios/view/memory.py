@@ -14,4 +14,4 @@ class Driver(Driver):
 		if name not in self.templates:
 			return None
 		else:
-			return Source(self.templates[name], None, 0)
+			return Source(self.templates[name], None)
