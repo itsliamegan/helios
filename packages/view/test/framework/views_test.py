@@ -1,9 +1,8 @@
-from jinja2 import UndefinedError
 from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Container, Context
 from helios.http import Method, Request, Status, URL
-from helios.view import Component, Engine, memory
+from helios.view import Component, Engine, TemplateError, memory
 from helios.view.composer import Composers
 from helios.view.views import Views
 
@@ -118,7 +117,7 @@ def test_views_hide_assigns_from_components():
 	)
 	views = Views(engine, Composers(), context())
 
-	with assert_raises(UndefinedError):
+	with assert_raises(TemplateError):
 		views.render("index", {"user": "Ada"})
 
 

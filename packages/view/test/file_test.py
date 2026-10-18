@@ -2,10 +2,9 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from jinja2 import TemplateNotFound, TemplateSyntaxError
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.view import Engine, Helpers, View, file
+from helios.view import Engine, Helpers, TemplateError, View, file
 
 
 def test_directory_renders_application_helpers():
@@ -45,7 +44,7 @@ def test_directory_rejects_dotted_names_for_nested_templates():
 		views_dir.joinpath("posts", "index.html").write_text("<h1>Posts</h1>")
 		engine = Engine(file.Driver(views_dir))
 
-		with assert_raises(TemplateNotFound):
+		with assert_raises(TemplateError):
 			engine.render(View("posts.index"))
 
 
@@ -57,12 +56,12 @@ def test_directory_rejects_syntax_errors_on_creation():
 		broken_file = views_dir.joinpath("posts", "index.html")
 		broken_file.write_text("<h1>{{ title }}</h1>\n{% if title %}\n")
 
-		with assert_raises(TemplateSyntaxError) as raised:
+		with assert_raises(TemplateError) as raised:
 			Engine(file.Driver(views_dir))
 
 		exception = raised.exception
-		assert_eq(exception.filename, str(broken_file))
-		assert_eq(exception.lineno, 2)
+		assert_eq(exception.path, str(broken_file))
+		assert_eq(exception.line, 2)
 
 
 def test_directory_rejects_names_outside_directory():
@@ -72,7 +71,7 @@ def test_directory_rejects_names_outside_directory():
 		Path(dir, "secret.html").write_text("secret")
 		engine = Engine(file.Driver(views_dir))
 
-		with assert_raises(TemplateNotFound):
+		with assert_raises(TemplateError):
 			engine.render(View("../secret"))
 
 
@@ -112,3 +111,18 @@ def test_directory_ignores_hidden_directories():
 		engine = Engine(file.Driver(views_dir))
 
 		assert_eq(engine.render(View("index")), "<h1>Index</h1>")
+
+
+def test_directory_locates_runtime_errors_in_the_template_file():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("posts").mkdir()
+		post_file = views_dir.joinpath("posts", "show.html")
+		post_file.write_text("<h1>Post</h1>\n{{ post.title }}")
+		engine = Engine(file.Driver(views_dir))
+
+		with assert_raises(TemplateError) as raised:
+			engine.render(View("posts/show"))
+
+		assert_eq(raised.exception.path, str(post_file))
+		assert_eq(raised.exception.line, 2)

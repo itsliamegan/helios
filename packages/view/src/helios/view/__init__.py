@@ -2,7 +2,7 @@ from . import file, memory
 from .attributes import Attributes
 from .component import Component
 from .engine import Engine, Loader
-from .error import ComponentError
+from .error import ComponentError, TemplateError
 from .extension import RenderExtension
 from .helpers import Helpers
 from .prop import Prop
@@ -20,6 +20,7 @@ __all__ = [
 	"Prop",
 	"RenderExtension",
 	"Source",
+	"TemplateError",
 	"View",
 	"file",
 	"memory",

@@ -2,11 +2,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from jinja2 import TemplateNotFound, TemplateSyntaxError, UndefinedError
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
 
-from helios.view import Component, Engine, Helpers, View, file, memory
+from helios.view import (
+	Component,
+	Engine,
+	Helpers,
+	TemplateError,
+	View,
+	file,
+	memory,
+)
 
 
 def test_renders_simple():
@@ -115,21 +122,21 @@ def test_escapes_assigns_in_loaded_templates():
 def test_rejects_undefined_variables():
 	engine = Engine(memory.Driver({"index": "<h1>{{ titel }}</h1>"}))
 
-	with assert_raises(UndefinedError):
+	with assert_raises(TemplateError):
 		engine.render(View("index"), {"title": "Index"})
 
 
 def test_rejects_undefined_attributes():
 	engine = Engine(memory.Driver({"index": "<h1>{{ post.titel }}</h1>"}))
 
-	with assert_raises(UndefinedError):
+	with assert_raises(TemplateError):
 		engine.render(View("index"), {"post": {"title": "Index"}})
 
 
 def test_rejects_undefined_variables_in_conditions():
 	engine = Engine(memory.Driver({"index": "{% if error %}{{ error }}{% endif %}"}))
 
-	with assert_raises(UndefinedError):
+	with assert_raises(TemplateError):
 		engine.render(View("index"))
 
 
@@ -176,7 +183,7 @@ def test_nothing_equals_no_word():
 def test_rejects_members_of_nothing():
 	engine = Engine(memory.Driver({"index": "{{ value.title }}"}))
 
-	with assert_raises(UndefinedError):
+	with assert_raises(TemplateError):
 		engine.render(View("index"), {"value": None})
 
 
@@ -247,7 +254,7 @@ def test_rejects_templates_no_driver_has_with_fallbacks():
 		fallbacks=[memory.Driver({"about": "fallback"})],
 	)
 
-	with assert_raises(TemplateNotFound):
+	with assert_raises(TemplateError):
 		engine.render(View("missing"))
 
 
@@ -267,8 +274,31 @@ def test_registers_components_whose_templates_only_a_fallback_has():
 
 
 def test_compiles_fallback_templates_when_made():
-	with assert_raises(TemplateSyntaxError):
+	with assert_raises(TemplateError):
 		Engine(
 			memory.Driver({"index": "own"}),
 			fallbacks=[memory.Driver({"broken": "{% if %}"})],
 		)
+
+
+def test_wraps_runtime_errors_in_a_view():
+	engine = Engine(memory.Driver({"posts/show": "<h1>Post</h1>\n{{ post.title }}"}))
+
+	with assert_raises(TemplateError) as raised:
+		engine.render(View("posts/show"))
+
+	assert_eq(raised.exception.path, None)
+	assert_eq(raised.exception.line, 2)
+
+
+def test_passes_through_errors_raised_by_a_helper():
+	def fail():
+		raise ValueError("author")
+
+	engine = Engine(
+		memory.Driver({"posts/show": "{{ fail() }}"}),
+		Helpers(globals={"fail": fail}),
+	)
+
+	with assert_raises(ValueError):
+		engine.render(View("posts/show"))
