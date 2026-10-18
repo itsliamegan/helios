@@ -1,13 +1,7 @@
-from jinja2 import (
-	TemplateNotFound,
-	TemplateRuntimeError,
-	TemplateSyntaxError,
-	UndefinedError,
-)
 from luna.test.assertion import assert_eq, assert_raises
 from markupsafe import Markup
 
-from helios.view import Component, Engine, View, memory
+from helios.view import Component, Engine, TemplateError, View, memory
 
 
 class Card(Component):
@@ -114,14 +108,14 @@ def test_nests_render_inside_render():
 def test_rejects_expressions_that_are_not_calls():
 	driver = memory.Driver({"index": "{% render Card %}body{% endrender %}"})
 
-	with assert_raises(TemplateSyntaxError):
+	with assert_raises(TemplateError):
 		Engine(driver)
 
 
 def test_rejects_a_missing_endrender():
 	driver = memory.Driver({"index": '{% render Card(title="a") %}body'})
 
-	with assert_raises(TemplateSyntaxError):
+	with assert_raises(TemplateError):
 		Engine(driver)
 
 
@@ -266,7 +260,7 @@ def test_hides_the_view_assignments_from_the_layout():
 		)
 	)
 
-	with assert_raises(UndefinedError):
+	with assert_raises(TemplateError):
 		engine.render(View("posts/show"))
 
 
@@ -284,7 +278,7 @@ def test_rejects_a_section_set_twice_in_one_view():
 		)
 	)
 
-	with assert_raises(TemplateRuntimeError):
+	with assert_raises(TemplateError):
 		engine.render(View("posts/show"))
 
 
@@ -305,7 +299,7 @@ def test_rejects_a_layout_setting_a_section_its_view_set():
 		)
 	)
 
-	with assert_raises(TemplateRuntimeError):
+	with assert_raises(TemplateError):
 		engine.render(View("posts/show"))
 
 
@@ -320,14 +314,14 @@ def test_rejects_a_second_layout():
 		)
 	)
 
-	with assert_raises(TemplateRuntimeError):
+	with assert_raises(TemplateError):
 		engine.render(View("posts/show"))
 
 
 def test_rejects_a_missing_layout():
 	engine = Engine(memory.Driver({"posts/show": '{% layout "layouts/base" %}'}))
 
-	with assert_raises(TemplateNotFound):
+	with assert_raises(TemplateError):
 		engine.render(View("posts/show"))
 
 
@@ -342,28 +336,28 @@ def test_rejects_a_loop_of_layouts():
 		)
 	)
 
-	with assert_raises(TemplateRuntimeError):
+	with assert_raises(TemplateError):
 		engine.render(View("posts/show"))
 
 
 def test_rejects_a_layout_name_that_is_not_a_literal():
 	driver = memory.Driver({"posts/show": "{% layout name %}"})
 
-	with assert_raises(TemplateSyntaxError):
+	with assert_raises(TemplateError):
 		Engine(driver)
 
 
 def test_rejects_a_section_name_that_is_not_a_literal():
 	driver = memory.Driver({"posts/show": "{% section name %}a{% endsection %}"})
 
-	with assert_raises(TemplateSyntaxError):
+	with assert_raises(TemplateError):
 		Engine(driver)
 
 
 def test_rejects_a_missing_endsection():
 	driver = memory.Driver({"posts/show": '{% section "title" %}a'})
 
-	with assert_raises(TemplateSyntaxError):
+	with assert_raises(TemplateError):
 		Engine(driver)
 
 
@@ -375,12 +369,28 @@ def test_disables_extends():
 		}
 	)
 
-	with assert_raises(TemplateSyntaxError):
+	with assert_raises(TemplateError):
 		Engine(driver)
 
 
 def test_disables_block():
 	driver = memory.Driver({"posts/show": "{% block title %}{% endblock %}"})
 
-	with assert_raises(TemplateSyntaxError):
+	with assert_raises(TemplateError):
 		Engine(driver)
+
+
+def test_wraps_an_error_in_a_layout():
+	engine = Engine(
+		memory.Driver(
+			{
+				"layouts/base": "<main>\n{{ comment.body }}</main>",
+				"posts/show": '{% layout "layouts/base" %}Post',
+			}
+		)
+	)
+
+	with assert_raises(TemplateError) as raised:
+		engine.render(View("posts/show"))
+
+	assert_eq(raised.exception.line, 2)

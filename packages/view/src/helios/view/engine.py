@@ -8,9 +8,11 @@ from jinja2 import (
 	TemplateNotFound,
 	TemplateRuntimeError,
 )
+from jinja2 import TemplateError as JinjaTemplateError
 from markupsafe import Markup
 
 from .component import Component
+from .error import TemplateError
 from .extension import LayoutExtension, RenderExtension
 from .helpers import Helpers
 from .rendering import Rendering, Sections, current
@@ -45,7 +47,10 @@ class Engine:
 
 		templates = self.jinja.list_templates()
 		for name in templates:
-			self.jinja.get_template(name)
+			try:
+				self.jinja.get_template(name)
+			except JinjaTemplateError as error:
+				raise TemplateError.from_jinja(error) from error
 
 		registered: dict[str, Any] = {}
 		for component in components or []:
@@ -99,6 +104,8 @@ class Engine:
 						}
 					)
 				return html
+			except JinjaTemplateError as error:
+				raise TemplateError.from_jinja(error) from error
 			finally:
 				current.reset(token)
 

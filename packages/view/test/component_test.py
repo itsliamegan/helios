@@ -1,4 +1,3 @@
-from jinja2 import UndefinedError
 from luna.test.assertion import assert_eq, assert_is, assert_raises
 from markupsafe import Markup
 
@@ -8,6 +7,7 @@ from helios.view import (
 	ComponentError,
 	Engine,
 	Helpers,
+	TemplateError,
 	View,
 	memory,
 )
@@ -159,7 +159,7 @@ def test_hides_caller_assigns():
 		components=[Chip],
 	)
 
-	with assert_raises(UndefinedError):
+	with assert_raises(TemplateError):
 		engine.render(View("index"), {"name": "Travel", "title": "Posts"})
 
 
@@ -468,3 +468,27 @@ def test_engine_renders_component():
 	html = engine.render(Chip(name="Ada"))
 
 	assert_eq(html, "<i>Ada</i>")
+
+
+def test_wraps_a_component_error_once_inside_a_page():
+	class Tag(Component):
+		template = "tag"
+
+		name: str
+
+	engine = Engine(
+		memory.Driver(
+			{
+				"posts/show": "<h1>Post</h1>\n{{ Tag(name='travel') }}",
+				"tag": "<i>{{ name }}</i>\n{{ tag.name }}",
+			}
+		),
+		components=[Tag],
+	)
+
+	with assert_raises(TemplateError) as raised:
+		engine.render(View("posts/show"))
+
+	exception = raised.exception
+	assert_eq(isinstance(exception.__cause__, TemplateError), False)
+	assert_eq(exception.line, 2)
