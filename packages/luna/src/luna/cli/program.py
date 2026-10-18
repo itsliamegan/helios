@@ -1,3 +1,4 @@
+import logging
 import sys
 from typing import Any, ClassVar
 
@@ -5,6 +6,7 @@ from luna.cli.command import Command
 from luna.cli.parse import CommandMissing, HelpRequested, ParseError, parse
 from luna.cli.runnable import Failure, Runnable
 from luna.declarative import check_single_base
+from luna.logger import Handler, Logger
 
 
 class Program(Runnable):
@@ -31,6 +33,15 @@ class Program(Runnable):
 		if argv and argv[0] == sys.argv[0]:
 			argv = argv[1:]
 
+		logging.basicConfig(
+			level=logging.INFO,
+			format="%(message)s",
+			handlers=[Handler(cls.name)],
+			# A program run after another in one process replaces its handler.
+			force=True,
+		)
+		logger = Logger(logging.getLogger(__name__))
+
 		try:
 			result = parse(cls, argv)
 		except HelpRequested as requested:
@@ -41,7 +52,7 @@ class Program(Runnable):
 			raise SystemExit(2) from None
 		except ParseError as error:
 			print(error.usage, end="", file=sys.stderr)
-			print(f"{cls.name}: error: {error.message}", file=sys.stderr)
+			logger.error(error.message)
 			raise SystemExit(2) from None
 
 		try:
@@ -50,7 +61,7 @@ class Program(Runnable):
 			else:
 				return result.program(*extra, **result.values).run()
 		except Failure as failure:
-			print(f"{cls.name}: error: {failure.message}", file=sys.stderr)
+			logger.error(failure.message)
 			raise SystemExit(1) from None
 
 

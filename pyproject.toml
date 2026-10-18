@@ -24,6 +24,7 @@ extend-select = [
 ]
 ignore = [
 	"BLE001",
+	"G010",
 	"RUF012",
 ]
 

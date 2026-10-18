@@ -107,6 +107,7 @@ def test_rejects_reserved_names():
 	for value in [
 		"run",
 		"fail",
+		"logger",
 		"main",
 		"name",
 		"commands",
