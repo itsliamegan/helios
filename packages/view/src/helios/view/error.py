@@ -7,11 +7,7 @@ class ComponentError(TypeError):
 
 
 class TemplateError(Exception):
-	"""A template failed to compile or render.
-
-	The path and line locate the failure in the template's source. Each is None
-	when unknown, as for a template without a file or a missing template.
-	"""
+	"""A template failed to compile or render."""
 
 	path: str | None
 	line: int | None
