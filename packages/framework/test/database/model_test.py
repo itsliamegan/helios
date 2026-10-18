@@ -232,7 +232,7 @@ def test_rejects_redeclaring_model_attributes():
 	with assert_raises(ModelError):
 
 		class Assigned(Model):
-			created_at = None
+			created_at = None  # ty: ignore[invalid-assignment]
 
 
 def test_rejects_attributes_named_like_model_metadata():
@@ -244,14 +244,14 @@ def test_rejects_attributes_named_like_model_metadata():
 	with assert_raises(ModelError):
 
 		class Assigned(Model):
-			columns = {}
+			columns = {}  # ty: ignore[invalid-assignment]
 
 
 def test_rejects_attributes_named_like_model_members():
 	with assert_raises(ModelError):
 
 		class Annotated(Model):
-			hydrate: str
+			hydrate: str  # ty: ignore[invalid-attribute-override]
 
 	with assert_raises(ModelError):
 

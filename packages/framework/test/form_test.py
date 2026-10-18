@@ -267,7 +267,7 @@ def test_rejects_names_form_uses():
 	with assert_raises(FormError):
 
 		class DeclaredForm(Form):
-			validate: str
+			validate: str  # ty: ignore[invalid-attribute-override]
 
 	with assert_raises(FormError):
 

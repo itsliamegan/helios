@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
@@ -134,7 +134,7 @@ CREATE TABLE drafts (
 def open_store(
 	model_types: list[type[Model]] = MODELS,
 	rows: str = "",
-) -> Iterator[Store]:
+) -> Generator[Store]:
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		raw = sqlite3.connect(path, autocommit=True)
@@ -148,7 +148,7 @@ def open_store(
 
 
 @contextmanager
-def recording(store: Store) -> Iterator[list[str]]:
+def recording(store: Store) -> Generator[list[str]]:
 	statements: list[str] = []
 	store.connection.connection.set_trace_callback(statements.append)
 	try:

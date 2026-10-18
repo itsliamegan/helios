@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
@@ -124,7 +124,7 @@ CREATE TABLE drafts (
 
 
 @contextmanager
-def open_store() -> Iterator[Store]:
+def open_store() -> Generator[Store]:
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		raw = sqlite3.connect(path, autocommit=True)

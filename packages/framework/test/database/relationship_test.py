@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from importlib import import_module
 from pathlib import Path
@@ -133,7 +133,7 @@ CREATE TABLE drafts (
 
 
 @contextmanager
-def open_store() -> Iterator[Store]:
+def open_store() -> Generator[Store]:
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		raw = sqlite3.connect(path, autocommit=True)
@@ -145,7 +145,7 @@ def open_store() -> Iterator[Store]:
 
 
 @contextmanager
-def importable_package(name: str, files: dict[str, str]) -> Iterator[None]:
+def importable_package(name: str, files: dict[str, str]) -> Generator[None]:
 	with TemporaryDirectory() as directory:
 		package = Path(directory, name)
 		package.mkdir()
@@ -427,7 +427,7 @@ def test_rejects_relationships_with_reserved_names():
 	with assert_raises(ModelError):
 
 		class Shadow(Model):
-			id: Author = belongs_to("author_id")
+			id: Author = belongs_to("author_id")  # ty: ignore[invalid-attribute-override]
 			author_id: UUID
 
 	with assert_raises(ModelError):

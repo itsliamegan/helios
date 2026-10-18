@@ -1,7 +1,7 @@
 [dependency-groups]
 dev = [
-	"ruff>=0.16.6",
-	"ty>=0.0.80",
+	"ruff>=0.17.1",
+	"ty>=0.0.89",
 ]
 
 [tool.uv.workspace]

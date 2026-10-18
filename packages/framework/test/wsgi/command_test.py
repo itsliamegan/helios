@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager, redirect_stderr
 from io import StringIO
 from pathlib import Path
@@ -21,7 +21,7 @@ from helios.wsgi.command import Filter, Serve
 
 
 @contextmanager
-def command_line(argv: list[str]) -> Iterator[None]:
+def command_line(argv: list[str]) -> Generator[None]:
 	previous = sys.argv
 	sys.argv = argv
 	try:
