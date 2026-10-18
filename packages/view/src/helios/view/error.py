@@ -45,17 +45,18 @@ class TemplateError(Exception):
 		else:
 			message = str(error)
 
-		# Jinja rewrites the traceback so that template frames carry the
-		# template's file name and line. Those frames are the ones whose globals
-		# hold the exception, and a template without a file is named <template>.
+		# Walk the exception traceback to find the original file name and line
+		# number.
 		path = None
 		line = None
 		frame = error.__traceback__
 		while frame is not None:
+			# Jinja marks a frame as synthetic with a global.
 			if "__jinja_exception__" in frame.tb_frame.f_globals:
 				path = frame.tb_frame.f_code.co_filename
 				line = frame.tb_lineno
 			frame = frame.tb_next
+		# Ignore Jinja's placeholder name if the template has no file name.
 		if path == "<template>":
 			path = None
 
