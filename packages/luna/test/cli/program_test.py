@@ -264,6 +264,24 @@ def test_main_fails_when_the_command_takes_no_extra_arguments():
 		Migrate.main(["status"], object())
 
 
+def test_main_reports_a_command_s_status():
+	class Check(Command):
+		name = "check"
+		target: str = argument()
+
+		def run(self):
+			self.logger.info(f"checked {self.target}")
+
+	class Tools(Program):
+		name = "tools"
+		commands = (Check,)
+
+	_result, stdout, stderr = run_main(Tools, ["check", "notes"])
+
+	assert_eq(stdout, "")
+	assert_eq(stderr, "tools: checked notes\n")
+
+
 def test_main_reports_a_failure_from_a_command():
 	class Check(Command):
 		name = "check"

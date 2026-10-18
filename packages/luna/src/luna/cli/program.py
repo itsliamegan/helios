@@ -5,6 +5,7 @@ from luna.cli.command import Command
 from luna.cli.parse import CommandMissing, HelpRequested, ParseError, parse
 from luna.cli.runnable import Failure, Runnable
 from luna.declarative import check_single_base
+from luna.logger import Logger
 
 
 class Program(Runnable):
@@ -31,6 +32,8 @@ class Program(Runnable):
 		if argv and argv[0] == sys.argv[0]:
 			argv = argv[1:]
 
+		logger = Logger(cls.name)
+
 		try:
 			result = parse(cls, argv)
 		except HelpRequested as requested:
@@ -41,16 +44,18 @@ class Program(Runnable):
 			raise SystemExit(2) from None
 		except ParseError as error:
 			print(error.usage, end="", file=sys.stderr)
-			print(f"{cls.name}: error: {error.message}", file=sys.stderr)
+			logger.error(error.message)
 			raise SystemExit(2) from None
 
 		try:
 			if result.command is not None:
-				return result.command(*extra, **result.values).run()
+				runnable = result.command(*extra, **result.values)
 			else:
-				return result.program(*extra, **result.values).run()
+				runnable = result.program(*extra, **result.values)
+			runnable.logger = logger
+			return runnable.run()
 		except Failure as failure:
-			print(f"{cls.name}: error: {failure.message}", file=sys.stderr)
+			logger.error(failure.message)
 			raise SystemExit(1) from None
 
 

@@ -7,8 +7,9 @@ from typing import Any, ClassVar, Never, dataclass_transform, get_origin
 from luna.cli.argument import Argument, argument
 from luna.cli.option import Option, option
 from luna.declarative import check_init_keywords, declarations
+from luna.logger import Logger
 
-RESERVED_NAMES = {"run", "fail", "main", "name", "commands", "help"}
+RESERVED_NAMES = {"run", "fail", "logger", "main", "name", "commands", "help"}
 RESERVED_SHORTS = {"h"}
 
 
@@ -33,6 +34,8 @@ class Runnable(ABC):
 		)
 		for name, value in settled.items():
 			setattr(self, name, values.get(name, value.initial))
+
+		self.logger = Logger()
 
 	@classmethod
 	def declare(cls):
