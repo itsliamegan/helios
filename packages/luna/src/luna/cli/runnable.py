@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from annotationlib import Format, get_annotations
 import inspect
-import logging
 import string
 from typing import Any, ClassVar, Never, dataclass_transform, get_origin
 
@@ -36,7 +35,7 @@ class Runnable(ABC):
 		for name, value in settled.items():
 			setattr(self, name, values.get(name, value.initial))
 
-		self.logger = Logger(logging.getLogger(owner.__module__))
+		self.logger = Logger()
 
 	@classmethod
 	def declare(cls):

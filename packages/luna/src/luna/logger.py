@@ -3,32 +3,44 @@ import logging
 import sys
 
 
-@dataclass
+@dataclass(init=False)
 class Logger:
-	"""Reports a program's status through a standard library logger."""
+	"""A logger that wraps the standard library implementation.
 
-	logger: logging.Logger
+	Each message is written to standard error after its level, when it is a
+	warning or an error, and after the logger's name, when it has one.
+	"""
+
+	name: str | None
+	wrapped: logging.Logger
+
+	def __init__(self, name: str | None = None):
+		self.name = name
+		# An unregistered logger has no parent, so it shares no handlers or
+		# levels with any other logger.
+		self.wrapped = logging.Logger(name or "")  # noqa: LOG001
+		self.wrapped.addHandler(Handler(name))
 
 	def info(self, message: str):
-		self.logger.info(message)
+		self.wrapped.info(message)
 
 	def warn(self, message: str):
-		self.logger.warning(message)
+		self.wrapped.warning(message)
 
 	def error(self, message: str):
-		self.logger.error(message)
+		self.wrapped.error(message)
 
 
 class Handler(logging.Handler):
-	"""Writes each record to standard error, prefixed with the program's name.
+	"""Writes each record to standard error, labeled with its level and prefix.
 
 	It finds standard error as it writes each record, so it follows a
-	redirection made after it was installed, such as the test runner's.
+	redirection made after it was created, such as the test runner's.
 	"""
 
-	def __init__(self, program: str):
+	def __init__(self, prefix: str | None):
 		super().__init__()
-		self.program = program
+		self.prefix = prefix
 
 	def emit(self, record: logging.LogRecord):
 		try:
@@ -39,8 +51,11 @@ class Handler(logging.Handler):
 	def format(self, record: logging.LogRecord) -> str:
 		message = super().format(record)
 		if record.levelno >= logging.ERROR:
-			return f"{self.program}: error: {message}"
+			message = f"error: {message}"
 		elif record.levelno >= logging.WARNING:
-			return f"{self.program}: warning: {message}"
+			message = f"warning: {message}"
+
+		if self.prefix is None:
+			return message
 		else:
-			return f"{self.program}: {message}"
+			return f"{self.prefix}: {message}"
