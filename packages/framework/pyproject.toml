@@ -25,7 +25,7 @@ build-backend = "uv_build"
 helios-assets = { workspace = true }
 helios-url = { workspace = true }
 helios-view = { workspace = true }
-luna = { workspace = true }
+luna = { git = "https://github.com/itsliamegan/luna", branch = "main" }
 
 [tool.uv.build-backend]
 module-name = "helios"
