@@ -7,8 +7,8 @@ import sys
 class Logger:
 	"""A logger that wraps the standard library implementation.
 
-	Each message is written to standard error after its level, when it is a
-	warning or an error, and after the logger's name, when it has one.
+	Every message is prefixed with the logger's name when it has one. Every
+	message is also prefixed with its level when it is a warning or an error.
 	"""
 
 	name: str | None
@@ -16,8 +16,9 @@ class Logger:
 
 	def __init__(self, name: str | None = None):
 		self.name = name
-		# An unregistered logger has no parent, so it shares no handlers or
-		# levels with any other logger.
+		# Because logging.getLogger shares one logger per name, every Logger
+		# would add another handler to it. A logger built directly is this
+		# Logger's alone, and it has no parent to print its messages again.
 		self.wrapped = logging.Logger(name or "")  # noqa: LOG001
 		self.wrapped.addHandler(Handler(name))
 
@@ -32,11 +33,7 @@ class Logger:
 
 
 class Handler(logging.Handler):
-	"""Writes each record to standard error, labeled with its level and prefix.
-
-	It finds standard error as it writes each record, so it follows a
-	redirection made after it was created, such as the test runner's.
-	"""
+	"""A logging handler that writes each record to standard error with its level and an optional prefix."""
 
 	def __init__(self, prefix: str | None):
 		super().__init__()
@@ -44,6 +41,8 @@ class Handler(logging.Handler):
 
 	def emit(self, record: logging.LogRecord):
 		try:
+			# Finding standard error on each write follows a redirection made
+			# after the handler was created, such as the test runner's.
 			print(self.format(record), file=sys.stderr)
 		except Exception:
 			self.handleError(record)
