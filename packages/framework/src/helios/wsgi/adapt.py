@@ -100,8 +100,15 @@ class RequestAdapter:
 		}:
 			return Input(), Files()
 
+		max_content_length: int | None
+		if mime_type == "application/x-www-form-urlencoded":
+			max_content_length = 500_000
+		else:
+			max_content_length = None
+
 		parser = FormDataParser(
 			max_form_memory_size=500_000,
+			max_content_length=max_content_length,
 			max_form_parts=1_000,
 		)
 		try:
