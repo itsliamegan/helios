@@ -19,6 +19,10 @@ class DatabaseBusyError(DatabaseError):
 	pass
 
 
+class ScriptError(DatabaseError):
+	pass
+
+
 class NotFoundError(BaseNotFoundError):
 	def __init__(self, model_type: type[Model], id: UUID):
 		self.model_type = model_type

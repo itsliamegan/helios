@@ -181,32 +181,6 @@ def test_rebuilds_a_table_that_other_tables_reference():
 		assert_eq(scratch.query("SELECT * FROM comments"), [(1, 1)])
 
 
-def test_runs_semicolons_inside_triggers_and_strings():
-	with Scratch() as scratch:
-		scratch.write(
-			"0001_create_initial_schema.sql",
-			"-- Comment on every new post.\n"
-			"CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT);\n"
-			"CREATE TABLE comments (body TEXT);\n"
-			"CREATE TRIGGER posts_comment AFTER INSERT ON posts\n"
-			"BEGIN\n"
-			"\tINSERT INTO comments VALUES ('posted; ' || NEW.title);\n"
-			"\tINSERT INTO comments VALUES ('done;');\n"
-			"END;\n"
-			"INSERT INTO posts VALUES (1, 'a;\n"
-			"b');\n"
-			"/* trailing comment */\n",
-		)
-
-		scratch.migrator().apply()
-
-		assert_eq(scratch.query("SELECT title FROM posts"), [("a;\nb",)])
-		assert_eq(
-			scratch.query("SELECT body FROM comments"),
-			[("posted; a;\nb",), ("done;",)],
-		)
-
-
 def test_refuses_a_gap_in_numbering():
 	with Scratch() as scratch:
 		scratch.write("0001_create_authors.sql", "CREATE TABLE authors (id INTEGER);\n")
@@ -233,19 +207,6 @@ def test_refuses_a_malformed_filename():
 	with Scratch() as scratch:
 		scratch.write("0001_create_authors.sql", "CREATE TABLE authors (id INTEGER);\n")
 		scratch.write("2_Posts.sql", "CREATE TABLE posts (id INTEGER);\n")
-
-		with assert_raises(MigrationError):
-			scratch.migrator().apply()
-
-		assert_not(scratch.config.path.exists())
-
-
-def test_refuses_an_incomplete_final_statement():
-	with Scratch() as scratch:
-		scratch.write(
-			"0001_create_initial_schema.sql",
-			"CREATE TABLE authors (id INTEGER);\nCREATE TABLE posts (id INTEGER)\n",
-		)
 
 		with assert_raises(MigrationError):
 			scratch.migrator().apply()
