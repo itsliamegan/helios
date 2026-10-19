@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 from helios.database.config import Config
-from helios.database.error import DatabaseError
 from helios.database.sqlite import Connection, connect
 
 from .error import MigrationError
@@ -24,8 +23,8 @@ class Migrator:
 		if not self.config.path.is_file():
 			raise MigrationError(f"database {self.config.path} does not exist")
 
-		with self.connect() as connection:
-			return read_version(connection)
+		with connect(self.config) as connection:
+			return connection.read_version()
 
 	def status(self) -> Status:
 		"""Report the database's version and the migrations it has not applied."""
@@ -56,8 +55,10 @@ class Migrator:
 			)
 
 		applied = []
+		# Foreign keys are off so migrations can rebuild tables that others
+		# reference, and each migration checks them before committing instead.
 		# Closing the connection rolls back a migration that failed partway.
-		with self.connect() as connection:
+		with connect(self.config, foreign_keys=False) as connection:
 			while migration := self.begin_next(connection):
 				migration.run(connection)
 				connection.commit()
@@ -72,24 +73,8 @@ class Migrator:
 		"""
 
 		connection.begin()
-		remaining = self.migrations.after(read_version(connection))
+		remaining = self.migrations.after(connection.read_version())
 		return remaining[0] if remaining else None
-
-	def connect(self) -> Connection:
-		"""Open the database with foreign keys off.
-
-		Turning them off lets migrations rebuild tables that others reference;
-		each migration checks foreign keys before committing instead. SQLite
-		ignores the pragma inside a transaction, so it runs before any begins.
-		"""
-
-		connection = connect(self.config)
-		try:
-			connection.control("PRAGMA foreign_keys = OFF", "configuration")
-		except DatabaseError:
-			connection.close()
-			raise
-		return connection
 
 
 @dataclass
@@ -97,15 +82,3 @@ class Status:
 	current: int
 	latest: int
 	pending: list[Migration]
-
-
-def read_version(connection: Connection) -> int:
-	cursor = connection.execute("PRAGMA user_version")
-	try:
-		row = cursor.fetch_one()
-	finally:
-		cursor.close()
-
-	if row is None or not isinstance(row[0], int):
-		raise MigrationError("could not read the database version")
-	return row[0]

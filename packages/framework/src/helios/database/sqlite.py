@@ -1,18 +1,18 @@
 from collections.abc import Iterable
 import sqlite3
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from .codec import Scalar
 from .config import Config
 from .error import DatabaseBusyError, DatabaseError
 
 
-def connect(config: Config) -> Connection:
-	return Connection(config)
+def connect(config: Config, foreign_keys: bool = True) -> Connection:
+	return Connection(config, foreign_keys=foreign_keys)
 
 
 class Connection:
-	def __init__(self, config: Config):
+	def __init__(self, config: Config, foreign_keys: bool = True):
 		try:
 			self.connection = sqlite3.connect(
 				config.path,
@@ -23,7 +23,7 @@ class Connection:
 		self.closed = False
 
 		try:
-			self.configure(config)
+			self.configure(config, foreign_keys=foreign_keys)
 		except Exception:
 			try:
 				self.close()
@@ -45,8 +45,11 @@ class Connection:
 	def parameter_limit(self) -> int:
 		return self.connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
 
-	def configure(self, config: Config):
-		self.control("PRAGMA foreign_keys = ON", "configuration")
+	def configure(self, config: Config, foreign_keys: bool):
+		if foreign_keys:
+			self.control("PRAGMA foreign_keys = ON", "configuration")
+		else:
+			self.control("PRAGMA foreign_keys = OFF", "configuration")
 		self.control(
 			f"PRAGMA busy_timeout = {config.busy_timeout.total_seconds() * 1000}",
 			"configuration",
@@ -71,6 +74,24 @@ class Connection:
 	def rollback(self):
 		if self.in_transaction:
 			self.control("ROLLBACK", "transaction rollback")
+
+	def read_version(self) -> int:
+		cursor = self.execute("PRAGMA user_version")
+		try:
+			(version,) = cast(tuple[int], cursor.fetch_one())
+		finally:
+			cursor.close()
+		return version
+
+	def write_version(self, version: int):
+		self.control(f"PRAGMA user_version = {version}", "version update")
+
+	def foreign_key_violations(self) -> list[tuple[Scalar | None, ...]]:
+		cursor = self.execute("PRAGMA foreign_key_check")
+		try:
+			return cursor.fetch_all()
+		finally:
+			cursor.close()
 
 	def control(self, sql: str, operation: str):
 		try:

@@ -47,7 +47,7 @@ class Migration:
 			self.execute(connection, statement)
 
 		self.check_foreign_keys(connection)
-		connection.control(f"PRAGMA user_version = {self.number}", "version update")
+		connection.write_version(self.number)
 
 	def execute(self, connection: Connection, statement: str):
 		try:
@@ -64,12 +64,7 @@ class Migration:
 			)
 
 	def check_foreign_keys(self, connection: Connection):
-		cursor = connection.execute("PRAGMA foreign_key_check")
-		try:
-			violations = cursor.fetch_all()
-		finally:
-			cursor.close()
-
+		violations = connection.foreign_key_violations()
 		if violations:
 			details = "; ".join(
 				f"{table} row {rowid} references missing {parent} (foreign key {index})"
