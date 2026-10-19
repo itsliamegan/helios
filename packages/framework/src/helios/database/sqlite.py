@@ -148,7 +148,7 @@ def translate(error: sqlite3.Error, operation: str) -> DatabaseError:
 		sqlite3.SQLITE_LOCKED,
 	):
 		return DatabaseBusyError(f"database {operation} could not acquire a lock")
-	return DatabaseError(f"database {operation} failed")
+	return DatabaseError(f"database {operation} failed: {error}")
 
 
 def quote_identifier(identifier: str) -> str:
