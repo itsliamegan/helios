@@ -1,7 +1,7 @@
 from luna.cli import Program
 
 from helios.assets.command import Compile
-from helios.database.command import Migrate, Status
+from helios.database.migration.command import Migrate, Status
 from helios.wsgi.command import Serve
 
 

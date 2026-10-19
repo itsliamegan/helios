@@ -4,9 +4,11 @@ from typing import Any
 from luna.cli import Command, option
 
 from helios.app import Application
+from helios.database.config import Config
 
-from .config import Config
-from .migration import MigrationError, Migrations, Migrator
+from .error import MigrationError
+from .migrations import Migrations
+from .migrator import Migrator
 
 
 class Migrate(Command):
