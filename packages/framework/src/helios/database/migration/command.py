@@ -1,12 +1,11 @@
-import sqlite3
 from typing import Any
 
 from luna.cli import Command, option
 
 from helios.app import Application
 from helios.database.config import Config
+from helios.database.error import DatabaseError
 
-from .error import MigrationError
 from .migrations import Migrations
 from .migrator import Migrator
 
@@ -33,8 +32,8 @@ class Migrate(Command):
 
 		try:
 			migrations = Migrations.load(config.migrations)
-		except MigrationError as error:
-			self.fail(describe(error))
+		except DatabaseError as error:
+			self.fail(str(error))
 		migrator = Migrator(config, migrations)
 
 		if self.dry:
@@ -45,9 +44,9 @@ class Migrate(Command):
 	def apply(self, migrator: Migrator):
 		try:
 			applied = migrator.apply()
-		except MigrationError as error:
+		except DatabaseError as error:
 			self.report_version(migrator)
-			self.fail(describe(error))
+			self.fail(str(error))
 
 		for migration in applied:
 			self.logger.info(f"apply  {migration.name}")
@@ -56,8 +55,8 @@ class Migrate(Command):
 	def preview(self, migrator: Migrator):
 		try:
 			pending = migrator.pending()
-		except MigrationError as error:
-			self.fail(describe(error))
+		except DatabaseError as error:
+			self.fail(str(error))
 
 		for migration in pending:
 			self.logger.info(f"apply  {migration.name}")
@@ -68,7 +67,7 @@ class Migrate(Command):
 
 		try:
 			version = migrator.version()
-		except MigrationError:
+		except DatabaseError:
 			return
 		self.logger.info(f"database at version {version}")
 
@@ -91,8 +90,8 @@ class Status(Command):
 		try:
 			migrations = Migrations.load(config.migrations)
 			status = Migrator(config, migrations).status()
-		except MigrationError as error:
-			self.fail(describe(error))
+		except DatabaseError as error:
+			self.fail(str(error))
 
 		self.logger.info(f"current  {status.current}")
 		self.logger.info(f"latest   {status.latest}")
@@ -100,14 +99,3 @@ class Status(Command):
 			self.logger.info("database is newer than the latest migration")
 		for migration in status.pending:
 			self.logger.info(f"pending  {migration.name}")
-
-
-def describe(error: MigrationError) -> str:
-	"""Describe the error, followed by the SQLite error that caused it."""
-
-	cause = error.__cause__
-	while cause is not None:
-		if isinstance(cause, sqlite3.Error):
-			return f"{error}\nsqlite: {cause}"
-		cause = cause.__cause__
-	return str(error)

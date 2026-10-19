@@ -47,23 +47,14 @@ class Migration:
 			self.execute(connection, statement)
 
 		self.check_foreign_keys(connection)
-
-		try:
-			connection.control(
-				f"PRAGMA user_version = {self.number}",
-				"version update",
-			)
-		except DatabaseError as error:
-			raise MigrationError(
-				f"{self.path.name}: could not record version {self.number}"
-			) from error
+		connection.control(f"PRAGMA user_version = {self.number}", "version update")
 
 	def execute(self, connection: Connection, statement: str):
 		try:
 			connection.execute(statement).close()
 		except DatabaseError as error:
 			raise MigrationError(
-				f"{self.path.name}: statement failed: {summarize(statement)}"
+				f"{self.path.name}: {error}: {summarize(statement)}"
 			) from error
 
 		if not connection.in_transaction:
@@ -73,16 +64,11 @@ class Migration:
 			)
 
 	def check_foreign_keys(self, connection: Connection):
+		cursor = connection.execute("PRAGMA foreign_key_check")
 		try:
-			cursor = connection.execute("PRAGMA foreign_key_check")
-			try:
-				violations = cursor.fetch_all()
-			finally:
-				cursor.close()
-		except DatabaseError as error:
-			raise MigrationError(
-				f"{self.path.name}: could not check foreign keys"
-			) from error
+			violations = cursor.fetch_all()
+		finally:
+			cursor.close()
 
 		if violations:
 			details = "; ".join(

@@ -60,12 +60,7 @@ class Migrator:
 		with self.connect() as connection:
 			while migration := self.begin_next(connection):
 				migration.run(connection)
-				try:
-					connection.commit()
-				except DatabaseError as error:
-					raise MigrationError(
-						f"{migration.path.name}: could not commit"
-					) from error
+				connection.commit()
 				applied.append(migration)
 		return applied
 
@@ -76,11 +71,7 @@ class Migrator:
 		cannot apply the same migration twice.
 		"""
 
-		try:
-			connection.begin()
-		except DatabaseError as error:
-			raise MigrationError("could not begin a transaction") from error
-
+		connection.begin()
 		remaining = self.migrations.after(read_version(connection))
 		return remaining[0] if remaining else None
 
@@ -92,18 +83,12 @@ class Migrator:
 		ignores the pragma inside a transaction, so it runs before any begins.
 		"""
 
-		try:
-			connection = connect(self.config)
-		except DatabaseError as error:
-			raise MigrationError(
-				f"could not open database {self.config.path}"
-			) from error
-
+		connection = connect(self.config)
 		try:
 			connection.control("PRAGMA foreign_keys = OFF", "configuration")
-		except DatabaseError as error:
+		except DatabaseError:
 			connection.close()
-			raise MigrationError("could not disable foreign keys") from error
+			raise
 		return connection
 
 
@@ -115,14 +100,12 @@ class Status:
 
 
 def read_version(connection: Connection) -> int:
+	cursor = connection.execute("PRAGMA user_version")
 	try:
-		cursor = connection.execute("PRAGMA user_version")
-		try:
-			row = cursor.fetch_one()
-		finally:
-			cursor.close()
-	except DatabaseError as error:
-		raise MigrationError("could not read the database version") from error
+		row = cursor.fetch_one()
+	finally:
+		cursor.close()
+
 	if row is None or not isinstance(row[0], int):
 		raise MigrationError("could not read the database version")
 	return row[0]
