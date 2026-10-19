@@ -97,7 +97,7 @@ def test_translates_writer_contention_to_database_busy():
 		path = Path(directory, "app.sqlite")
 		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
 		first = connect(Config(path))
-		second = connect(Config(path, timedelta(milliseconds=10)))
+		second = connect(Config(path, busy_timeout=timedelta(milliseconds=10)))
 		try:
 			first.begin()
 			with assert_raises(DatabaseBusyError) as raised:
@@ -161,3 +161,51 @@ def test_reports_the_bound_parameter_limit():
 			assert_eq(connection.parameter_limit, 3)
 		finally:
 			connection.close()
+
+
+def test_reads_the_version_it_writes():
+	with TemporaryDirectory() as directory:
+		connection = connect(Config(Path(directory, "app.sqlite")))
+		try:
+			connection.write_version(3)
+
+			version = connection.read_version()
+		finally:
+			connection.close()
+
+	assert_eq(version, 3)
+
+
+def test_refuses_rows_that_reference_missing_parents():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(
+			path,
+			"CREATE TABLE posts (id INTEGER PRIMARY KEY);"
+			"CREATE TABLE comments (post_id INTEGER REFERENCES posts (id));",
+		)
+		connection = connect(Config(path))
+		try:
+			with assert_raises(DatabaseError):
+				connection.execute("INSERT INTO comments VALUES (99)").close()
+		finally:
+			connection.close()
+
+
+def test_reports_foreign_key_violations_with_foreign_keys_off():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(
+			path,
+			"CREATE TABLE posts (id INTEGER PRIMARY KEY);"
+			"CREATE TABLE comments (post_id INTEGER REFERENCES posts (id));",
+		)
+		connection = connect(Config(path), foreign_keys=False)
+		try:
+			connection.execute("INSERT INTO comments VALUES (99)").close()
+
+			violations = connection.foreign_key_violations()
+		finally:
+			connection.close()
+
+	assert_eq(violations, [("comments", 1, "posts", 0)])

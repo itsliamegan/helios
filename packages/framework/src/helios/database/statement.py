@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import re
 from typing import Any, Literal
 
 from .clause import Clause
@@ -40,6 +41,40 @@ class Delete:
 class Raw:
 	sql: str
 	parameters: tuple[Any, ...]
+
+	@property
+	def body(self) -> str:
+		"""The SQL after its leading whitespace and comments."""
+
+		remainder = self.sql.lstrip()
+		while True:
+			if remainder.startswith("--"):
+				end = remainder.find("\n")
+				remainder = "" if end == -1 else remainder[end + 1 :]
+			elif remainder.startswith("/*"):
+				end = remainder.find("*/")
+				remainder = "" if end == -1 else remainder[end + 2 :]
+			else:
+				return remainder
+			remainder = remainder.lstrip()
+
+	@property
+	def keyword(self) -> str:
+		"""The body's first word in uppercase, or an empty string."""
+
+		match = re.match(r"[A-Za-z]+", self.body)
+		if match is None:
+			return ""
+		return match.group(0).upper()
+
+	@property
+	def summary(self) -> str:
+		"""The body collapsed onto one line, shortened for error messages."""
+
+		text = " ".join(self.body.split())
+		if len(text) <= 80:
+			return text
+		return text[:77] + "..."
 
 
 type Expression = ColumnReference | Count
