@@ -7,14 +7,26 @@ python = "3.15"
 python.uv_venv_auto = "create|source"
 
 [tasks]
-test = """
-set -e
-for member in packages/*/; do
-	(cd "$member" && uv run luna test)
-done
-"""
+test = "mise run --continue-on-error --output keep-order 'test:*'"
+
 lint = [
 	"ruff format",
 	"ruff check --fix",
 ]
 check = "ty check"
+
+[tasks."test:assets"]
+dir = "packages/assets"
+run = "uv run luna test"
+
+[tasks."test:framework"]
+dir = "packages/framework"
+run = "uv run luna test"
+
+[tasks."test:url"]
+dir = "packages/url"
+run = "uv run luna test"
+
+[tasks."test:view"]
+dir = "packages/view"
+run = "uv run luna test"
