@@ -6,4 +6,5 @@ from pathlib import Path
 @dataclass
 class Config:
 	path: Path
+	migrations: Path = Path("database", "migrations")
 	busy_timeout: timedelta = timedelta(seconds=30)

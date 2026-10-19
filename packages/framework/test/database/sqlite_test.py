@@ -97,7 +97,7 @@ def test_translates_writer_contention_to_database_busy():
 		path = Path(directory, "app.sqlite")
 		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
 		first = connect(Config(path))
-		second = connect(Config(path, timedelta(milliseconds=10)))
+		second = connect(Config(path, busy_timeout=timedelta(milliseconds=10)))
 		try:
 			first.begin()
 			with assert_raises(DatabaseBusyError) as raised:
