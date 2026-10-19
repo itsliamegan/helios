@@ -3,10 +3,8 @@ from typing import Any
 from luna.cli import Command, option
 
 from helios.app import Application
-from helios.database.config import Config
 from helios.database.error import DatabaseError
 
-from .migrations import Migrations
 from .migrator import Migrator
 
 
@@ -26,15 +24,12 @@ class Migrate(Command):
 
 	def run(self):
 		container = self.application.container
-		if not container.bound(Config):
+		if not container.bound(Migrator):
 			self.fail("the application has no database configuration")
-		config = container.get(Config)
-
 		try:
-			migrations = Migrations.load(config.migrations)
+			migrator = container.get(Migrator)
 		except DatabaseError as error:
 			self.fail(str(error))
-		migrator = Migrator(config, migrations)
 
 		if self.dry:
 			self.preview(migrator)
@@ -83,13 +78,10 @@ class Status(Command):
 
 	def run(self):
 		container = self.application.container
-		if not container.bound(Config):
+		if not container.bound(Migrator):
 			self.fail("the application has no database configuration")
-		config = container.get(Config)
-
 		try:
-			migrations = Migrations.load(config.migrations)
-			status = Migrator(config, migrations).status()
+			status = container.get(Migrator).status()
 		except DatabaseError as error:
 			self.fail(str(error))
 

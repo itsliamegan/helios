@@ -4,6 +4,7 @@ from helios.app import Application, Container, Context, Next, Provider
 from helios.http import Request, Response
 
 from .config import Config
+from .migration import Migrations, Migrator
 from .model import Model
 from .registry import Registry
 from .sqlite import connect
@@ -17,10 +18,14 @@ class Provider(Provider):
 
 	def register(self, container: Container):
 		container.instance(Config, self.config)
+		container.singleton(Migrator, self.migrator)
 		container.scoped(Store, self.store)
 
 	def boot(self, application: Application):
 		application.use(self.middleware)
+
+	def migrator(self, container: Container) -> Migrator:
+		return Migrator(self.config, Migrations.load(self.config.migrations))
 
 	def store(self, context: Context) -> Store:
 		connection = context.enter(connect(self.config))
