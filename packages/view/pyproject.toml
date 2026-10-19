@@ -1,7 +1,7 @@
 [project]
 name = "helios-view"
 version = "0.1"
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 dependencies = [
 	"jinja2==3.1.*",
 	"luna",
