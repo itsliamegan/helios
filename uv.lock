@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.15"
 
 [manifest]
@@ -148,7 +148,7 @@ wheels = [
 [[package]]
 name = "luna"
 version = "0.1.0"
-source = { git = "https://github.com/itsliamegan/luna?branch=main#e655818b837ec193bfde9747441e46aacf3a78bf" }
+source = { git = "https://github.com/itsliamegan/luna?branch=main#6e5fdcb29432b45261ad4327eb3fc3f9f1987572" }
 
 [[package]]
 name = "markupsafe"
