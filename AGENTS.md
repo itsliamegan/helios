@@ -5,9 +5,9 @@ module first, then write against it.
 
 ## Commands
 
-- `mise run test`: Run the test suite.
-- `mise run lint`: Run Ruff for formatting & linting.
-- `mise run check`: Run Ty for type checking.
+- `just test`: Run the test suite.
+- `just lint`: Run Ruff for formatting & linting.
+- `just check`: Run Ty for type checking.
 
 ## Workflow
 
