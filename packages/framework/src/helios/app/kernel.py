@@ -1,9 +1,14 @@
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Sequence
 import sys
 import traceback
 
-from helios.http import Method, Request, Response, Status
-from helios.http.error import BadRequestError, HTTPError, UnsupportedMethodError
+from helios.http import Method, Request, Response
+from helios.http.error import (
+	BadRequestError,
+	HTTPError,
+	InternalServerError,
+	UnsupportedMethodError,
+)
 from helios.routing import Router
 
 from .container import Container
@@ -21,11 +26,14 @@ class Kernel:
 		self.pipeline = self.build(router, middlewares)
 
 	def handle(self, request: Request) -> Response:
-		context = Context(self.container, request)
 		try:
-			return self.pipeline(request, context)
-		finally:
-			context.close()
+			with Context(self.container, request) as context:
+				return self.pipeline(request, context)
+		except Exception as error:
+			# To reach this, the cleanup of a request-scoped service must have
+			# raised. The kernel captures all other errors inside the pipeline.
+			traceback.print_exception(error, file=sys.stderr)
+			return Response.error(InternalServerError())
 
 	def build(self, router: Router, middlewares: Sequence[Middleware]) -> Next:
 		next: Next = self.render_http_errors(router)
@@ -47,7 +55,8 @@ class Kernel:
 			try:
 				return next(request, context)
 			except HTTPError as error:
-				context.aborted = error
+				if context.failure is None:
+					context.failure = error
 				return Response.error(error)
 
 		return call
@@ -74,30 +83,10 @@ class Kernel:
 		try:
 			return next(request, context)
 		except Exception as error:
+			if context.failure is None:
+				context.failure = error
 			traceback.print_exception(error, file=sys.stderr)
-			return Response.text(
-				"500 Internal Server Error",
-				Status.INTERNAL_SERVER_ERROR,
-			)
-
-
-class Middlewares:
-	"""An application's middleware kept in two tiers.
-
-	Those its providers use wrap those it was constructed with. Each tier keeps
-	the order its middleware was added in.
-	"""
-
-	def __init__(self, middlewares: Sequence[Middleware]):
-		self.provided: list[Middleware] = []
-		self.application = list(middlewares)
-
-	def __iter__(self) -> Iterator[Middleware]:
-		yield from self.provided
-		yield from self.application
-
-	def use(self, middleware: Middleware):
-		self.provided.append(middleware)
+			return Response.error(InternalServerError())
 
 
 type Middleware = Callable[[Request, Context, Next], Response]

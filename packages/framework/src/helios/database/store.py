@@ -19,6 +19,11 @@ from .statement import Delete, Insert, Raw, Select, Statement, Update
 
 
 class Store:
+	"""A set of models stored as rows, read and written through one connection.
+
+	The store never begins, commits, or rolls back a transaction itself.
+	"""
+
 	def __init__(
 		self,
 		connection: Connection,

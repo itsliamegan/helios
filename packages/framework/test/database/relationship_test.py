@@ -25,7 +25,7 @@ from helios.database import (
 	has_many,
 	has_one,
 )
-from helios.database.sqlite import connect
+from helios.database.sqlite import Connection
 
 
 class Author(Model):
@@ -139,7 +139,7 @@ def open_store() -> Generator[Store]:
 		raw = sqlite3.connect(path, autocommit=True)
 		raw.executescript(SCHEMA)
 		raw.close()
-		with connect(Config(path)) as connection:
+		with Connection.open(path) as connection:
 			connection.begin()
 			yield Store(connection, MODELS)
 

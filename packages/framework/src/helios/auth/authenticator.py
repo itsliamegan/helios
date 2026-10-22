@@ -1,5 +1,6 @@
 from helios.database import Model
-from helios.session.store import Session
+from helios.session.session import Session
+from helios.session.sessions import Sessions
 
 from .error import AuthenticationError
 
@@ -7,8 +8,9 @@ SESSION_KEY = "_user_id"
 
 
 class Authenticator[U: Model]:
-	def __init__(self, session: Session, user: U | None = None):
+	def __init__(self, session: Session, sessions: Sessions, user: U | None = None):
 		self.session = session
+		self.sessions = sessions
 		self._user = user
 
 	@property
@@ -18,14 +20,14 @@ class Authenticator[U: Model]:
 		return self._user
 
 	def sign_in(self, user: U):
-		self.session.rotate()
+		self.sessions.rotate(self.session)
 		self.session[SESSION_KEY] = str(user.id)
 		self._user = user
 
 	def sign_out(self):
 		if SESSION_KEY in self.session:
 			del self.session[SESSION_KEY]
-		self.session.rotate()
+		self.sessions.rotate(self.session)
 		self._user = None
 
 	def is_signed_in(self) -> bool:

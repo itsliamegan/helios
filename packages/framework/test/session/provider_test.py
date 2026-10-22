@@ -22,10 +22,22 @@ from helios.http import Headers, Method, Request, Response, Status, URL
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
 import helios.session
+from helios.session import Flash
 from helios.session.file import Driver
-from helios.session.store import Session
+from helios.session.session import Session
+from helios.session.sessions import Sessions
+from helios.view import Component
+import helios.view.config
+import helios.view.provider
+from helios.view.views import Views
 
 MAXIMUM_AGE = timedelta(days=30)
+
+
+class Notice(Component):
+	template = "notice"
+
+	label: str
 
 
 def request(session_id: str | None = None) -> Request:
@@ -58,7 +70,7 @@ def exercise(
 			session = context.get(Session)
 			seen.append(session)
 			if change is not None:
-				change(session)
+				change(session, context.get(Sessions))
 		return Response.empty()
 
 	app = Application(
@@ -116,7 +128,7 @@ def test_stores_data_and_sets_cookie_policy():
 			session, response = exercise(
 				path,
 				request(),
-				lambda session: session.__setitem__("message", "Hello"),
+				lambda session, sessions: session.__setitem__("message", "Hello"),
 				secure=True,
 			)
 
@@ -138,7 +150,9 @@ def test_reuses_touches_and_rotates_known_session():
 		now = datetime(2026, 10, 12, tzinfo=UTC)
 		with time_machine.travel(now, tick=False):
 			session, response = exercise(
-				path, request(str(old_id)), lambda session: session.rotate()
+				path,
+				request(str(old_id)),
+				lambda session, sessions: sessions.rotate(session),
 			)
 
 		stored = read_sessions(path)
@@ -186,27 +200,20 @@ def test_purges_expired_sessions_and_renews_boundary():
 		assert_not_in(str(expired_id), stored)
 
 
-def test_clear_and_invalidate_remove_persisted_session():
+def test_clear_removes_persisted_session():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "sessions.json")
-		first_id = uuid4()
-		write_sessions(path, {str(first_id): session_data({"message": "Hello"})})
+		id = uuid4()
+		write_sessions(path, {str(id): session_data({"message": "Hello"})})
 		_, response = exercise(
-			path, request(str(first_id)), lambda session: session.clear()
+			path, request(str(id)), lambda session, sessions: session.clear()
 		)
+
 		assert_eq(read_sessions(path), {})
 		assert_eq(response.cookies["session_id"].value, "")
 		assert_eq(
 			response.cookies["session_id"].expires, datetime(1970, 1, 1, tzinfo=UTC)
 		)
-
-		second_id = uuid4()
-		write_sessions(path, {str(second_id): session_data({"message": "Hello"})})
-		_, response = exercise(
-			path, request(str(second_id)), lambda session: session.invalidate()
-		)
-		assert_eq(read_sessions(path), {})
-		assert_eq(response.cookies["session_id"].value, "")
 
 
 def test_unexpected_exception_does_not_save_and_releases_lock():
@@ -270,6 +277,40 @@ def test_raised_http_error_discards_mutation():
 		assert_not_in("session_id", response.cookies)
 
 
+def test_releases_lock_when_request_fails_after_resolving_session():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		id = uuid4()
+		initial = {str(id): session_data({"message": "Before"})}
+		write_sessions(path, initial)
+
+		def refuse(request, context, next):
+			next(request, context)
+			raise NotFoundError()
+
+		def change(request, context):
+			context.get(Session)["message"] = "After"
+			return Response.empty()
+
+		driver = Driver(path, path.with_suffix(".lock"))
+		app = Application(
+			AppConfig(),
+			Router([Route.get("/", change)]),
+			[helios.session.Provider(helios.session.Config(), driver)],
+			[refuse],
+		)
+		app.boot()
+		try:
+			response = app.handle(request(str(id)))
+		finally:
+			app.close()
+
+		assert_eq(response.status, Status.NOT_FOUND)
+		assert_eq(read_sessions(path), initial)
+		with driver.open() as store:
+			assert_eq(store.get(id)["message"], "Before")
+
+
 def test_returned_error_response_saves_mutation():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "sessions.json")
@@ -299,6 +340,177 @@ def test_returned_error_response_saves_mutation():
 		assert_eq(
 			next(iter(read_sessions(path).values()))["items"], {"message": "Saved"}
 		)
+
+
+def test_flash_reaches_next_request_only():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		write_sessions(path)
+		notices = []
+
+		def create(request, context):
+			context.get(Flash)["notice"] = "Saved"
+			return Response.empty()
+
+		def index(request, context):
+			notices.append(context.get(Flash).get("notice"))
+			return Response.empty()
+
+		app = Application(
+			AppConfig(),
+			Router([Route.post("/", create), Route.get("/", index)]),
+			[
+				helios.session.Provider(
+					helios.session.Config(),
+					Driver(path, path.with_suffix(".lock")),
+				)
+			],
+		)
+		app.boot()
+		try:
+			response = app.handle(Request(Method.POST, URL("/")))
+			id = response.cookies["session_id"].value
+			app.handle(request(id))
+			app.handle(request(id))
+		finally:
+			app.close()
+
+		assert_eq(notices, ["Saved", None])
+
+
+def test_failed_request_keeps_unread_flash():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		id = uuid4()
+		write_sessions(path, {str(id): session_data({"_flash": {"notice": "Saved"}})})
+		notices = []
+
+		def missing(request, context):
+			notices.append(context.get(Flash).get("notice"))
+			raise NotFoundError()
+
+		app = Application(
+			AppConfig(),
+			Router([Route.get("/", missing)]),
+			[
+				helios.session.Provider(
+					helios.session.Config(),
+					Driver(path, path.with_suffix(".lock")),
+				)
+			],
+		)
+		app.boot()
+		try:
+			app.handle(request(str(id)))
+			app.handle(request(str(id)))
+		finally:
+			app.close()
+
+		assert_eq(notices, ["Saved", "Saved"])
+
+
+def test_shares_flash_with_views():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		id = uuid4()
+		write_sessions(path, {str(id): session_data({"_flash": {"notice": "Saved"}})})
+		views_directory = Path(directory, "views")
+		views_directory.mkdir()
+		views_directory.joinpath("index.html").write_text('{{ flash.get("notice") }}')
+
+		def index(request, context):
+			return context.get(Views).render("index")
+
+		app = Application(
+			AppConfig(),
+			Router([Route.get("/", index)]),
+			[
+				helios.session.Provider(
+					helios.session.Config(),
+					Driver(path, path.with_suffix(".lock")),
+				),
+				helios.view.provider.Provider(
+					helios.view.config.Config(views_directory)
+				),
+			],
+		)
+		app.boot()
+		try:
+			response = app.handle(request(str(id)))
+		finally:
+			app.close()
+
+	assert_eq(str(response.body), "Saved")
+
+
+def test_shares_flash_with_components():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		id = uuid4()
+		write_sessions(path, {str(id): session_data({"_flash": {"notice": "Saved"}})})
+		views_directory = Path(directory, "views")
+		views_directory.mkdir()
+		views_directory.joinpath("index.html").write_text(
+			'{{ Notice(label="Notice") }}'
+		)
+		views_directory.joinpath("notice.html").write_text(
+			'{{ label }}: {{ flash.get("notice") }}'
+		)
+
+		def index(request, context):
+			return context.get(Views).render("index")
+
+		app = Application(
+			AppConfig(),
+			Router([Route.get("/", index)]),
+			[
+				helios.session.Provider(
+					helios.session.Config(),
+					Driver(path, path.with_suffix(".lock")),
+				),
+				helios.view.provider.Provider(
+					helios.view.config.Config(views_directory),
+					components=[Notice],
+				),
+			],
+		)
+		app.boot()
+		try:
+			response = app.handle(request(str(id)))
+		finally:
+			app.close()
+
+	assert_eq(str(response.body), "Notice: Saved")
+
+
+def test_boots_without_views():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		id = uuid4()
+		write_sessions(path, {str(id): session_data({"_flash": {"notice": "Saved"}})})
+		notices = []
+
+		def index(request, context):
+			notices.append(context.get(Flash).get("notice"))
+			return Response.empty()
+
+		app = Application(
+			AppConfig(),
+			Router([Route.get("/", index)]),
+			[
+				helios.session.Provider(
+					helios.session.Config(),
+					Driver(path, path.with_suffix(".lock")),
+				)
+			],
+		)
+		app.boot()
+		try:
+			app.handle(request(str(id)))
+		finally:
+			app.close()
+
+	assert_eq(notices, ["Saved"])
 
 
 def lock_worker(path: str, lock_path: str, queue):

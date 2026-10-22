@@ -13,8 +13,8 @@ from luna.test.assertion import (
 )
 
 from helios.auth.password import Digest, Password
-from helios.database import Config, Model, Store
-from helios.database.sqlite import connect
+from helios.database import Model, Store
+from helios.database.sqlite import Connection
 
 Digest.method = "pbkdf2:sha256:1"
 
@@ -56,7 +56,7 @@ def test_round_trips_password_attrs():
 			"""
 		)
 		raw.close()
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		store = Store(connection, [Account])
 		created = store.create(
@@ -66,7 +66,7 @@ def test_round_trips_password_attrs():
 		connection.commit()
 		connection.close()
 
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		try:
 			found = Store(connection, [Account]).find_one(Account, created.id)

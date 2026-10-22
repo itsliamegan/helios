@@ -1,5 +1,6 @@
 from pathlib import Path
 import shlex
+import signal
 import sys
 from typing import Any
 
@@ -48,10 +49,14 @@ class Serve(Command):
 		if self.application.container.bound(helios.assets.config.Config):
 			self.compile(root)
 		self.application.boot()
+		# Treat SIGTERM like SIGINT. This lets Werkzeug stop serving normally
+		# and lets the application clean up its resources before exiting.
+		signal.signal(signal.SIGTERM, signal.default_int_handler)
 		run_simple(
 			host,
 			port,
 			self.application,
+			threaded=True,
 			static_files={"/": str(Path(root, "public"))},
 		)
 

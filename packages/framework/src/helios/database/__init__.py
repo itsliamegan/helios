@@ -1,6 +1,7 @@
 from .codec import Codec, Scalar
 from .column import generated
 from .config import Config
+from .database import Database
 from .error import DatabaseBusyError, DatabaseError, ModelError, NotFoundError
 from .model import Model
 from .provider import Provider
@@ -11,6 +12,7 @@ from .store import Store
 __all__ = [
 	"Codec",
 	"Config",
+	"Database",
 	"DatabaseBusyError",
 	"DatabaseError",
 	"Model",

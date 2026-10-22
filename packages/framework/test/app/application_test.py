@@ -1,10 +1,24 @@
-from contextlib import contextmanager
-
-from luna.test.assertion import assert_eq
+from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Application, Config, Provider
 from helios.http import Method, Request, Response, Status, URL
 from helios.routing import Route, Router, URLs
+
+
+class Moderator:
+	pass
+
+
+class Newsletter:
+	pass
+
+
+class Reader:
+	pass
+
+
+class Visit:
+	pass
 
 
 def request(path: str = "/") -> Request:
@@ -45,29 +59,40 @@ def test_registers_all_providers_before_booting_in_order():
 def test_closes_request_and_application_resources_in_reverse_order():
 	events = []
 
-	@contextmanager
-	def resource(name):
-		events.append(f"enter {name}")
-		try:
-			yield name
-		finally:
-			events.append(f"exit {name}")
-
 	class Resources(Provider):
 		def register(self, container):
-			container.scoped(str, self.value)
+			container.singleton(Moderator, self.moderator)
+			container.singleton(Newsletter, self.newsletter)
+			container.scoped(Reader, self.reader)
+			container.scoped(Visit, self.visit)
 
 		def boot(self, application):
-			application.container.enter(resource("application one"))
-			application.container.enter(resource("application two"))
+			application.container.get(Moderator)
+			application.container.get(Newsletter)
 
-		def value(self, context):
-			context.enter(resource("request one"))
-			context.enter(resource("request two"))
-			return "value"
+		def moderator(self, container):
+			events.append("enter application one")
+			yield Moderator()
+			events.append("exit application one")
+
+		def newsletter(self, container):
+			events.append("enter application two")
+			yield Newsletter()
+			events.append("exit application two")
+
+		def reader(self, context):
+			events.append("enter request one")
+			yield Reader()
+			events.append("exit request one")
+
+		def visit(self, context):
+			events.append("enter request two")
+			yield Visit()
+			events.append("exit request two")
 
 	def index(request, context):
-		context.get(str)
+		context.get(Reader)
+		context.get(Visit)
 		return Response.empty(Status.OK)
 
 	app = Application(Config(), Router([Route.get("/", index)]), [Resources()])
@@ -165,3 +190,68 @@ def test_registers_providers_without_booting_them():
 	Application(Config(), Router([]), [RecordingProvider()])
 
 	assert_eq(events, ["register"])
+
+
+def test_rejects_handling_before_boot():
+	app = Application(Config(), Router([]), [])
+
+	with assert_raises(RuntimeError):
+		app.handle(request())
+
+
+def test_closes_when_its_block_ends():
+	events = []
+
+	def moderator(container):
+		yield Moderator()
+		events.append("released")
+
+	class Moderation(Provider):
+		def register(self, container):
+			container.singleton(Moderator, moderator)
+
+	with Application(Config(), Router([]), [Moderation()]) as app:
+		app.container.get(Moderator)
+		assert_eq(events, [])
+
+	assert_eq(events, ["released"])
+
+
+def test_entering_does_not_boot():
+	events = []
+
+	class RecordingProvider(Provider):
+		def boot(self, application):
+			events.append("boot")
+
+	with Application(Config(), Router([]), [RecordingProvider()]):
+		pass
+
+	assert_eq(events, [])
+
+
+def test_failed_boot_releases_services_built_during_boot():
+	events = []
+
+	def moderator(container):
+		try:
+			yield Moderator()
+		finally:
+			events.append("released")
+
+	class Moderation(Provider):
+		def register(self, container):
+			container.singleton(Moderator, moderator)
+
+		def boot(self, application):
+			application.container.get(Moderator)
+
+	class Broken(Provider):
+		def boot(self, application):
+			raise ValueError("failed")
+
+	app = Application(Config(), Router([]), [Moderation(), Broken()])
+
+	with assert_raises(ValueError):
+		app.boot()
+	assert_eq(events, ["released"])

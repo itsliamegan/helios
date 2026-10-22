@@ -1,50 +1,61 @@
-from collections.abc import Callable
-from contextlib import AbstractContextManager, ExitStack
-from typing import Any, cast
+from typing import Self
 
 from helios.http import Request
-from helios.http.error import HTTPError
 
-from .container import Container, DependencyError, Scoped, unparameterized
+from .container import Container, Instance, Scoped, Singleton, unparameterized
+from .services import Services
 
 
 class Context:
+	"""A set of services scoped to a single request.
+
+	The context includes the current request. It builds each scoped service once
+	and releases it when its with block ends. Lookups of any other service
+	delegate to the container, so an application service can be resolved
+	through the context.
+
+	The context records the first error the kernel encountered as the request's
+	failure.
+	"""
+
 	def __init__(self, container: Container, request: Request):
 		self.container = container
 		self.request = request
-		self.scoped: dict[type[Any], Any] = {}
-		self.resources = ExitStack()
-		self.aborted: HTTPError | None = None
+		self.services = Services({Request: request})
+		self.failure: Exception | None = None
+		self.closed = False
 
 	def get[T](self, key: type[T]) -> T:
-		key = unparameterized(key)
-		if key is Request:
-			return cast(T, self.request)
-		if key in self.scoped:
-			return cast(T, self.scoped[key])
-		binding = self.container.bindings.get(key)
-		if binding is None:
-			raise DependencyError(f"nothing provides {key.__qualname__}")
-		if not isinstance(binding, Scoped):
-			return self.container.get(key)
+		if self.closed:
+			raise RuntimeError("the context is closed")
 
-		factory = cast(Callable[[Context], T], binding.factory)
-		value = factory(self)
-		if value is None:
-			raise DependencyError(f"factory for {key.__qualname__} returned None")
-		self.scoped[key] = value
-		return value
+		key = unparameterized(key)
+		value = self.services.get(key)
+		if value is not None:
+			return value
+
+		match self.container.binding(key):
+			case Instance() | Singleton():
+				return self.container.get(key)
+			case Scoped(factory):
+				return self.services.build(key, factory, self)
 
 	def resolved[T](self, key: type[T]) -> T | None:
+		if self.closed:
+			raise RuntimeError("the context is closed")
+
 		key = unparameterized(key)
-		if key is Request:
-			return cast(T, self.request)
-		if key in self.scoped:
-			return cast(T, self.scoped[key])
+		value = self.services.get(key)
+		if value is not None:
+			return value
 		return self.container.resolved(key)
 
-	def enter[T](self, resource: AbstractContextManager[T]) -> T:
-		return self.resources.enter_context(resource)
+	def __enter__(self) -> Self:
+		return self
 
-	def close(self):
-		self.resources.close()
+	def __exit__(self, exception_type, exception, traceback):
+		self.closed = True
+		# An exception that escaped the block takes precedence over a recorded
+		# failure.
+		self.services.close(exception or self.failure)
+		return False

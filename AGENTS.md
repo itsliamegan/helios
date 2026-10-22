@@ -18,10 +18,12 @@ CI runs these steps on every pull request.
 
 ## Conventions
 
-- Helios follows Rails and Laravel. When naming a concept or shaping an API,
-  start from what they call it and how they structure it.
+- Helios is inspired by Laravel, Hono, and Rails. When naming a concept or
+  shaping an API, start from what they call it and how they structure it.
 - Views always use a separate template language. Do not build HTML in Python.
 - Generic helpers that are not specific to Helios, such as inflection and
   case handling, belong in Luna.
-- Tests use one set of generic fixtures: `Post`, `Author`, `Comment`, and
-  `Tag`.
+- Only a provider reads its `Config`. Services take the values they use.
+- Tests share one blog domain. Its models are `Post`, `Author`, `Comment`, and
+  `Tag`. Its services, for tests that bind them, are `Moderator` and
+  `Newsletter` for the application and `Reader` and `Visit` for a request.

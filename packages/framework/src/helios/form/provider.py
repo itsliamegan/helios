@@ -1,6 +1,6 @@
 from helios.app import Application, Container, Context, Provider
-from helios.flash import Flashes
 from helios.http import Input
+from helios.session import Flash
 from helios.view import View
 from helios.view.composer import Composers
 
@@ -19,10 +19,10 @@ class Provider(Provider):
 			application.container.get(Composers).add(self.compose)
 
 	def submissions(self, context: Context) -> Submissions:
-		return Submissions(context.get(Flashes))
+		return Submissions(context.get(Flash))
 
 	def submission(self, context: Context) -> Submission:
-		flash = context.get(Flashes)
+		flash = context.get(Flash)
 		input = flash.get(INPUT_KEY)
 		errors = flash.get(ERRORS_KEY)
 		return Submission(

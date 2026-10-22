@@ -1,10 +1,11 @@
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from typing import Self
 
 from helios.http import Request, Response, URL
 from helios.routing import Router, URLs
 
 from .container import Container
-from .kernel import Kernel, Middleware, Middlewares
+from .kernel import Kernel, Middleware
 
 
 class Config:
@@ -33,14 +34,12 @@ class Application:
 		self.container = Container()
 		self.providers = list(providers)
 		self.middlewares = Middlewares(middlewares)
+		self.kernel: Kernel | None = None
 		try:
-			for key, value in (
-				(Application, self),
-				(Container, self.container),
-				(Config, config),
-				(Router, router),
-			):
-				self.container.instance(key, value)
+			self.container.instance(Application, self)
+			self.container.instance(Container, self.container)
+			self.container.instance(Config, config)
+			self.container.instance(Router, router)
 			if config.base_url is not None:
 				self.container.instance(URLs, URLs(router, config.base_url))
 
@@ -67,7 +66,34 @@ class Application:
 		self.middlewares.use(middleware)
 
 	def handle(self, request: Request) -> Response:
+		if self.kernel is None:
+			raise RuntimeError("the application is not booted")
 		return self.kernel.handle(request)
 
 	def close(self):
 		self.container.close()
+
+	def __enter__(self) -> Self:
+		return self
+
+	def __exit__(self, exception_type, exception, traceback):
+		self.close()
+
+
+class Middlewares:
+	"""An application's middleware kept in two tiers.
+
+	Those its providers use wrap those it was constructed with. Each tier keeps
+	the order its middleware was added in.
+	"""
+
+	def __init__(self, middlewares: Sequence[Middleware]):
+		self.provided: list[Middleware] = []
+		self.application = list(middlewares)
+
+	def __iter__(self) -> Iterator[Middleware]:
+		yield from self.provided
+		yield from self.application
+
+	def use(self, middleware: Middleware):
+		self.provided.append(middleware)

@@ -4,7 +4,6 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_not, assert_raises
 
-from helios.database import Config
 from helios.database.migration import (
 	ForeignKeyError,
 	MigrationError,
@@ -21,7 +20,7 @@ class Scratch:
 		self.dir = Path(self.temp_dir.name)
 		self.migrations = self.dir.joinpath("migrations")
 		self.migrations.mkdir()
-		self.config = Config(self.dir.joinpath("app.sqlite"))
+		self.path = self.dir.joinpath("app.sqlite")
 
 	def __enter__(self):
 		return self
@@ -29,17 +28,14 @@ class Scratch:
 	def __exit__(self, exception_type, exception, traceback):
 		self.temp_dir.cleanup()
 
-	def migrator(self, config: Config | None = None) -> Migrator:
-		return Migrator(
-			self.config if config is None else config,
-			Migrations.load(self.migrations),
-		)
+	def migrator(self, path: Path | None = None) -> Migrator:
+		return Migrator(path or self.path, Migrations.load(self.migrations))
 
 	def write(self, name: str, sql: str):
 		self.migrations.joinpath(name).write_text(sql)
 
 	def query(self, sql: str) -> list[tuple]:
-		connection = sqlite3.connect(self.config.path)
+		connection = sqlite3.connect(self.path)
 		try:
 			return connection.execute(sql).fetchall()
 		finally:
@@ -189,7 +185,7 @@ def test_refuses_a_gap_in_numbering():
 		with assert_raises(MigrationError):
 			scratch.migrator().apply()
 
-		assert_not(scratch.config.path.exists())
+		assert_not(scratch.path.exists())
 
 
 def test_refuses_a_duplicate_number():
@@ -200,7 +196,7 @@ def test_refuses_a_duplicate_number():
 		with assert_raises(MigrationError):
 			scratch.migrator().apply()
 
-		assert_not(scratch.config.path.exists())
+		assert_not(scratch.path.exists())
 
 
 def test_refuses_a_malformed_filename():
@@ -211,7 +207,7 @@ def test_refuses_a_malformed_filename():
 		with assert_raises(MigrationError):
 			scratch.migrator().apply()
 
-		assert_not(scratch.config.path.exists())
+		assert_not(scratch.path.exists())
 
 
 def test_refuses_transaction_control_statements():
@@ -224,13 +220,13 @@ def test_refuses_transaction_control_statements():
 		with assert_raises(MigrationError):
 			scratch.migrator().apply()
 
-		assert_not(scratch.config.path.exists())
+		assert_not(scratch.path.exists())
 
 
 def test_refuses_a_database_newer_than_the_latest_migration():
 	with Scratch() as scratch:
 		scratch.write("0001_create_authors.sql", "CREATE TABLE authors (id INTEGER);\n")
-		connection = sqlite3.connect(scratch.config.path)
+		connection = sqlite3.connect(scratch.path)
 		connection.execute("PRAGMA user_version = 5")
 		connection.close()
 
@@ -276,18 +272,18 @@ def test_status_and_pending_refuse_a_missing_database():
 		with assert_raises(MigrationError):
 			scratch.migrator().pending()
 
-		assert_not(scratch.config.path.exists())
+		assert_not(scratch.path.exists())
 
 
 def test_apply_refuses_a_missing_database_directory():
 	with Scratch() as scratch:
 		scratch.write("0001_create_authors.sql", "CREATE TABLE authors (id INTEGER);\n")
-		config = Config(scratch.dir.joinpath("missing", "app.sqlite"))
+		path = scratch.dir.joinpath("missing", "app.sqlite")
 
 		with assert_raises(MigrationError):
-			scratch.migrator(config).apply()
+			scratch.migrator(path).apply()
 
-		assert_not(config.path.parent.exists())
+		assert_not(path.parent.exists())
 
 
 def test_ignores_hidden_files():

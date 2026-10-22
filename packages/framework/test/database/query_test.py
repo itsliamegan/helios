@@ -4,8 +4,8 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.database import Config, DatabaseError, Model, ModelError, Store
-from helios.database.sqlite import connect
+from helios.database import DatabaseError, Model, ModelError, Store
+from helios.database.sqlite import Connection
 
 
 class Item(Model):
@@ -35,7 +35,7 @@ def open_store(path: Path):
 	raw = sqlite3.connect(path, autocommit=True)
 	raw.executescript(SCHEMA)
 	raw.close()
-	connection = connect(Config(path))
+	connection = Connection.open(path)
 	connection.begin()
 	store = Store(connection, [Item])
 	store.create(Item, name="Alpha", group="one", rank=2)

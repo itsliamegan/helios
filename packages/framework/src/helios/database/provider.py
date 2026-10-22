@@ -1,51 +1,37 @@
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
 
-from helios.app import Application, Container, Context, Next, Provider
-from helios.http import Request, Response
+from helios.app import Container, Context, Provider
 
 from .config import Config
+from .database import Database
 from .migration import Migrations, Migrator
 from .model import Model
 from .registry import Registry
-from .sqlite import connect
 from .store import Store
 
 
 class Provider(Provider):
 	def __init__(self, config: Config, model_types: Iterable[type[Model]]):
 		self.config = config
-		self.registry = Registry(model_types)
+		self.database = Database(
+			config.path,
+			Registry(model_types),
+			busy_timeout=config.busy_timeout,
+		)
 
 	def register(self, container: Container):
 		container.instance(Config, self.config)
+		container.instance(Database, self.database)
 		container.singleton(Migrator, self.migrator)
 		container.scoped(Store, self.store)
 
-	def boot(self, application: Application):
-		application.use(self.middleware)
-
 	def migrator(self, container: Container) -> Migrator:
-		return Migrator(self.config, Migrations.load(self.config.migrations))
+		return Migrator(
+			self.config.path,
+			Migrations.load(self.config.migrations),
+			busy_timeout=self.config.busy_timeout,
+		)
 
-	def store(self, context: Context) -> Store:
-		connection = context.enter(connect(self.config))
-		connection.begin()
-		return Store(connection, self.registry)
-
-	def middleware(self, request: Request, context: Context, next: Next) -> Response:
-		try:
-			response = next(request, context)
-			store = context.resolved(Store)
-			if store is None:
-				return response
-
-			if context.aborted is None:
-				store.connection.commit()
-			else:
-				store.connection.rollback()
-			return response
-		except BaseException:
-			store = context.resolved(Store)
-			if store is not None:
-				store.connection.rollback()
-			raise
+	def store(self, context: Context) -> Generator[Store]:
+		with context.get(Database).transaction() as transaction:
+			yield transaction
