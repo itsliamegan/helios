@@ -21,11 +21,15 @@ class Kernel:
 		self.pipeline = self.build(router, middlewares)
 
 	def handle(self, request: Request) -> Response:
-		context = Context(self.container, request)
 		try:
-			return self.pipeline(request, context)
-		finally:
-			context.close()
+			with Context(self.container, request) as context:
+				response = self.pipeline(request, context)
+		except Exception as error:
+			# Releasing the request's services failed, such as a commit. Nothing
+			# has been sent, so the server error replaces the rendered response.
+			return self.server_error(error)
+		else:
+			return response
 
 	def build(self, router: Router, middlewares: Sequence[Middleware]) -> Next:
 		next: Next = self.render_http_errors(router)
@@ -47,7 +51,8 @@ class Kernel:
 			try:
 				return next(request, context)
 			except HTTPError as error:
-				context.aborted = error
+				if context.failure is None:
+					context.failure = error
 				return Response.error(error)
 
 		return call
@@ -74,11 +79,17 @@ class Kernel:
 		try:
 			return next(request, context)
 		except Exception as error:
-			traceback.print_exception(error, file=sys.stderr)
-			return Response.text(
-				"500 Internal Server Error",
-				Status.INTERNAL_SERVER_ERROR,
-			)
+			if context.failure is None:
+				context.failure = error
+			return Kernel.server_error(error)
+
+	@staticmethod
+	def server_error(error: Exception) -> Response:
+		traceback.print_exception(error, file=sys.stderr)
+		return Response.text(
+			"500 Internal Server Error",
+			Status.INTERNAL_SERVER_ERROR,
+		)
 
 
 class Middlewares:

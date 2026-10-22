@@ -1,10 +1,9 @@
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, ExitStack, contextmanager
 import inspect
-from typing import Any, cast
+from typing import Any, Self, cast
 
 from helios.http import Request
-from helios.http.error import HTTPError
 
 from .container import Container, DependencyError, Scoped, unparameterized
 
@@ -15,9 +14,13 @@ class Context:
 		self.request = request
 		self.scoped: dict[type[Any], Any] = {}
 		self.resources = ExitStack()
-		self.aborted: HTTPError | None = None
+		self.failure: Exception | None = None
+		self.closed = False
 
 	def get[T](self, key: type[T]) -> T:
+		if self.closed:
+			raise RuntimeError("the context is closed")
+
 		key = unparameterized(key)
 		if key is Request:
 			return cast(T, self.request)
@@ -49,6 +52,9 @@ class Context:
 		return value
 
 	def resolved[T](self, key: type[T]) -> T | None:
+		if self.closed:
+			raise RuntimeError("the context is closed")
+
 		key = unparameterized(key)
 		if key is Request:
 			return cast(T, self.request)
@@ -59,5 +65,22 @@ class Context:
 	def enter[T](self, resource: AbstractContextManager[T]) -> T:
 		return self.resources.enter_context(resource)
 
-	def close(self):
-		self.resources.close()
+	def __enter__(self) -> Self:
+		return self
+
+	def __exit__(self, exception_type, exception, traceback):
+		self.closed = True
+		if exception is not None:
+			self.resources.__exit__(exception_type, exception, traceback)
+		elif self.failure is not None:
+			# The failure is raised into each yielding factory so it can tell
+			# success from failure. Its response is already rendered, so the
+			# failure itself goes no further.
+			self.resources.__exit__(
+				type(self.failure),
+				self.failure,
+				self.failure.__traceback__,
+			)
+		else:
+			self.resources.close()
+		return False

@@ -1,4 +1,11 @@
-from luna.test.assertion import assert_eq, assert_is, assert_is_not, assert_not_none
+from luna.test.assertion import (
+	assert_eq,
+	assert_is,
+	assert_is_instance,
+	assert_is_not,
+	assert_not_none,
+	assert_raises,
+)
 
 from helios.app import Container, Context
 from helios.http import Method, Request, URL
@@ -80,11 +87,9 @@ def test_releases_yielding_scoped_service_when_closed():
 		events.append("release")
 
 	container.scoped(Post, post)
-	context = Context(container, request())
-	context.get(Post)
-
-	assert_eq(events, ["acquire"])
-	context.close()
+	with Context(container, request()) as context:
+		context.get(Post)
+		assert_eq(events, ["acquire"])
 
 	assert_eq(events, ["acquire", "release"])
 
@@ -104,9 +109,8 @@ def test_releases_scoped_services_before_their_dependencies():
 
 	container.scoped(Author, author)
 	container.scoped(Post, post)
-	context = Context(container, request())
-	context.get(Post)
-	context.close()
+	with Context(container, request()) as context:
+		context.get(Post)
 
 	assert_eq(events, ["post", "author"])
 
@@ -126,3 +130,95 @@ def test_builds_yielding_scoped_service_once_per_context():
 	assert_is(first.get(Post), first.get(Post))
 	assert_is_not(second.get(Post), first.get(Post))
 	assert_eq(len(calls), 2)
+
+
+def test_yielding_factory_sees_no_error_on_success():
+	seen = []
+	container = Container()
+
+	def post(context):
+		try:
+			yield Post()
+		except BaseException as error:
+			seen.append(error)
+			raise
+		else:
+			seen.append(None)
+
+	container.scoped(Post, post)
+	with Context(container, request()) as context:
+		context.get(Post)
+
+	assert_eq(seen, [None])
+
+
+def test_yielding_factory_sees_recorded_failure():
+	seen = []
+	failure = ValueError("failed")
+	container = Container()
+
+	def post(context):
+		try:
+			yield Post()
+		except BaseException as error:
+			seen.append(error)
+			raise
+
+	container.scoped(Post, post)
+	with Context(container, request()) as context:
+		context.get(Post)
+		context.failure = failure
+
+	assert_eq(len(seen), 1)
+	assert_is(seen[0], failure)
+
+
+def test_releases_with_escaped_exception_and_propagates_it():
+	seen = []
+	container = Container()
+
+	def post(context):
+		try:
+			yield Post()
+		except BaseException as error:
+			seen.append(error)
+			raise
+
+	container.scoped(Post, post)
+	context = Context(container, request())
+
+	with assert_raises(KeyboardInterrupt), context:
+		context.get(Post)
+		raise KeyboardInterrupt()
+	assert_is_instance(seen[0], KeyboardInterrupt)
+	assert_eq(context.failure, None)
+
+
+def test_escaped_exception_takes_precedence_over_recorded_failure():
+	seen = []
+	container = Container()
+
+	def post(context):
+		try:
+			yield Post()
+		except BaseException as error:
+			seen.append(error)
+			raise
+
+	container.scoped(Post, post)
+
+	with assert_raises(KeyboardInterrupt), Context(container, request()) as context:
+		context.get(Post)
+		context.failure = ValueError("failed")
+		raise KeyboardInterrupt()
+	assert_is_instance(seen[0], KeyboardInterrupt)
+
+
+def test_rejects_resolving_from_closed_context():
+	container = Container()
+	container.scoped(Post, lambda context: Post())
+	with Context(container, request()) as context:
+		pass
+
+	with assert_raises(RuntimeError):
+		context.get(Post)

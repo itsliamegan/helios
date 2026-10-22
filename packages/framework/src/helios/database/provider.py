@@ -39,7 +39,7 @@ class Provider(Provider):
 			if store is None:
 				return response
 
-			if context.aborted is None:
+			if context.failure is None:
 				store.connection.commit()
 			else:
 				store.connection.rollback()

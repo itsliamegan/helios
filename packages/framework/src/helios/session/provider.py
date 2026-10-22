@@ -48,7 +48,7 @@ class Provider(Provider):
 	def middleware(self, request: Request, context: Context, next: Next) -> Response:
 		response = next(request, context)
 		session = context.resolved(Session)
-		if session is None or context.aborted is not None:
+		if session is None or context.failure is not None:
 			return response
 		store = context.get(Store)
 
