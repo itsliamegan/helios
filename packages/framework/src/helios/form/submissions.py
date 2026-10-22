@@ -1,5 +1,5 @@
-from helios.flash import Flashes
 from helios.http import Input
+from helios.session import Flashes
 
 from .errors import Errors
 

@@ -1,16 +1,14 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from uuid import uuid4
 
 from luna.test.assertion import assert_eq, assert_that
 
 from helios.app import Application, Config, Container, Provider
-import helios.flash
 import helios.form
 from helios.form import Errors, Submission, Submissions
 from helios.http import Input, Method, Request, Response, URL
 from helios.routing import Route, Router
-from helios.session.store import Session
+from helios.session import Flashes
 from helios.view import Component
 import helios.view.config
 import helios.view.provider
@@ -24,15 +22,15 @@ class Field(Component):
 
 
 class Values(Provider):
-	def __init__(self, session: Session):
-		self.session = session
+	def __init__(self, flashes: Flashes):
+		self.flashes = flashes
 
 	def register(self, container: Container):
-		container.scoped(Session, lambda context: self.session)
+		container.scoped(Flashes, lambda context: self.flashes)
 
 
 def test_flashes_errors_and_input():
-	session = Session(uuid4(), {})
+	flashes = Flashes()
 
 	def update(request, context):
 		context.get(Submissions).flash(
@@ -41,7 +39,7 @@ def test_flashes_errors_and_input():
 		return Response.empty()
 
 	handle(
-		session,
+		flashes,
 		Route.post("/", update),
 		Request(
 			Method.POST,
@@ -51,7 +49,7 @@ def test_flashes_errors_and_input():
 	)
 
 	assert_eq(
-		session["_flash"],
+		flashes.dirty(),
 		{
 			"_errors": {"title": ["Title must be provided."]},
 			"_input": {"title": [""], "tag_ids": ["news", "python"]},
@@ -60,7 +58,7 @@ def test_flashes_errors_and_input():
 
 
 def test_flashes_errors_without_input():
-	session = Session(uuid4(), {})
+	flashes = Flashes()
 
 	def create(request, context):
 		context.get(Submissions).flash(
@@ -69,26 +67,23 @@ def test_flashes_errors_without_input():
 		return Response.empty()
 
 	handle(
-		session,
+		flashes,
 		Route.post("/", create),
 		Request(Method.POST, URL("/"), input=Input({"recovery_code": "secret"})),
 	)
 
 	assert_eq(
-		session["_flash"],
+		flashes.dirty(),
 		{"_errors": {"recovery_code": ["That recovery code is invalid."]}},
 	)
 
 
 def test_resolves_flashed_submission():
-	session = Session(
-		uuid4(),
+	flashes = Flashes(
 		{
-			"_flash": {
-				"_errors": {"title": ["Title must be provided."]},
-				"_input": {"title": ""},
-			}
-		},
+			"_errors": {"title": ["Title must be provided."]},
+			"_input": {"title": ""},
+		}
 	)
 	submissions = []
 
@@ -96,21 +91,21 @@ def test_resolves_flashed_submission():
 		submissions.append(context.get(Submission))
 		return Response.empty()
 
-	handle(session, Route.get("/", edit), Request(Method.GET, URL("/")))
+	handle(flashes, Route.get("/", edit), Request(Method.GET, URL("/")))
 
 	assert_eq(submissions[0].value("title", "Old title"), "")
 	assert_eq(submissions[0].error("title"), "Title must be provided.")
 
 
 def test_resolves_empty_submission_without_flashes():
-	session = Session(uuid4(), {})
+	flashes = Flashes()
 	submissions = []
 
 	def edit(request, context):
 		submissions.append(context.get(Submission))
 		return Response.empty()
 
-	handle(session, Route.get("/", edit), Request(Method.GET, URL("/")))
+	handle(flashes, Route.get("/", edit), Request(Method.GET, URL("/")))
 
 	assert_eq(submissions[0].input, None)
 	assert_eq(submissions[0].value("title", "Old title"), "Old title")
@@ -125,21 +120,18 @@ def test_shares_submission_with_views():
 			'{{ submission.error("title") }}|'
 			'{{ submission.invalid("note") }}'
 		)
-		session = Session(
-			uuid4(),
+		flashes = Flashes(
 			{
-				"_flash": {
-					"_errors": {"title": ["Title must be provided."]},
-					"_input": {"title": ""},
-				}
-			},
+				"_errors": {"title": ["Title must be provided."]},
+				"_input": {"title": ""},
+			}
 		)
 
 		def edit(request, context):
 			return context.get(Views).render("edit")
 
 		response = handle(
-			session,
+			flashes,
 			Route.get("/", edit),
 			Request(Method.GET, URL("/")),
 			[helios.view.provider.Provider(helios.view.config.Config(views_dir))],
@@ -155,16 +147,13 @@ def test_shares_submission_with_components():
 		views_dir.joinpath("field.html").write_text(
 			"{{ name }}: {{ submission.error(name) }}"
 		)
-		session = Session(
-			uuid4(),
-			{"_flash": {"_errors": {"title": ["Title must be provided."]}}},
-		)
+		flashes = Flashes({"_errors": {"title": ["Title must be provided."]}})
 
 		def edit(request, context):
 			return context.get(Views).render("edit")
 
 		response = handle(
-			session,
+			flashes,
 			Route.get("/", edit),
 			Request(Method.GET, URL("/")),
 			[
@@ -178,13 +167,12 @@ def test_shares_submission_with_components():
 	assert_eq(str(response.body), "title: Title must be provided.")
 
 
-def handle(session, route, request, providers=None):
+def handle(flashes, route, request, providers=None):
 	app = Application(
 		Config(),
 		Router([route]),
 		[
-			Values(session),
-			helios.flash.Provider(),
+			Values(flashes),
 			helios.form.Provider(),
 			*(providers or []),
 		],

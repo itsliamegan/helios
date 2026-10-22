@@ -1,6 +1,6 @@
 from helios.app import Application, Container, Context, Provider
-from helios.flash import Flashes
 from helios.http import Input
+from helios.session import Flashes
 from helios.view import View
 from helios.view.composer import Composers
 

@@ -2,12 +2,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from helios.app import Application, Container, Context, Next, Provider
-from helios.http import Request, Response
-from helios.session.store import Session
-from helios.view import View
-from helios.view.composer import Composers
-
 
 @dataclass(init=False)
 class Flashes:
@@ -53,31 +47,3 @@ class Flash:
 	name: str
 	value: Any
 	is_dirty: bool = False
-
-
-class Provider(Provider):
-	def register(self, container: Container):
-		container.scoped(Flashes, self.flashes)
-
-	def boot(self, application: Application):
-		application.use(self.middleware)
-		if application.container.bound(Composers):
-			application.container.get(Composers).add(self.compose)
-
-	def flashes(self, context: Context) -> Flashes:
-		session = context.get(Session)
-		if "_flash" in session:
-			flashes = Flashes(session["_flash"])
-			del session["_flash"]
-			return flashes
-		return Flashes()
-
-	def compose(self, view: View, context: Context):
-		view.share("flash", context.get(Flashes))
-
-	def middleware(self, request: Request, context: Context, next: Next) -> Response:
-		response = next(request, context)
-		flashes = context.resolved(Flashes)
-		if flashes is not None and flashes.is_dirty():
-			context.get(Session)["_flash"] = flashes.dirty()
-		return response
