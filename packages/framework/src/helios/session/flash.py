@@ -4,46 +4,35 @@ from typing import Any
 
 
 @dataclass(init=False)
-class Flashes:
-	flashes: dict[str, Flash]
+class Flash:
+	items: dict[str, Any]
+	_dirty: set[str]
 
-	def __init__(self, flashes: Mapping[str, Any] | None = None):
-		flashes = flashes or {}
-		self.flashes = {}
-		for name in flashes:
-			self.flashes[name] = Flash(name, flashes[name])
+	def __init__(self, items: Mapping[str, Any] | None = None):
+		self.items = dict(items or {})
+		self._dirty = set()
 
 	def dirty(self) -> dict[str, Any]:
 		dirty = {}
-		for name in self.flashes:
-			if self.flashes[name].is_dirty:
-				dirty[name] = self.flashes[name].value
+		for name in self._dirty:
+			dirty[name] = self.items[name]
 		return dirty
 
 	def is_dirty(self) -> bool:
-		for name in self.flashes:
-			if self.flashes[name].is_dirty:
-				return True
-		return False
+		return len(self._dirty) > 0
 
 	def __getitem__(self, name: str) -> Any:
-		return self.flashes[name].value
+		return self.items[name]
 
 	def get(self, name: str, default: Any = None) -> Any:
-		if name in self.flashes:
-			return self.flashes[name].value
+		if name in self.items:
+			return self.items[name]
 		else:
 			return default
 
 	def __setitem__(self, name: str, value: Any):
-		self.flashes[name] = Flash(name, value, is_dirty=True)
+		self.items[name] = value
+		self._dirty.add(name)
 
 	def __contains__(self, name: object) -> bool:
-		return name in self.flashes
-
-
-@dataclass
-class Flash:
-	name: str
-	value: Any
-	is_dirty: bool = False
+		return name in self.items

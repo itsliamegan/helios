@@ -1,5 +1,5 @@
 from helios.http import Input
-from helios.session import Flashes
+from helios.session import Flash
 
 from .errors import Errors
 
@@ -8,12 +8,12 @@ INPUT_KEY = "_input"
 
 
 class Submissions:
-	def __init__(self, flashes: Flashes):
-		self.flashes = flashes
+	def __init__(self, flash: Flash):
+		self._flash = flash
 
 	def flash(self, errors: Errors, input: Input | None = None):
-		self.flashes[ERRORS_KEY] = {
+		self._flash[ERRORS_KEY] = {
 			name: list(messages) for name, messages in errors.messages.items()
 		}
 		if input is not None:
-			self.flashes[INPUT_KEY] = dict(input.items)
+			self._flash[INPUT_KEY] = dict(input.items)

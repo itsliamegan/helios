@@ -22,7 +22,7 @@ from helios.http import Headers, Method, Request, Response, Status, URL
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
 import helios.session
-from helios.session import Flashes
+from helios.session import Flash
 from helios.session.file import Driver
 from helios.session.store import Session
 from helios.view import Component
@@ -353,11 +353,11 @@ def test_flash_reaches_next_request_only():
 		notices = []
 
 		def create(request, context):
-			context.get(Flashes)["notice"] = "Saved"
+			context.get(Flash)["notice"] = "Saved"
 			return Response.empty()
 
 		def index(request, context):
-			notices.append(context.get(Flashes).get("notice"))
+			notices.append(context.get(Flash).get("notice"))
 			return Response.empty()
 
 		app = Application(
@@ -390,7 +390,7 @@ def test_failed_request_keeps_unread_flash():
 		notices = []
 
 		def missing(request, context):
-			notices.append(context.get(Flashes).get("notice"))
+			notices.append(context.get(Flash).get("notice"))
 			raise NotFoundError()
 
 		app = Application(
@@ -495,7 +495,7 @@ def test_boots_without_views():
 		notices = []
 
 		def index(request, context):
-			notices.append(context.get(Flashes).get("notice"))
+			notices.append(context.get(Flash).get("notice"))
 			return Response.empty()
 
 		app = Application(

@@ -1,6 +1,6 @@
 from .config import Config
-from .flash import Flashes
+from .flash import Flash
 from .provider import Provider
 from .store import Session
 
-__all__ = ["Config", "Flashes", "Provider", "Session"]
+__all__ = ["Config", "Flash", "Provider", "Session"]

@@ -9,7 +9,7 @@ from helios.view.composer import Composers
 
 from .config import Config
 from .file import Driver
-from .flash import Flashes
+from .flash import Flash
 from .store import Session, Store
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -24,7 +24,7 @@ class Provider(Provider):
 		container.instance(Config, self.config)
 		container.scoped(Store, self.store)
 		container.scoped(Session, self.session)
-		container.scoped(Flashes, self.flashes)
+		container.scoped(Flash, self.flash)
 
 	def boot(self, application: Application):
 		application.use(self.middleware)
@@ -54,25 +54,25 @@ class Provider(Provider):
 				store.remove(id)
 		return Session(uuid4())
 
-	def flashes(self, context: Context) -> Flashes:
+	def flash(self, context: Context) -> Flash:
 		session = context.get(Session)
 		if "_flash" in session:
-			flashes = Flashes(session["_flash"])
+			flash = Flash(session["_flash"])
 			del session["_flash"]
-			return flashes
-		return Flashes()
+			return flash
+		return Flash()
 
 	def compose(self, view: View, context: Context):
-		view.share("flash", context.get(Flashes))
+		view.share("flash", context.get(Flash))
 
 	def middleware(self, request: Request, context: Context, next: Next) -> Response:
 		response = next(request, context)
 		if context.failure is not None:
 			return response
 
-		flashes = context.resolved(Flashes)
-		if flashes is not None and flashes.is_dirty():
-			context.get(Session)["_flash"] = flashes.dirty()
+		flash = context.resolved(Flash)
+		if flash is not None and flash.is_dirty():
+			context.get(Session)["_flash"] = flash.dirty()
 
 		session = context.resolved(Session)
 		if session is None:

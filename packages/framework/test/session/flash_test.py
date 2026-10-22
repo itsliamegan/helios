@@ -1,17 +1,17 @@
 from luna.test.assertion import assert_eq
 
-from helios.session import Flashes
+from helios.session import Flash
 
 
 def test_gets_flash_value():
-	flashes = Flashes({"notice": "Saved"})
+	flash = Flash({"notice": "Saved"})
 
-	assert_eq(flashes.get("notice"), "Saved")
+	assert_eq(flash.get("notice"), "Saved")
 
 
 def test_gets_default_for_missing_flash():
-	flashes = Flashes()
+	flash = Flash()
 
 	assert_eq(
-		[flashes.get("notice"), flashes.get("notice", "None yet")], [None, "None yet"]
+		[flash.get("notice"), flash.get("notice", "None yet")], [None, "None yet"]
 	)

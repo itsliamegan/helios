@@ -8,7 +8,7 @@ import helios.form
 from helios.form import Errors, Submission, Submissions
 from helios.http import Input, Method, Request, Response, URL
 from helios.routing import Route, Router
-from helios.session import Flashes
+from helios.session import Flash
 from helios.view import Component
 import helios.view.config
 import helios.view.provider
@@ -22,15 +22,15 @@ class Field(Component):
 
 
 class Values(Provider):
-	def __init__(self, flashes: Flashes):
-		self.flashes = flashes
+	def __init__(self, flash: Flash):
+		self.flash = flash
 
 	def register(self, container: Container):
-		container.scoped(Flashes, lambda context: self.flashes)
+		container.scoped(Flash, lambda context: self.flash)
 
 
 def test_flashes_errors_and_input():
-	flashes = Flashes()
+	flash = Flash()
 
 	def update(request, context):
 		context.get(Submissions).flash(
@@ -39,7 +39,7 @@ def test_flashes_errors_and_input():
 		return Response.empty()
 
 	handle(
-		flashes,
+		flash,
 		Route.post("/", update),
 		Request(
 			Method.POST,
@@ -49,7 +49,7 @@ def test_flashes_errors_and_input():
 	)
 
 	assert_eq(
-		flashes.dirty(),
+		flash.dirty(),
 		{
 			"_errors": {"title": ["Title must be provided."]},
 			"_input": {"title": [""], "tag_ids": ["news", "python"]},
@@ -58,7 +58,7 @@ def test_flashes_errors_and_input():
 
 
 def test_flashes_errors_without_input():
-	flashes = Flashes()
+	flash = Flash()
 
 	def create(request, context):
 		context.get(Submissions).flash(
@@ -67,19 +67,19 @@ def test_flashes_errors_without_input():
 		return Response.empty()
 
 	handle(
-		flashes,
+		flash,
 		Route.post("/", create),
 		Request(Method.POST, URL("/"), input=Input({"recovery_code": "secret"})),
 	)
 
 	assert_eq(
-		flashes.dirty(),
+		flash.dirty(),
 		{"_errors": {"recovery_code": ["That recovery code is invalid."]}},
 	)
 
 
 def test_resolves_flashed_submission():
-	flashes = Flashes(
+	flash = Flash(
 		{
 			"_errors": {"title": ["Title must be provided."]},
 			"_input": {"title": ""},
@@ -91,21 +91,21 @@ def test_resolves_flashed_submission():
 		submissions.append(context.get(Submission))
 		return Response.empty()
 
-	handle(flashes, Route.get("/", edit), Request(Method.GET, URL("/")))
+	handle(flash, Route.get("/", edit), Request(Method.GET, URL("/")))
 
 	assert_eq(submissions[0].value("title", "Old title"), "")
 	assert_eq(submissions[0].error("title"), "Title must be provided.")
 
 
-def test_resolves_empty_submission_without_flashes():
-	flashes = Flashes()
+def test_resolves_empty_submission_without_flash():
+	flash = Flash()
 	submissions = []
 
 	def edit(request, context):
 		submissions.append(context.get(Submission))
 		return Response.empty()
 
-	handle(flashes, Route.get("/", edit), Request(Method.GET, URL("/")))
+	handle(flash, Route.get("/", edit), Request(Method.GET, URL("/")))
 
 	assert_eq(submissions[0].input, None)
 	assert_eq(submissions[0].value("title", "Old title"), "Old title")
@@ -120,7 +120,7 @@ def test_shares_submission_with_views():
 			'{{ submission.error("title") }}|'
 			'{{ submission.invalid("note") }}'
 		)
-		flashes = Flashes(
+		flash = Flash(
 			{
 				"_errors": {"title": ["Title must be provided."]},
 				"_input": {"title": ""},
@@ -131,7 +131,7 @@ def test_shares_submission_with_views():
 			return context.get(Views).render("edit")
 
 		response = handle(
-			flashes,
+			flash,
 			Route.get("/", edit),
 			Request(Method.GET, URL("/")),
 			[helios.view.provider.Provider(helios.view.config.Config(views_dir))],
@@ -147,13 +147,13 @@ def test_shares_submission_with_components():
 		views_dir.joinpath("field.html").write_text(
 			"{{ name }}: {{ submission.error(name) }}"
 		)
-		flashes = Flashes({"_errors": {"title": ["Title must be provided."]}})
+		flash = Flash({"_errors": {"title": ["Title must be provided."]}})
 
 		def edit(request, context):
 			return context.get(Views).render("edit")
 
 		response = handle(
-			flashes,
+			flash,
 			Route.get("/", edit),
 			Request(Method.GET, URL("/")),
 			[
@@ -167,12 +167,12 @@ def test_shares_submission_with_components():
 	assert_eq(str(response.body), "title: Title must be provided.")
 
 
-def handle(flashes, route, request, providers=None):
+def handle(flash, route, request, providers=None):
 	app = Application(
 		Config(),
 		Router([route]),
 		[
-			Values(flashes),
+			Values(flash),
 			helios.form.Provider(),
 			*(providers or []),
 		],
