@@ -16,11 +16,11 @@ from helios.http.error import BadRequestError, ContentTooLargeError, NotFoundErr
 from helios.routing import Route, Router
 
 
-class Post:
+class Visit:
 	pass
 
 
-class Author:
+class Reader:
 	pass
 
 
@@ -86,19 +86,19 @@ def test_keeps_first_failure_when_outer_middleware_raises():
 def test_releases_request_services_with_raised_http_error():
 	seen = []
 
-	def post(context):
+	def visit(context):
 		try:
-			yield Post()
+			yield Visit()
 		except Exception as error:
 			seen.append(error)
 			raise
 
 	def resolve(request, context, next):
-		context.get(Post)
+		context.get(Visit)
 		return next(request, context)
 
 	container = Container()
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 	kernel = Kernel(container, Router([]), [resolve])
 	kernel.handle(request())
 
@@ -108,19 +108,19 @@ def test_releases_request_services_with_raised_http_error():
 def test_releases_request_services_with_unexpected_error():
 	seen = []
 
-	def post(context):
+	def visit(context):
 		try:
-			yield Post()
+			yield Visit()
 		except Exception as error:
 			seen.append(error)
 			raise
 
 	def index(request, context):
-		context.get(Post)
+		context.get(Visit)
 		raise ValueError("failed")
 
 	container = Container()
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 	kernel = Kernel(container, Router([Route.get("/", index)]), [])
 	kernel.handle(request())
 
@@ -130,8 +130,8 @@ def test_releases_request_services_with_unexpected_error():
 def test_releases_request_services_before_stream_is_read():
 	events = []
 
-	def post(context):
-		yield Post()
+	def visit(context):
+		yield Visit()
 		events.append("released")
 
 	def chunks():
@@ -140,11 +140,11 @@ def test_releases_request_services_before_stream_is_read():
 		yield b"two"
 
 	def index(request, context):
-		context.get(Post)
+		context.get(Visit)
 		return Response.stream(chunks())
 
 	container = Container()
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 	kernel = Kernel(container, Router([Route.get("/", index)]), [])
 	response = kernel.handle(request())
 	body = cast(Stream, response.body)
@@ -155,16 +155,16 @@ def test_releases_request_services_before_stream_is_read():
 
 
 def test_release_error_becomes_server_error_response():
-	def post(context):
-		yield Post()
+	def visit(context):
+		yield Visit()
 		raise ValueError("failed")
 
 	def index(request, context):
-		context.get(Post)
+		context.get(Visit)
 		return Response.empty(Status.OK)
 
 	container = Container()
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 	kernel = Kernel(container, Router([Route.get("/", index)]), [])
 	response = kernel.handle(request())
 
@@ -175,25 +175,25 @@ def test_cleanups_after_failed_release_see_its_error():
 	seen = []
 	failure = ValueError("failed")
 
-	def author(context):
+	def reader(context):
 		try:
-			yield Author()
+			yield Reader()
 		except Exception as error:
 			seen.append(error)
 			raise
 
-	def post(context):
-		yield Post()
+	def visit(context):
+		yield Visit()
 		raise failure
 
 	def index(request, context):
-		context.get(Author)
-		context.get(Post)
+		context.get(Reader)
+		context.get(Visit)
 		return Response.empty(Status.OK)
 
 	container = Container()
-	container.scoped(Author, author)
-	container.scoped(Post, post)
+	container.scoped(Reader, reader)
+	container.scoped(Visit, visit)
 	kernel = Kernel(container, Router([Route.get("/", index)]), [])
 	kernel.handle(request())
 
@@ -203,14 +203,14 @@ def test_cleanups_after_failed_release_see_its_error():
 def test_unexpected_errors_skip_response_middleware_and_close_resources():
 	events = []
 
-	def post(context):
+	def visit(context):
 		try:
-			yield Post()
+			yield Visit()
 		finally:
 			events.append("closed")
 
 	def observe(request, context, next):
-		context.get(Post)
+		context.get(Visit)
 		next(request, context)
 		events.append("after")
 		return Response.empty()
@@ -219,7 +219,7 @@ def test_unexpected_errors_skip_response_middleware_and_close_resources():
 		raise RuntimeError("boom")
 
 	container = Container()
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 	kernel = Kernel(
 		container,
 		Router([Route.get("/", index)]),

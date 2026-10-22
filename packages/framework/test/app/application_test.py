@@ -5,19 +5,19 @@ from helios.http import Method, Request, Response, Status, URL
 from helios.routing import Route, Router, URLs
 
 
-class Post:
+class Moderator:
 	pass
 
 
-class Author:
+class Newsletter:
 	pass
 
 
-class Comment:
+class Reader:
 	pass
 
 
-class Tag:
+class Visit:
 	pass
 
 
@@ -61,38 +61,38 @@ def test_closes_request_and_application_resources_in_reverse_order():
 
 	class Resources(Provider):
 		def register(self, container):
-			container.singleton(Post, self.post)
-			container.singleton(Author, self.author)
-			container.scoped(Comment, self.comment)
-			container.scoped(Tag, self.tag)
+			container.singleton(Moderator, self.moderator)
+			container.singleton(Newsletter, self.newsletter)
+			container.scoped(Reader, self.reader)
+			container.scoped(Visit, self.visit)
 
 		def boot(self, application):
-			application.container.get(Post)
-			application.container.get(Author)
+			application.container.get(Moderator)
+			application.container.get(Newsletter)
 
-		def post(self, container):
+		def moderator(self, container):
 			events.append("enter application one")
-			yield Post()
+			yield Moderator()
 			events.append("exit application one")
 
-		def author(self, container):
+		def newsletter(self, container):
 			events.append("enter application two")
-			yield Author()
+			yield Newsletter()
 			events.append("exit application two")
 
-		def comment(self, context):
+		def reader(self, context):
 			events.append("enter request one")
-			yield Comment()
+			yield Reader()
 			events.append("exit request one")
 
-		def tag(self, context):
+		def visit(self, context):
 			events.append("enter request two")
-			yield Tag()
+			yield Visit()
 			events.append("exit request two")
 
 	def index(request, context):
-		context.get(Comment)
-		context.get(Tag)
+		context.get(Reader)
+		context.get(Visit)
 		return Response.empty(Status.OK)
 
 	app = Application(Config(), Router([Route.get("/", index)]), [Resources()])
@@ -202,16 +202,16 @@ def test_rejects_handling_before_boot():
 def test_closes_when_its_block_ends():
 	events = []
 
-	def post(container):
-		yield Post()
+	def moderator(container):
+		yield Moderator()
 		events.append("released")
 
-	class Posts(Provider):
+	class Moderation(Provider):
 		def register(self, container):
-			container.singleton(Post, post)
+			container.singleton(Moderator, moderator)
 
-	with Application(Config(), Router([]), [Posts()]) as app:
-		app.container.get(Post)
+	with Application(Config(), Router([]), [Moderation()]) as app:
+		app.container.get(Moderator)
 		assert_eq(events, [])
 
 	assert_eq(events, ["released"])
@@ -233,24 +233,24 @@ def test_entering_does_not_boot():
 def test_failed_boot_releases_services_built_during_boot():
 	events = []
 
-	def post(container):
+	def moderator(container):
 		try:
-			yield Post()
+			yield Moderator()
 		finally:
 			events.append("released")
 
-	class Posts(Provider):
+	class Moderation(Provider):
 		def register(self, container):
-			container.singleton(Post, post)
+			container.singleton(Moderator, moderator)
 
 		def boot(self, application):
-			application.container.get(Post)
+			application.container.get(Moderator)
 
 	class Broken(Provider):
 		def boot(self, application):
 			raise ValueError("failed")
 
-	app = Application(Config(), Router([]), [Posts(), Broken()])
+	app = Application(Config(), Router([]), [Moderation(), Broken()])
 
 	with assert_raises(ValueError):
 		app.boot()

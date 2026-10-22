@@ -11,11 +11,11 @@ from helios.app import Container, Context
 from helios.http import Method, Request, URL
 
 
-class Post:
+class Visit:
 	pass
 
 
-class Author:
+class Reader:
 	pass
 
 
@@ -81,14 +81,14 @@ def test_releases_yielding_scoped_service_when_closed():
 	events = []
 	container = Container()
 
-	def post(context):
+	def visit(context):
 		events.append("acquire")
-		yield Post()
+		yield Visit()
 		events.append("release")
 
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 	with Context(container, request()) as context:
-		context.get(Post)
+		context.get(Visit)
 		assert_eq(events, ["acquire"])
 
 	assert_eq(events, ["acquire", "release"])
@@ -98,37 +98,37 @@ def test_releases_scoped_services_before_their_dependencies():
 	events = []
 	container = Container()
 
-	def author(context):
-		yield Author()
-		events.append("author")
+	def reader(context):
+		yield Reader()
+		events.append("reader")
 
-	def post(context):
-		context.get(Author)
-		yield Post()
-		events.append("post")
+	def visit(context):
+		context.get(Reader)
+		yield Visit()
+		events.append("visit")
 
-	container.scoped(Author, author)
-	container.scoped(Post, post)
+	container.scoped(Reader, reader)
+	container.scoped(Visit, visit)
 	with Context(container, request()) as context:
-		context.get(Post)
+		context.get(Visit)
 
-	assert_eq(events, ["post", "author"])
+	assert_eq(events, ["visit", "reader"])
 
 
 def test_builds_yielding_scoped_service_once_per_context():
 	calls = []
 	container = Container()
 
-	def post(context):
+	def visit(context):
 		calls.append(context)
-		yield Post()
+		yield Visit()
 
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 	first = Context(container, request())
 	second = Context(container, request())
 
-	assert_is(first.get(Post), first.get(Post))
-	assert_is_not(second.get(Post), first.get(Post))
+	assert_is(first.get(Visit), first.get(Visit))
+	assert_is_not(second.get(Visit), first.get(Visit))
 	assert_eq(len(calls), 2)
 
 
@@ -136,18 +136,18 @@ def test_yielding_factory_sees_no_error_on_success():
 	seen = []
 	container = Container()
 
-	def post(context):
+	def visit(context):
 		try:
-			yield Post()
+			yield Visit()
 		except BaseException as error:
 			seen.append(error)
 			raise
 		else:
 			seen.append(None)
 
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 	with Context(container, request()) as context:
-		context.get(Post)
+		context.get(Visit)
 
 	assert_eq(seen, [None])
 
@@ -157,16 +157,16 @@ def test_yielding_factory_sees_recorded_failure():
 	failure = ValueError("failed")
 	container = Container()
 
-	def post(context):
+	def visit(context):
 		try:
-			yield Post()
+			yield Visit()
 		except BaseException as error:
 			seen.append(error)
 			raise
 
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 	with Context(container, request()) as context:
-		context.get(Post)
+		context.get(Visit)
 		context.failure = failure
 
 	assert_eq(len(seen), 1)
@@ -177,18 +177,18 @@ def test_releases_with_escaped_exception_and_propagates_it():
 	seen = []
 	container = Container()
 
-	def post(context):
+	def visit(context):
 		try:
-			yield Post()
+			yield Visit()
 		except BaseException as error:
 			seen.append(error)
 			raise
 
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 	context = Context(container, request())
 
 	with assert_raises(KeyboardInterrupt), context:
-		context.get(Post)
+		context.get(Visit)
 		raise KeyboardInterrupt()
 	assert_is_instance(seen[0], KeyboardInterrupt)
 	assert_eq(context.failure, None)
@@ -198,17 +198,17 @@ def test_escaped_exception_takes_precedence_over_recorded_failure():
 	seen = []
 	container = Container()
 
-	def post(context):
+	def visit(context):
 		try:
-			yield Post()
+			yield Visit()
 		except BaseException as error:
 			seen.append(error)
 			raise
 
-	container.scoped(Post, post)
+	container.scoped(Visit, visit)
 
 	with assert_raises(KeyboardInterrupt), Context(container, request()) as context:
-		context.get(Post)
+		context.get(Visit)
 		context.failure = ValueError("failed")
 		raise KeyboardInterrupt()
 	assert_is_instance(seen[0], KeyboardInterrupt)
@@ -216,9 +216,9 @@ def test_escaped_exception_takes_precedence_over_recorded_failure():
 
 def test_rejects_resolving_from_closed_context():
 	container = Container()
-	container.scoped(Post, lambda context: Post())
+	container.scoped(Visit, lambda context: Visit())
 	with Context(container, request()) as context:
 		pass
 
 	with assert_raises(RuntimeError):
-		context.get(Post)
+		context.get(Visit)

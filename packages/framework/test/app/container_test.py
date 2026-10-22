@@ -11,11 +11,11 @@ from luna.test.assertion import (
 from helios.app import Container, DependencyError
 
 
-class Post:
+class Newsletter:
 	pass
 
 
-class Author:
+class Moderator:
 	pass
 
 
@@ -94,30 +94,30 @@ def test_constructs_one_yielding_singleton_across_threads():
 	calls = []
 	container = Container()
 
-	def post(container):
+	def newsletter(container):
 		calls.append(None)
-		yield Post()
+		yield Newsletter()
 
-	container.singleton(Post, post)
+	container.singleton(Newsletter, newsletter)
 
 	with ThreadPoolExecutor(max_workers=8) as executor:
-		posts = list(executor.map(lambda _: container.get(Post), range(32)))
+		newsletters = list(executor.map(lambda _: container.get(Newsletter), range(32)))
 
 	assert_eq(len(calls), 1)
-	assert_that(all(post is posts[0] for post in posts))
+	assert_that(all(newsletter is newsletters[0] for newsletter in newsletters))
 
 
 def test_releases_yielding_singleton_when_closed():
 	events = []
 	container = Container()
 
-	def post(container):
+	def newsletter(container):
 		events.append("acquire")
-		yield Post()
+		yield Newsletter()
 		events.append("release")
 
-	container.singleton(Post, post)
-	container.get(Post)
+	container.singleton(Newsletter, newsletter)
+	container.get(Newsletter)
 
 	assert_eq(events, ["acquire"])
 	container.close()
@@ -129,71 +129,71 @@ def test_releases_singletons_before_their_dependencies():
 	events = []
 	container = Container()
 
-	def author(container):
-		yield Author()
-		events.append("author")
+	def moderator(container):
+		yield Moderator()
+		events.append("moderator")
 
-	def post(container):
-		container.get(Author)
-		yield Post()
-		events.append("post")
+	def newsletter(container):
+		container.get(Moderator)
+		yield Newsletter()
+		events.append("newsletter")
 
-	container.singleton(Author, author)
-	container.singleton(Post, post)
-	container.get(Post)
+	container.singleton(Moderator, moderator)
+	container.singleton(Newsletter, newsletter)
+	container.get(Newsletter)
 	container.close()
 
-	assert_eq(events, ["post", "author"])
+	assert_eq(events, ["newsletter", "moderator"])
 
 
 def test_runs_remaining_cleanups_when_one_raises():
 	events = []
 	container = Container()
 
-	def author(container):
+	def moderator(container):
 		try:
-			yield Author()
+			yield Moderator()
 		finally:
-			events.append("author")
+			events.append("moderator")
 
-	def post(container):
-		yield Post()
+	def newsletter(container):
+		yield Newsletter()
 		raise ValueError("failed")
 
-	container.singleton(Author, author)
-	container.singleton(Post, post)
-	container.get(Author)
-	container.get(Post)
+	container.singleton(Moderator, moderator)
+	container.singleton(Newsletter, newsletter)
+	container.get(Moderator)
+	container.get(Newsletter)
 
 	with assert_raises(ValueError):
 		container.close()
-	assert_eq(events, ["author"])
+	assert_eq(events, ["moderator"])
 
 
 def test_rejects_none_from_yielding_factory_and_releases_it():
 	events = []
 	container = Container()
 
-	def post(container):
+	def newsletter(container):
 		try:
 			yield None
 		finally:
 			events.append("release")
 
-	container.singleton(Post, post)
+	container.singleton(Newsletter, newsletter)
 
 	with assert_raises(DependencyError):
-		container.get(Post)
+		container.get(Newsletter)
 	assert_eq(events, ["release"])
 
 
 def test_rejects_resolving_from_closed_container():
 	container = Container()
-	container.singleton(Post, lambda container: Post())
+	container.singleton(Newsletter, lambda container: Newsletter())
 	container.close()
 
 	with assert_raises(RuntimeError):
-		container.get(Post)
+		container.get(Newsletter)
 
 
 def test_resolves_parameterized_keys_by_their_class():

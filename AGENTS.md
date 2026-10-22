@@ -23,5 +23,6 @@ CI runs these steps on every pull request.
 - Views always use a separate template language. Do not build HTML in Python.
 - Generic helpers that are not specific to Helios, such as inflection and
   case handling, belong in Luna.
-- Tests use one set of generic fixtures: `Post`, `Author`, `Comment`, and
-  `Tag`.
+- Tests share one blog domain. Its models are `Post`, `Author`, `Comment`, and
+  `Tag`. Its services, for tests that bind them, are `Moderator` and
+  `Newsletter` for the application and `Reader` and `Visit` for a request.
