@@ -1,7 +1,8 @@
 from dataclasses import dataclass
+from datetime import timedelta
+from pathlib import Path
 
-from helios.database.config import Config
-from helios.database.sqlite import Connection, connect
+from helios.database.sqlite import Connection
 
 from .error import MigrationError
 from .migration import Migration
@@ -11,19 +12,25 @@ from .migrations import Migrations
 class Migrator:
 	"""Brings one database up to date with a sequence of migrations."""
 
-	def __init__(self, config: Config, migrations: Migrations):
-		self.config = config
+	def __init__(
+		self,
+		path: Path,
+		migrations: Migrations,
+		busy_timeout: timedelta = timedelta(seconds=30),
+	):
+		self.path = path
 		self.migrations = migrations
+		self.busy_timeout = busy_timeout
 
 	def version(self) -> int:
 		"""Read the database's version without opening a transaction."""
 
 		# Connecting would create an empty file, leaving a stray database behind
 		# when the path is mistyped.
-		if not self.config.path.is_file():
-			raise MigrationError(f"database {self.config.path} does not exist")
+		if not self.path.is_file():
+			raise MigrationError(f"database {self.path} does not exist")
 
-		with connect(self.config) as connection:
+		with Connection.open(self.path, self.busy_timeout) as connection:
 			return connection.read_version()
 
 	def status(self) -> Status:
@@ -49,16 +56,20 @@ class Migrator:
 		committed, leaving the database at the last fully applied version.
 		"""
 
-		if not self.config.path.parent.is_dir():
+		if not self.path.parent.is_dir():
 			raise MigrationError(
-				f"database directory {self.config.path.parent} does not exist"
+				f"database directory {self.path.parent} does not exist"
 			)
 
 		applied = []
 		# Foreign keys are off so migrations can rebuild tables that others
 		# reference, and each migration checks them before committing instead.
 		# Closing the connection rolls back a migration that failed partway.
-		with connect(self.config, foreign_keys=False) as connection:
+		with Connection.open(
+			self.path,
+			self.busy_timeout,
+			foreign_keys=False,
+		) as connection:
 			while migration := self.begin_next(connection):
 				migration.run(connection)
 				connection.commit()

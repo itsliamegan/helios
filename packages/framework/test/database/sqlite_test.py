@@ -11,8 +11,8 @@ from luna.test.assertion import (
 	assert_that,
 )
 
-from helios.database import Config, DatabaseBusyError, DatabaseError
-from helios.database.sqlite import connect
+from helios.database import DatabaseBusyError, DatabaseError
+from helios.database.sqlite import Connection
 
 
 def create_database(path: Path, schema: str):
@@ -27,7 +27,7 @@ def test_commits_transaction_visible_to_separate_connection():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		try:
 			connection.begin()
 			connection.execute(
@@ -50,7 +50,7 @@ def test_rolls_back_transaction():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		try:
 			connection.begin()
 			connection.execute(
@@ -79,7 +79,7 @@ def test_enforces_foreign_keys():
 			);
 			""",
 		)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		try:
 			connection.begin()
 			with assert_raises(DatabaseError) as raised:
@@ -96,8 +96,8 @@ def test_translates_writer_contention_to_database_busy():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
-		first = connect(Config(path))
-		second = connect(Config(path, busy_timeout=timedelta(milliseconds=10)))
+		first = Connection.open(path)
+		second = Connection.open(path, busy_timeout=timedelta(milliseconds=10))
 		try:
 			first.begin()
 			with assert_raises(DatabaseBusyError) as raised:
@@ -113,7 +113,7 @@ def test_translates_statement_errors_without_bound_values():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		secret = "distinctive-secret-value"
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		try:
 			connection.begin()
 			with assert_raises(DatabaseError) as raised:
@@ -130,7 +130,7 @@ def test_cursor_reports_changed_rows():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		try:
 			connection.begin()
 			connection.execute("INSERT INTO posts VALUES ('A'), ('B')").close()
@@ -152,7 +152,7 @@ def test_cursor_reports_changed_rows():
 def test_reports_the_bound_parameter_limit():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		try:
 			default = connection.parameter_limit
 			connection.connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 3)
@@ -165,7 +165,7 @@ def test_reports_the_bound_parameter_limit():
 
 def test_reads_the_version_it_writes():
 	with TemporaryDirectory() as directory:
-		connection = connect(Config(Path(directory, "app.sqlite")))
+		connection = Connection.open(Path(directory, "app.sqlite"))
 		try:
 			connection.write_version(3)
 
@@ -184,7 +184,7 @@ def test_refuses_rows_that_reference_missing_parents():
 			"CREATE TABLE posts (id INTEGER PRIMARY KEY);"
 			"CREATE TABLE comments (post_id INTEGER REFERENCES posts (id));",
 		)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		try:
 			with assert_raises(DatabaseError):
 				connection.execute("INSERT INTO comments VALUES (99)").close()
@@ -200,7 +200,7 @@ def test_reports_foreign_key_violations_with_foreign_keys_off():
 			"CREATE TABLE posts (id INTEGER PRIMARY KEY);"
 			"CREATE TABLE comments (post_id INTEGER REFERENCES posts (id));",
 		)
-		connection = connect(Config(path), foreign_keys=False)
+		connection = Connection.open(path, foreign_keys=False)
 		try:
 			connection.execute("INSERT INTO comments VALUES (99)").close()
 

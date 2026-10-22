@@ -9,7 +9,8 @@ import tempfile
 from typing import Any, TextIO, cast
 from uuid import UUID
 
-from .store import Session, Store
+from .session import Session
+from .sessions import Sessions
 
 
 class DriverError(RuntimeError):
@@ -24,7 +25,7 @@ class Driver:
 	def open(self) -> FileScope:
 		return FileScope(self)
 
-	def load(self) -> Store:
+	def load(self) -> Sessions:
 		try:
 			with self.path.open() as file:
 				value = json.load(file)
@@ -35,9 +36,9 @@ class Driver:
 		except Exception as error:
 			raise DriverError(f"could not decode session file {self.path}") from error
 
-	def save(self, store: Store):
+	def save(self, sessions: Sessions):
 		try:
-			serialized = json.dumps(encode(store))
+			serialized = json.dumps(encode(sessions))
 		except Exception as error:
 			raise DriverError(f"could not encode session file {self.path}") from error
 
@@ -73,12 +74,12 @@ class FileScope:
 		self.driver = driver
 		self.lock: TextIO | None = None
 
-	def __enter__(self) -> Store:
+	def __enter__(self) -> Sessions:
 		lock = None
 		try:
 			lock = self.driver.lock_path.open("a+")
 			fcntl.flock(lock, fcntl.LOCK_EX)
-			store = self.driver.load()
+			sessions = self.driver.load()
 		except BaseException as error:
 			if lock is not None:
 				with suppress(BaseException):
@@ -89,7 +90,7 @@ class FileScope:
 				) from error
 			raise
 		self.lock = lock
-		return store
+		return sessions
 
 	def __exit__(self, exception_type, exception, traceback):
 		lock = self.lock
@@ -107,9 +108,9 @@ class FileScope:
 			) from error
 
 
-def encode(store: Store) -> dict[str, Any]:
+def encode(sessions: Sessions) -> dict[str, Any]:
 	data = {}
-	for id, session in store.sessions.items():
+	for id, session in sessions.items.items():
 		data[str(id)] = {
 			"items": session.items,
 			"last_active_at": (
@@ -121,7 +122,7 @@ def encode(store: Store) -> dict[str, Any]:
 	return data
 
 
-def decode(value: object) -> Store:
+def decode(value: object) -> Sessions:
 	if not isinstance(value, dict):
 		raise TypeError("expected a session object")
 	sessions = {}
@@ -141,4 +142,4 @@ def decode(value: object) -> Store:
 			else None
 		)
 		sessions[id] = Session(id, cast(dict[str, Any], items), last_active_at)
-	return Store(sessions)
+	return Sessions(sessions)

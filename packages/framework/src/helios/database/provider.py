@@ -13,7 +13,11 @@ from .store import Store
 class Provider(Provider):
 	def __init__(self, config: Config, model_types: Iterable[type[Model]]):
 		self.config = config
-		self.database = Database(config, Registry(model_types))
+		self.database = Database(
+			config.path,
+			Registry(model_types),
+			busy_timeout=config.busy_timeout,
+		)
 
 	def register(self, container: Container):
 		container.instance(Config, self.config)
@@ -22,7 +26,11 @@ class Provider(Provider):
 		container.scoped(Store, self.store)
 
 	def migrator(self, container: Container) -> Migrator:
-		return Migrator(self.config, Migrations.load(self.config.migrations))
+		return Migrator(
+			self.config.path,
+			Migrations.load(self.config.migrations),
+			busy_timeout=self.config.busy_timeout,
+		)
 
 	def store(self, context: Context) -> Generator[Store]:
 		with context.get(Database).transaction() as transaction:

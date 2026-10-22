@@ -14,7 +14,6 @@ from luna.test.assertion import (
 )
 
 from helios.database import (
-	Config,
 	DatabaseError,
 	Model,
 	ModelError,
@@ -23,7 +22,7 @@ from helios.database import (
 	has_many,
 	has_one,
 )
-from helios.database.sqlite import connect
+from helios.database.sqlite import Connection
 
 
 class Author(Model):
@@ -142,7 +141,7 @@ def open_store(
 		raw.execute("PRAGMA foreign_keys = OFF")
 		raw.executescript(rows)
 		raw.close()
-		with connect(Config(path)) as connection:
+		with Connection.open(path) as connection:
 			connection.begin()
 			yield Store(connection, model_types)
 

@@ -28,14 +28,12 @@ class Kernel:
 	def handle(self, request: Request) -> Response:
 		try:
 			with Context(self.container, request) as context:
-				response = self.pipeline(request, context)
+				return self.pipeline(request, context)
 		except Exception as error:
-			# Releasing the request's services failed, such as a commit. Nothing
-			# has been sent, so the server error replaces the rendered response.
+			# To reach this, the cleanup of a request-scoped service must have
+			# raised. The kernel captures all other errors inside the pipeline.
 			traceback.print_exception(error, file=sys.stderr)
 			return Response.error(InternalServerError())
-		else:
-			return response
 
 	def build(self, router: Router, middlewares: Sequence[Middleware]) -> Next:
 		next: Next = self.render_http_errors(router)

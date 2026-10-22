@@ -7,6 +7,17 @@ from .services import Services
 
 
 class Context:
+	"""A set of services scoped to a single request.
+
+	The context includes the current request. It builds each scoped service once
+	and releases it when its with block ends. Lookups of any other service
+	delegate to the container, so an application service can be resolved
+	through the context.
+
+	The context records the first error the kernel encountered as the request's
+	failure.
+	"""
+
 	def __init__(self, container: Container, request: Request):
 		self.container = container
 		self.request = request
@@ -44,5 +55,7 @@ class Context:
 
 	def __exit__(self, exception_type, exception, traceback):
 		self.closed = True
+		# An exception that escaped the block takes precedence over a recorded
+		# failure.
 		self.services.close(exception or self.failure)
 		return False

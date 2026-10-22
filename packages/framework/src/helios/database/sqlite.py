@@ -1,35 +1,54 @@
 from collections.abc import Iterable
+from datetime import timedelta
+from pathlib import Path
 import sqlite3
 from typing import Any, Self, cast
 
 from .codec import Scalar
-from .config import Config
 from .error import DatabaseBusyError, DatabaseError
 
 
-def connect(config: Config, foreign_keys: bool = True) -> Connection:
-	return Connection(config, foreign_keys=foreign_keys)
-
-
 class Connection:
-	def __init__(self, config: Config, foreign_keys: bool = True):
-		try:
-			self.connection = sqlite3.connect(
-				config.path,
-				autocommit=True,
-			)
-		except sqlite3.Error as error:
-			raise translate(error, "connection") from error
+	"""An open connection to a SQLite database.
+
+	A statement outside a transaction commits immediately. Beginning a
+	transaction takes the database's write lock, and closing the connection
+	rolls back a transaction left open. SQLite's errors are raised as
+	DatabaseError or as DatabaseBusyError when a lock is not acquired in time.
+	"""
+
+	def __init__(self, connection: sqlite3.Connection):
+		self.connection = connection
 		self.closed = False
 
+	@classmethod
+	def open(
+		cls,
+		path: Path,
+		busy_timeout: timedelta = timedelta(seconds=30),
+		foreign_keys: bool = True,
+	) -> Self:
 		try:
-			self.configure(config, foreign_keys=foreign_keys)
+			connection = cls(sqlite3.connect(path, autocommit=True))
+		except sqlite3.Error as error:
+			raise translate(error, "connection") from error
+
+		try:
+			if foreign_keys:
+				connection.control("PRAGMA foreign_keys = ON", "configuration")
+			else:
+				connection.control("PRAGMA foreign_keys = OFF", "configuration")
+			connection.control(
+				f"PRAGMA busy_timeout = {busy_timeout.total_seconds() * 1000}",
+				"configuration",
+			)
 		except Exception:
 			try:
-				self.close()
+				connection.close()
 			except DatabaseError:
 				pass
 			raise
+		return connection
 
 	def __enter__(self) -> Self:
 		return self
@@ -44,16 +63,6 @@ class Connection:
 	@property
 	def parameter_limit(self) -> int:
 		return self.connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
-
-	def configure(self, config: Config, foreign_keys: bool):
-		if foreign_keys:
-			self.control("PRAGMA foreign_keys = ON", "configuration")
-		else:
-			self.control("PRAGMA foreign_keys = OFF", "configuration")
-		self.control(
-			f"PRAGMA busy_timeout = {config.busy_timeout.total_seconds() * 1000}",
-			"configuration",
-		)
 
 	def begin(self):
 		self.control("BEGIN IMMEDIATE", "transaction begin")

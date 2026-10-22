@@ -1,5 +1,5 @@
 from helios.app import Context, Next
-from helios.auth.state import Authenticator
+from helios.auth.authenticator import Authenticator
 from helios.http import Request, Response
 
 from .config import Config

@@ -24,7 +24,7 @@ from helios.database import (
 	Scalar,
 	Store,
 )
-from helios.database.sqlite import connect
+from helios.database.sqlite import Connection
 
 
 class Token:
@@ -99,7 +99,7 @@ def test_crud_and_scalar_round_trip():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		store = Store(connection, [Record])
 		try:
@@ -127,7 +127,7 @@ def test_crud_and_scalar_round_trip():
 		finally:
 			connection.close()
 
-		second_connection = connect(Config(path))
+		second_connection = Connection.open(path)
 		second_connection.begin()
 		try:
 			reloaded = Store(second_connection, [Record]).find_one(Record, created.id)
@@ -146,7 +146,7 @@ def test_find_by_matches_the_equivalent_query():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		store = Store(connection, [Record])
 		try:
@@ -170,7 +170,7 @@ def test_find_by_supports_only_column_equality():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		store = Store(connection, [Record])
 		try:
@@ -186,7 +186,7 @@ def test_failed_create_leaves_no_row():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		store = Store(connection, [Record])
 		try:
@@ -215,7 +215,7 @@ def test_failed_update_leaves_model_unchanged():
 			END;
 			""",
 		)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		store = Store(connection, [Record])
 		try:
@@ -258,7 +258,7 @@ def test_update_rejects_bad_arguments_before_writing():
 			END;
 			""",
 		)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		try:
 			store = Store(connection, [Record])
@@ -306,7 +306,7 @@ def test_update_writes_only_given_columns():
 			END;
 			""",
 		)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		try:
 			store = Store(connection, [Record])
@@ -330,7 +330,7 @@ def test_deletes_model_and_reports_missing_lookup():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		try:
 			store = Store(connection, [Record])
@@ -373,7 +373,7 @@ def test_malformed_stored_scalar_is_database_error():
 		finally:
 			raw.close()
 
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		try:
 			with assert_raises(DatabaseError):
@@ -412,7 +412,7 @@ def test_round_trips_models_with_codecs_declared_later():
 				label TEXT NOT NULL
 			)""",
 		)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		try:
 			created = Store(connection, [Badge]).create(Badge, label=Label("new"))
@@ -420,7 +420,7 @@ def test_round_trips_models_with_codecs_declared_later():
 		finally:
 			connection.close()
 
-		second_connection = connect(Config(path))
+		second_connection = Connection.open(path)
 		second_connection.begin()
 		try:
 			found = Store(second_connection, [Badge]).find_one(Badge, created.id)
@@ -446,7 +446,7 @@ def test_quotes_declared_table_and_column_identifiers():
 				"select" TEXT NOT NULL
 			)""",
 		)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		connection.begin()
 		try:
 			store = Store(connection, [OddRecord])
@@ -471,7 +471,7 @@ def test_validates_registry_and_rejects_unregistered_models():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path)
-		connection = connect(Config(path))
+		connection = Connection.open(path)
 		try:
 			with assert_raises(ModelError):
 				Store(connection, [Abstract])
@@ -507,7 +507,7 @@ def model_named(name: str, module: str) -> type[Model]:
 def open_record_store(directory: str):
 	path = Path(directory, "app.sqlite")
 	create_database(path)
-	connection = connect(Config(path))
+	connection = Connection.open(path)
 	connection.begin()
 	return connection, Store(connection, [Record])
 

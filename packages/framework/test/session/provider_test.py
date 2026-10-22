@@ -24,7 +24,8 @@ from helios.routing import Route, Router
 import helios.session
 from helios.session import Flash
 from helios.session.file import Driver
-from helios.session.store import Session
+from helios.session.session import Session
+from helios.session.sessions import Sessions
 from helios.view import Component
 import helios.view.config
 import helios.view.provider
@@ -69,7 +70,7 @@ def exercise(
 			session = context.get(Session)
 			seen.append(session)
 			if change is not None:
-				change(session)
+				change(session, context.get(Sessions))
 		return Response.empty()
 
 	app = Application(
@@ -127,7 +128,7 @@ def test_stores_data_and_sets_cookie_policy():
 			session, response = exercise(
 				path,
 				request(),
-				lambda session: session.__setitem__("message", "Hello"),
+				lambda session, sessions: session.__setitem__("message", "Hello"),
 				secure=True,
 			)
 
@@ -149,7 +150,9 @@ def test_reuses_touches_and_rotates_known_session():
 		now = datetime(2026, 10, 12, tzinfo=UTC)
 		with time_machine.travel(now, tick=False):
 			session, response = exercise(
-				path, request(str(old_id)), lambda session: session.rotate()
+				path,
+				request(str(old_id)),
+				lambda session, sessions: sessions.rotate(session),
 			)
 
 		stored = read_sessions(path)
@@ -197,27 +200,20 @@ def test_purges_expired_sessions_and_renews_boundary():
 		assert_not_in(str(expired_id), stored)
 
 
-def test_clear_and_invalidate_remove_persisted_session():
+def test_clear_removes_persisted_session():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "sessions.json")
-		first_id = uuid4()
-		write_sessions(path, {str(first_id): session_data({"message": "Hello"})})
+		id = uuid4()
+		write_sessions(path, {str(id): session_data({"message": "Hello"})})
 		_, response = exercise(
-			path, request(str(first_id)), lambda session: session.clear()
+			path, request(str(id)), lambda session, sessions: session.clear()
 		)
+
 		assert_eq(read_sessions(path), {})
 		assert_eq(response.cookies["session_id"].value, "")
 		assert_eq(
 			response.cookies["session_id"].expires, datetime(1970, 1, 1, tzinfo=UTC)
 		)
-
-		second_id = uuid4()
-		write_sessions(path, {str(second_id): session_data({"message": "Hello"})})
-		_, response = exercise(
-			path, request(str(second_id)), lambda session: session.invalidate()
-		)
-		assert_eq(read_sessions(path), {})
-		assert_eq(response.cookies["session_id"].value, "")
 
 
 def test_unexpected_exception_does_not_save_and_releases_lock():

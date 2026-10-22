@@ -5,9 +5,9 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_is_not, assert_raises
 
-from helios.database import Config, Database, DatabaseBusyError, Model
+from helios.database import Database, DatabaseBusyError, Model
 from helios.database.registry import Registry
-from helios.database.sqlite import connect
+from helios.database.sqlite import Connection
 
 SCHEMA = """
 CREATE TABLE posts (
@@ -30,7 +30,7 @@ def test_transaction_commits_when_block_ends():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute(SCHEMA)
 		connection.close()
-		database = Database(Config(path), Registry([Post]))
+		database = Database(path, Registry([Post]))
 
 		with database.transaction() as store:
 			store.create(Post, title="Intro")
@@ -47,7 +47,7 @@ def test_transaction_rolls_back_when_block_raises():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute(SCHEMA)
 		connection.close()
-		database = Database(Config(path), Registry([Post]))
+		database = Database(path, Registry([Post]))
 
 		with assert_raises(ValueError), database.transaction() as store:
 			store.create(Post, title="Intro")
@@ -62,8 +62,8 @@ def test_transaction_rolls_back_when_block_raises():
 def test_transaction_holds_write_lock():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
-		database = Database(Config(path), Registry([Post]))
-		other = connect(Config(path, busy_timeout=timedelta(milliseconds=10)))
+		database = Database(path, Registry([Post]))
+		other = Connection.open(path, busy_timeout=timedelta(milliseconds=10))
 
 		try:
 			with database.transaction(), assert_raises(DatabaseBusyError):
@@ -75,7 +75,7 @@ def test_transaction_holds_write_lock():
 def test_each_transaction_opens_its_own_connection():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
-		database = Database(Config(path), Registry([Post]))
+		database = Database(path, Registry([Post]))
 
 		with database.transaction() as first:
 			pass

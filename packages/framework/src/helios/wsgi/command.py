@@ -49,8 +49,8 @@ class Serve(Command):
 		if self.application.container.bound(helios.assets.config.Config):
 			self.compile(root)
 		self.application.boot()
-		# Werkzeug stops serving on KeyboardInterrupt, so SIGTERM stops it as
-		# an interrupt does and serve returns.
+		# Treat SIGTERM like SIGINT. This lets Werkzeug stop serving normally
+		# and lets the application clean up its resources before exiting.
 		signal.signal(signal.SIGTERM, signal.default_int_handler)
 		run_simple(
 			host,

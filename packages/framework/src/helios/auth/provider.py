@@ -2,11 +2,12 @@ from uuid import UUID
 
 from helios.app import Application, Container, Context, Provider
 from helios.database import Model, NotFoundError, Store
-from helios.session.store import Session
+from helios.session.session import Session
+from helios.session.sessions import Sessions
 from helios.view import View
 from helios.view.composer import Composers
 
-from .state import Authenticator, SESSION_KEY
+from .authenticator import Authenticator, SESSION_KEY
 
 
 class Provider[U: Model](Provider):
@@ -28,7 +29,7 @@ class Provider[U: Model](Provider):
 		user = self.user(session, context.get(Store))
 		if user is None and SESSION_KEY in session:
 			del session[SESSION_KEY]
-		return Authenticator(session, user)
+		return Authenticator(session, context.get(Sessions), user)
 
 	def user(self, session: Session, store: Store) -> U | None:
 		if SESSION_KEY not in session:

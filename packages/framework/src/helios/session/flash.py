@@ -5,6 +5,11 @@ from typing import Any
 
 @dataclass(init=False)
 class Flash:
+	"""A set of items kept only for the next request and cleared afterwards.
+
+	Setting an item marks it as dirty. Only dirty items reach the next request.
+	"""
+
 	items: dict[str, Any]
 	_dirty: set[str]
 

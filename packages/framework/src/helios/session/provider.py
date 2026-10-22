@@ -10,7 +10,8 @@ from helios.view.composer import Composers
 from .config import Config
 from .file import Driver
 from .flash import Flash
-from .store import Session, Store
+from .session import Session
+from .sessions import Sessions
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -22,7 +23,7 @@ class Provider(Provider):
 
 	def register(self, container: Container):
 		container.instance(Config, self.config)
-		container.scoped(Store, self.store)
+		container.scoped(Sessions, self.sessions)
 		container.scoped(Session, self.session)
 		container.scoped(Flash, self.flash)
 
@@ -31,27 +32,27 @@ class Provider(Provider):
 		if application.container.bound(Composers):
 			application.container.get(Composers).add(self.compose)
 
-	def store(self, context: Context) -> Generator[Store]:
-		with self.driver.open() as store:
-			store.purge(self.config.maximum_age)
-			yield store
-			if store.is_dirty():
-				self.driver.save(store)
+	def sessions(self, context: Context) -> Generator[Sessions]:
+		with self.driver.open() as sessions:
+			sessions.purge(self.config.maximum_age)
+			yield sessions
+			if sessions.is_dirty():
+				self.driver.save(sessions)
 
 	def session(self, context: Context) -> Session:
 		request = context.get(Request)
-		store = context.get(Store)
+		sessions = context.get(Sessions)
 		if "session_id" in request.cookies:
 			try:
 				id = UUID(request.cookies["session_id"].value)
 			except ValueError:
 				id = None
-			if id is not None and id in store:
-				session = store.get(id)
+			if id is not None and id in sessions:
+				session = sessions.get(id)
 				if not session.is_expired(self.config.maximum_age):
 					session.touch()
 					return session
-				store.remove(id)
+				sessions.remove(id)
 		return Session(uuid4())
 
 	def flash(self, context: Context) -> Flash:
@@ -77,18 +78,16 @@ class Provider(Provider):
 		session = context.resolved(Session)
 		if session is None:
 			return response
-		store = context.get(Store)
+		sessions = context.get(Sessions)
 
-		if session.invalidated:
-			response.cookies["session_id"] = self.cookie("", EPOCH)
-		elif session.items:
-			if session.store is None:
+		if session.items:
+			if session.id not in sessions:
 				session.touch()
-				store.put(session)
+				sessions.put(session)
 			expires = datetime.now(UTC) + self.config.maximum_age
 			response.cookies["session_id"] = self.cookie(str(session.id), expires)
-		elif session.store is not None:
-			store.remove(session.id)
+		elif session.id in sessions:
+			sessions.remove(session.id)
 			response.cookies["session_id"] = self.cookie("", EPOCH)
 		return response
 

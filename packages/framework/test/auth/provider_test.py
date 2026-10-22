@@ -14,12 +14,12 @@ from luna.test.assertion import (
 from helios.app import Application, Config, Container, Provider
 import helios.auth
 from helios.auth import Authenticator
-from helios.database import Config as DatabaseConfig
 from helios.database import Model, Store
-from helios.database.sqlite import connect
+from helios.database.sqlite import Connection
 from helios.http import Method, Request, Response, URL
 from helios.routing import Route, Router
-from helios.session.store import Session
+from helios.session.session import Session
+from helios.session.sessions import Sessions
 from helios.view import Component
 import helios.view.config
 import helios.view.provider
@@ -46,6 +46,10 @@ class Values(Provider):
 	def register(self, container: Container):
 		container.scoped(Store, lambda context: self.store)
 		container.scoped(Session, lambda context: self.session)
+		container.scoped(
+			Sessions,
+			lambda context: Sessions({self.session.id: self.session}),
+		)
 
 
 def create_store(path: Path):
@@ -60,7 +64,7 @@ def create_store(path: Path):
 		"""
 	)
 	raw.close()
-	connection = connect(DatabaseConfig(path))
+	connection = Connection.open(path)
 	connection.begin()
 	return connection, Store(connection, [User])
 

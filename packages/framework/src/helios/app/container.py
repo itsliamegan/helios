@@ -11,6 +11,15 @@ if TYPE_CHECKING:
 
 
 class Container:
+	"""A set of bindings from types to services.
+
+	An instance binding is a value given at registration that the container
+	never releases. A singleton binding's service is built the first time it is
+	resolved and released when the container closes. A scoped binding's service
+	is built once per request through that request's context and cannot be
+	resolved through the container.
+	"""
+
 	def __init__(self):
 		self.bindings: dict[type[Any], Binding] = {}
 		self.services = Services()
