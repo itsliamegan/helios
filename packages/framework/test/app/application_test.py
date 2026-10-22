@@ -1,5 +1,3 @@
-from contextlib import contextmanager
-
 from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Application, Config, Provider
@@ -8,6 +6,18 @@ from helios.routing import Route, Router, URLs
 
 
 class Post:
+	pass
+
+
+class Author:
+	pass
+
+
+class Comment:
+	pass
+
+
+class Tag:
 	pass
 
 
@@ -49,29 +59,40 @@ def test_registers_all_providers_before_booting_in_order():
 def test_closes_request_and_application_resources_in_reverse_order():
 	events = []
 
-	@contextmanager
-	def resource(name):
-		events.append(f"enter {name}")
-		try:
-			yield name
-		finally:
-			events.append(f"exit {name}")
-
 	class Resources(Provider):
 		def register(self, container):
-			container.scoped(str, self.value)
+			container.singleton(Post, self.post)
+			container.singleton(Author, self.author)
+			container.scoped(Comment, self.comment)
+			container.scoped(Tag, self.tag)
 
 		def boot(self, application):
-			application.container.enter(resource("application one"))
-			application.container.enter(resource("application two"))
+			application.container.get(Post)
+			application.container.get(Author)
 
-		def value(self, context):
-			context.enter(resource("request one"))
-			context.enter(resource("request two"))
-			return "value"
+		def post(self, container):
+			events.append("enter application one")
+			yield Post()
+			events.append("exit application one")
+
+		def author(self, container):
+			events.append("enter application two")
+			yield Author()
+			events.append("exit application two")
+
+		def comment(self, context):
+			events.append("enter request one")
+			yield Comment()
+			events.append("exit request one")
+
+		def tag(self, context):
+			events.append("enter request two")
+			yield Tag()
+			events.append("exit request two")
 
 	def index(request, context):
-		context.get(str)
+		context.get(Comment)
+		context.get(Tag)
 		return Response.empty(Status.OK)
 
 	app = Application(Config(), Router([Route.get("/", index)]), [Resources()])

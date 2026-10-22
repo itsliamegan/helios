@@ -1,5 +1,5 @@
 from collections.abc import Callable, Generator
-from contextlib import AbstractContextManager, ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager
 import inspect
 from typing import Any, Self, cast
 
@@ -61,9 +61,6 @@ class Context:
 		if key in self.scoped:
 			return cast(T, self.scoped[key])
 		return self.container.resolved(key)
-
-	def enter[T](self, resource: AbstractContextManager[T]) -> T:
-		return self.resources.enter_context(resource)
 
 	def __enter__(self) -> Self:
 		return self

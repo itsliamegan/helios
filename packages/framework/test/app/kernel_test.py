@@ -1,4 +1,3 @@
-from contextlib import contextmanager
 from typing import cast
 
 from luna.test.assertion import assert_eq, assert_is, assert_is_instance
@@ -204,15 +203,14 @@ def test_cleanups_after_failed_release_see_its_error():
 def test_unexpected_errors_skip_response_middleware_and_close_resources():
 	events = []
 
-	@contextmanager
-	def resource():
+	def post(context):
 		try:
-			yield
+			yield Post()
 		finally:
 			events.append("closed")
 
 	def observe(request, context, next):
-		context.enter(resource())
+		context.get(Post)
 		next(request, context)
 		events.append("after")
 		return Response.empty()
@@ -220,8 +218,10 @@ def test_unexpected_errors_skip_response_middleware_and_close_resources():
 	def index(request, context):
 		raise RuntimeError("boom")
 
+	container = Container()
+	container.scoped(Post, post)
 	kernel = Kernel(
-		Container(),
+		container,
 		Router([Route.get("/", index)]),
 		[observe],
 	)

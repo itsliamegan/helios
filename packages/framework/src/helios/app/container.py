@@ -1,5 +1,5 @@
 from collections.abc import Callable, Generator
-from contextlib import AbstractContextManager, ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 import inspect
 from threading import RLock
@@ -108,9 +108,6 @@ class Container:
 			return cast(T, binding.value)
 		with self.lock:
 			return cast(T | None, self.singletons.get(key))
-
-	def enter[T](self, resource: AbstractContextManager[T]) -> T:
-		return self.resources.enter_context(resource)
 
 	def close(self):
 		self.closed = True
