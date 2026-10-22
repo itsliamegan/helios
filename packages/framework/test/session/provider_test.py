@@ -270,6 +270,40 @@ def test_raised_http_error_discards_mutation():
 		assert_not_in("session_id", response.cookies)
 
 
+def test_releases_lock_when_request_fails_after_resolving_session():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		id = uuid4()
+		initial = {str(id): session_data({"message": "Before"})}
+		write_sessions(path, initial)
+
+		def refuse(request, context, next):
+			next(request, context)
+			raise NotFoundError()
+
+		def change(request, context):
+			context.get(Session)["message"] = "After"
+			return Response.empty()
+
+		driver = Driver(path, path.with_suffix(".lock"))
+		app = Application(
+			AppConfig(),
+			Router([Route.get("/", change)]),
+			[helios.session.Provider(helios.session.Config(), driver)],
+			[refuse],
+		)
+		app.boot()
+		try:
+			response = app.handle(request(str(id)))
+		finally:
+			app.close()
+
+		assert_eq(response.status, Status.NOT_FOUND)
+		assert_eq(read_sessions(path), initial)
+		with driver.open() as store:
+			assert_eq(store.get(id)["message"], "Before")
+
+
 def test_returned_error_response_saves_mutation():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "sessions.json")

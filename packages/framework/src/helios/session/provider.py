@@ -1,3 +1,4 @@
+from collections.abc import Generator
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -24,10 +25,12 @@ class Provider(Provider):
 	def boot(self, application: Application):
 		application.use(self.middleware)
 
-	def store(self, context: Context) -> Store:
-		store = context.enter(self.driver.open())
-		store.purge(self.config.maximum_age)
-		return store
+	def store(self, context: Context) -> Generator[Store]:
+		with self.driver.open() as store:
+			store.purge(self.config.maximum_age)
+			yield store
+			if store.is_dirty():
+				self.driver.save(store)
 
 	def session(self, context: Context) -> Session:
 		request = context.get(Request)
@@ -63,9 +66,6 @@ class Provider(Provider):
 		elif session.store is not None:
 			store.remove(session.id)
 			response.cookies["session_id"] = self.cookie("", EPOCH)
-
-		if store.is_dirty():
-			self.driver.save(store)
 		return response
 
 	def cookie(self, value: str, expires: datetime) -> Cookie:
