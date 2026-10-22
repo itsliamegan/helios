@@ -1,6 +1,7 @@
-from collections.abc import Callable
-from contextlib import AbstractContextManager, ExitStack
+from collections.abc import Callable, Generator
+from contextlib import AbstractContextManager, ExitStack, contextmanager
 from dataclasses import dataclass
+import inspect
 from threading import RLock
 from typing import Any, TYPE_CHECKING, cast, get_origin
 
@@ -19,15 +20,16 @@ class Instance:
 
 @dataclass
 class Singleton:
-	factory: Callable[[Container], Any]
+	factory: Factory[Container, Any]
 
 
 @dataclass
 class Scoped:
-	factory: Callable[[Context], Any]
+	factory: Factory[Context, Any]
 
 
 type Binding = Instance | Singleton | Scoped
+type Factory[C, T] = Callable[[C], T] | Callable[[C], Generator[T]]
 
 
 class Container:
@@ -36,14 +38,15 @@ class Container:
 		self.singletons: dict[type[Any], Any] = {}
 		self.resources = ExitStack()
 		self.lock = RLock()
+		self.closed = False
 
 	def instance[T](self, key: type[T], value: T):
 		self.register(key, Instance(value))
 
-	def singleton[T](self, key: type[T], factory: Callable[[Container], T]):
+	def singleton[T](self, key: type[T], factory: Factory[Container, T]):
 		self.register(key, Singleton(factory))
 
-	def scoped[T](self, key: type[T], factory: Callable[[Context], T]):
+	def scoped[T](self, key: type[T], factory: Factory[Context, T]):
 		self.register(key, Scoped(factory))
 
 	def register(self, key: type[Any], binding: Binding):
@@ -57,6 +60,9 @@ class Container:
 		return unparameterized(key) in self.bindings
 
 	def get[T](self, key: type[T]) -> T:
+		if self.closed:
+			raise RuntimeError("the container is closed")
+
 		key = unparameterized(key)
 		binding = self.bindings.get(key)
 		if binding is None:
@@ -69,14 +75,31 @@ class Container:
 		with self.lock:
 			if key in self.singletons:
 				return cast(T, self.singletons[key])
-			factory = cast(Callable[[Container], T], binding.factory)
-			value = factory(self)
-			if value is None:
-				raise DependencyError(f"factory for {key.__qualname__} returned None")
+			if inspect.isgeneratorfunction(binding.factory):
+				generator = cast(Callable[[Container], Generator[T]], binding.factory)
+				# The factory's cleanup runs here if its value is rejected, and
+				# moves onto the container's stack once it is accepted.
+				with ExitStack() as stack:
+					value = stack.enter_context(contextmanager(generator)(self))
+					if value is None:
+						raise DependencyError(
+							f"factory for {key.__qualname__} yielded None"
+						)
+					self.resources.enter_context(stack.pop_all())
+			else:
+				factory = cast(Callable[[Container], T], binding.factory)
+				value = factory(self)
+				if value is None:
+					raise DependencyError(
+						f"factory for {key.__qualname__} returned None"
+					)
 			self.singletons[key] = value
 			return value
 
 	def resolved[T](self, key: type[T]) -> T | None:
+		if self.closed:
+			raise RuntimeError("the container is closed")
+
 		key = unparameterized(key)
 		binding = self.bindings.get(key)
 		if binding is None or isinstance(binding, Scoped):
@@ -90,6 +113,7 @@ class Container:
 		return self.resources.enter_context(resource)
 
 	def close(self):
+		self.closed = True
 		self.resources.close()
 
 

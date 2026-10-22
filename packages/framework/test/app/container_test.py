@@ -11,6 +11,14 @@ from luna.test.assertion import (
 from helios.app import Container, DependencyError
 
 
+class Post:
+	pass
+
+
+class Author:
+	pass
+
+
 def test_reports_missing_and_scoped_dependencies():
 	container = Container()
 	container.singleton(str, lambda container: container.get(int))
@@ -80,6 +88,112 @@ def test_constructs_one_singleton_across_threads():
 
 	assert_eq(len(calls), 1)
 	assert_that(all(value is values[0] for value in values))
+
+
+def test_constructs_one_yielding_singleton_across_threads():
+	calls = []
+	container = Container()
+
+	def post(container):
+		calls.append(None)
+		yield Post()
+
+	container.singleton(Post, post)
+
+	with ThreadPoolExecutor(max_workers=8) as executor:
+		posts = list(executor.map(lambda _: container.get(Post), range(32)))
+
+	assert_eq(len(calls), 1)
+	assert_that(all(post is posts[0] for post in posts))
+
+
+def test_releases_yielding_singleton_when_closed():
+	events = []
+	container = Container()
+
+	def post(container):
+		events.append("acquire")
+		yield Post()
+		events.append("release")
+
+	container.singleton(Post, post)
+	container.get(Post)
+
+	assert_eq(events, ["acquire"])
+	container.close()
+
+	assert_eq(events, ["acquire", "release"])
+
+
+def test_releases_singletons_before_their_dependencies():
+	events = []
+	container = Container()
+
+	def author(container):
+		yield Author()
+		events.append("author")
+
+	def post(container):
+		container.get(Author)
+		yield Post()
+		events.append("post")
+
+	container.singleton(Author, author)
+	container.singleton(Post, post)
+	container.get(Post)
+	container.close()
+
+	assert_eq(events, ["post", "author"])
+
+
+def test_runs_remaining_cleanups_when_one_raises():
+	events = []
+	container = Container()
+
+	def author(container):
+		try:
+			yield Author()
+		finally:
+			events.append("author")
+
+	def post(container):
+		yield Post()
+		raise ValueError("failed")
+
+	container.singleton(Author, author)
+	container.singleton(Post, post)
+	container.get(Author)
+	container.get(Post)
+
+	with assert_raises(ValueError):
+		container.close()
+	assert_eq(events, ["author"])
+
+
+def test_rejects_none_from_yielding_factory_and_releases_it():
+	events = []
+	container = Container()
+
+	def post(container):
+		try:
+			yield None
+		finally:
+			events.append("release")
+
+	container.singleton(Post, post)
+
+	with assert_raises(DependencyError):
+		container.get(Post)
+	assert_eq(events, ["release"])
+
+
+def test_rejects_resolving_from_closed_container():
+	container = Container()
+	container.singleton(Post, lambda container: Post())
+	container.close()
+
+	with assert_raises(RuntimeError):
+		container.get(Post)
 
 
 def test_resolves_parameterized_keys_by_their_class():
