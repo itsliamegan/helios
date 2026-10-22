@@ -4,6 +4,14 @@ from helios.app import Container, Context
 from helios.http import Method, Request, URL
 
 
+class Post:
+	pass
+
+
+class Author:
+	pass
+
+
 def request() -> Request:
 	return Request(Method.GET, URL("/"))
 
@@ -60,3 +68,61 @@ def test_resolves_parameterized_keys_by_their_class():
 
 	assert_is(context.get(dict), value)
 	assert_is(context.resolved(dict[str, str]), value)
+
+
+def test_releases_yielding_scoped_service_when_closed():
+	events = []
+	container = Container()
+
+	def post(context):
+		events.append("acquire")
+		yield Post()
+		events.append("release")
+
+	container.scoped(Post, post)
+	context = Context(container, request())
+	context.get(Post)
+
+	assert_eq(events, ["acquire"])
+	context.close()
+
+	assert_eq(events, ["acquire", "release"])
+
+
+def test_releases_scoped_services_before_their_dependencies():
+	events = []
+	container = Container()
+
+	def author(context):
+		yield Author()
+		events.append("author")
+
+	def post(context):
+		context.get(Author)
+		yield Post()
+		events.append("post")
+
+	container.scoped(Author, author)
+	container.scoped(Post, post)
+	context = Context(container, request())
+	context.get(Post)
+	context.close()
+
+	assert_eq(events, ["post", "author"])
+
+
+def test_builds_yielding_scoped_service_once_per_context():
+	calls = []
+	container = Container()
+
+	def post(context):
+		calls.append(context)
+		yield Post()
+
+	container.scoped(Post, post)
+	first = Context(container, request())
+	second = Context(container, request())
+
+	assert_is(first.get(Post), first.get(Post))
+	assert_is_not(second.get(Post), first.get(Post))
+	assert_eq(len(calls), 2)

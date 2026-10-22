@@ -1,5 +1,6 @@
-from collections.abc import Callable
-from contextlib import AbstractContextManager, ExitStack
+from collections.abc import Callable, Generator
+from contextlib import AbstractContextManager, ExitStack, contextmanager
+import inspect
 from typing import Any, cast
 
 from helios.http import Request
@@ -28,10 +29,22 @@ class Context:
 		if not isinstance(binding, Scoped):
 			return self.container.get(key)
 
-		factory = cast(Callable[[Context], T], binding.factory)
-		value = factory(self)
-		if value is None:
-			raise DependencyError(f"factory for {key.__qualname__} returned None")
+		if inspect.isgeneratorfunction(binding.factory):
+			generator = cast(Callable[[Context], Generator[T]], binding.factory)
+			# The factory's cleanup runs here if its value is rejected, and
+			# moves onto the context's stack once it is accepted.
+			with ExitStack() as stack:
+				value = stack.enter_context(contextmanager(generator)(self))
+				if value is None:
+					raise DependencyError(
+						f"factory for {key.__qualname__} yielded None"
+					)
+				self.resources.enter_context(stack.pop_all())
+		else:
+			factory = cast(Callable[[Context], T], binding.factory)
+			value = factory(self)
+			if value is None:
+				raise DependencyError(f"factory for {key.__qualname__} returned None")
 		self.scoped[key] = value
 		return value
 
