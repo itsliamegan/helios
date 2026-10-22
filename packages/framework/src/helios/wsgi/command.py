@@ -1,5 +1,6 @@
 from pathlib import Path
 import shlex
+import signal
 import sys
 from typing import Any
 
@@ -48,10 +49,14 @@ class Serve(Command):
 		if self.application.container.bound(helios.assets.config.Config):
 			self.compile(root)
 		self.application.boot()
+		# Werkzeug stops serving on KeyboardInterrupt, so SIGTERM stops it as
+		# an interrupt does and serve returns.
+		signal.signal(signal.SIGTERM, signal.default_int_handler)
 		run_simple(
 			host,
 			port,
 			self.application,
+			threaded=True,
 			static_files={"/": str(Path(root, "public"))},
 		)
 
