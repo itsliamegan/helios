@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Sequence
 import sys
 import traceback
 
@@ -90,25 +90,6 @@ class Kernel:
 			"500 Internal Server Error",
 			Status.INTERNAL_SERVER_ERROR,
 		)
-
-
-class Middlewares:
-	"""An application's middleware kept in two tiers.
-
-	Those its providers use wrap those it was constructed with. Each tier keeps
-	the order its middleware was added in.
-	"""
-
-	def __init__(self, middlewares: Sequence[Middleware]):
-		self.provided: list[Middleware] = []
-		self.application = list(middlewares)
-
-	def __iter__(self) -> Iterator[Middleware]:
-		yield from self.provided
-		yield from self.application
-
-	def use(self, middleware: Middleware):
-		self.provided.append(middleware)
 
 
 type Middleware = Callable[[Request, Context, Next], Response]
