@@ -36,13 +36,10 @@ class Application:
 		self.middlewares = Middlewares(middlewares)
 		self.kernel: Kernel | None = None
 		try:
-			for key, value in (
-				(Application, self),
-				(Container, self.container),
-				(Config, config),
-				(Router, router),
-			):
-				self.container.instance(key, value)
+			self.container.instance(Application, self)
+			self.container.instance(Container, self.container)
+			self.container.instance(Config, config)
+			self.container.instance(Router, router)
 			if config.base_url is not None:
 				self.container.instance(URLs, URLs(router, config.base_url))
 

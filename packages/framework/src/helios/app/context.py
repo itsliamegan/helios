@@ -1,6 +1,6 @@
 from collections.abc import Callable, Generator
 from contextlib import ExitStack, contextmanager
-import inspect
+from inspect import isgeneratorfunction
 from typing import Any, Self, cast
 
 from helios.http import Request
@@ -32,7 +32,7 @@ class Context:
 		if not isinstance(binding, Scoped):
 			return self.container.get(key)
 
-		if inspect.isgeneratorfunction(binding.factory):
+		if isgeneratorfunction(binding.factory):
 			generator = cast(Callable[[Context], Generator[T]], binding.factory)
 			# The factory's cleanup runs here if its value is rejected, and
 			# moves onto the context's stack once it is accepted.

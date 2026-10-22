@@ -1,7 +1,7 @@
 from collections.abc import Callable, Generator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
-import inspect
+from inspect import isgeneratorfunction
 from threading import RLock
 from typing import Any, TYPE_CHECKING, cast, get_origin
 
@@ -11,25 +11,6 @@ if TYPE_CHECKING:
 
 class DependencyError(Exception):
 	pass
-
-
-@dataclass
-class Instance:
-	value: Any
-
-
-@dataclass
-class Singleton:
-	factory: Factory[Container, Any]
-
-
-@dataclass
-class Scoped:
-	factory: Factory[Context, Any]
-
-
-type Binding = Instance | Singleton | Scoped
-type Factory[C, T] = Callable[[C], T] | Callable[[C], Generator[T]]
 
 
 class Container:
@@ -75,7 +56,7 @@ class Container:
 		with self.lock:
 			if key in self.singletons:
 				return cast(T, self.singletons[key])
-			if inspect.isgeneratorfunction(binding.factory):
+			if isgeneratorfunction(binding.factory):
 				generator = cast(Callable[[Container], Generator[T]], binding.factory)
 				# The factory's cleanup runs here if its value is rejected, and
 				# moves onto the container's stack once it is accepted.
@@ -112,6 +93,25 @@ class Container:
 	def close(self):
 		self.closed = True
 		self.resources.close()
+
+
+type Binding = Instance | Singleton | Scoped
+type Factory[C, T] = Callable[[C], T] | Callable[[C], Generator[T]]
+
+
+@dataclass
+class Instance:
+	value: Any
+
+
+@dataclass
+class Singleton:
+	factory: Factory[Container, Any]
+
+
+@dataclass
+class Scoped:
+	factory: Factory[Context, Any]
 
 
 def unparameterized(key: type[Any]) -> type[Any]:
