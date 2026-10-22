@@ -1,23 +1,19 @@
 from collections.abc import Callable, Generator
-from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
-from inspect import isgeneratorfunction
 from threading import RLock
 from typing import Any, TYPE_CHECKING, cast, get_origin
+
+from .error import DependencyError
+from .services import Services
 
 if TYPE_CHECKING:
 	from .context import Context
 
 
-class DependencyError(Exception):
-	pass
-
-
 class Container:
 	def __init__(self):
 		self.bindings: dict[type[Any], Binding] = {}
-		self.singletons: dict[type[Any], Any] = {}
-		self.resources = ExitStack()
+		self.services = Services()
 		self.lock = RLock()
 		self.closed = False
 
@@ -35,64 +31,52 @@ class Container:
 		if isinstance(binding, Instance) and binding.value is None:
 			raise DependencyError(f"{key.__qualname__} cannot be bound to None")
 		self.bindings[key] = binding
-		self.singletons.pop(key, None)
+		self.services.forget(key)
 
 	def bound(self, key: type[Any]) -> bool:
 		return unparameterized(key) in self.bindings
+
+	def binding(self, key: type[Any]) -> Binding:
+		key = unparameterized(key)
+		binding = self.bindings.get(key)
+		if binding is None:
+			raise DependencyError(f"nothing provides {key.__qualname__}")
+		return binding
 
 	def get[T](self, key: type[T]) -> T:
 		if self.closed:
 			raise RuntimeError("the container is closed")
 
 		key = unparameterized(key)
-		binding = self.bindings.get(key)
-		if binding is None:
-			raise DependencyError(f"nothing provides {key.__qualname__}")
-		if isinstance(binding, Scoped):
-			raise DependencyError(f"{key.__qualname__} requires a request context")
-		if isinstance(binding, Instance):
-			return cast(T, binding.value)
-
-		with self.lock:
-			if key in self.singletons:
-				return cast(T, self.singletons[key])
-			if isgeneratorfunction(binding.factory):
-				generator = cast(Callable[[Container], Generator[T]], binding.factory)
-				# The factory's cleanup runs here if its value is rejected, and
-				# moves onto the container's stack once it is accepted.
-				with ExitStack() as stack:
-					value = stack.enter_context(contextmanager(generator)(self))
+		match self.binding(key):
+			case Instance(value):
+				return cast(T, value)
+			case Singleton(factory):
+				with self.lock:
+					value = self.services.get(key)
 					if value is None:
-						raise DependencyError(
-							f"factory for {key.__qualname__} yielded None"
-						)
-					self.resources.enter_context(stack.pop_all())
-			else:
-				factory = cast(Callable[[Container], T], binding.factory)
-				value = factory(self)
-				if value is None:
-					raise DependencyError(
-						f"factory for {key.__qualname__} returned None"
-					)
-			self.singletons[key] = value
-			return value
+						value = self.services.build(key, factory, self)
+					return value
+			case Scoped():
+				raise DependencyError(f"{key.__qualname__} requires a request context")
 
 	def resolved[T](self, key: type[T]) -> T | None:
 		if self.closed:
 			raise RuntimeError("the container is closed")
 
 		key = unparameterized(key)
-		binding = self.bindings.get(key)
-		if binding is None or isinstance(binding, Scoped):
-			return None
-		if isinstance(binding, Instance):
-			return cast(T, binding.value)
-		with self.lock:
-			return cast(T | None, self.singletons.get(key))
+		match self.bindings.get(key):
+			case Instance(value):
+				return cast(T, value)
+			case Singleton():
+				with self.lock:
+					return self.services.get(key)
+			case Scoped() | None:
+				return None
 
 	def close(self):
 		self.closed = True
-		self.resources.close()
+		self.services.close()
 
 
 type Binding = Instance | Singleton | Scoped

@@ -1,6 +1,7 @@
 from .application import Application, Config, Provider
-from .container import Binding, Container, DependencyError, Instance, Scoped, Singleton
+from .container import Binding, Container, Instance, Scoped, Singleton
 from .context import Context
+from .error import DependencyError
 from .kernel import Kernel, Middleware, Next
 
 __all__ = [
