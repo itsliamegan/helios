@@ -17,5 +17,9 @@ class ContentTooLargeError(HTTPError):
 	status = Status.CONTENT_TOO_LARGE
 
 
+class InternalServerError(HTTPError):
+	status = Status.INTERNAL_SERVER_ERROR
+
+
 class UnsupportedMethodError(HTTPError):
 	status = Status.NOT_IMPLEMENTED

@@ -2,8 +2,13 @@ from collections.abc import Callable, Sequence
 import sys
 import traceback
 
-from helios.http import Method, Request, Response, Status
-from helios.http.error import BadRequestError, HTTPError, UnsupportedMethodError
+from helios.http import Method, Request, Response
+from helios.http.error import (
+	BadRequestError,
+	HTTPError,
+	InternalServerError,
+	UnsupportedMethodError,
+)
 from helios.routing import Router
 
 from .container import Container
@@ -27,7 +32,8 @@ class Kernel:
 		except Exception as error:
 			# Releasing the request's services failed, such as a commit. Nothing
 			# has been sent, so the server error replaces the rendered response.
-			return self.server_error(error)
+			traceback.print_exception(error, file=sys.stderr)
+			return Response.error(InternalServerError())
 		else:
 			return response
 
@@ -81,15 +87,8 @@ class Kernel:
 		except Exception as error:
 			if context.failure is None:
 				context.failure = error
-			return Kernel.server_error(error)
-
-	@staticmethod
-	def server_error(error: Exception) -> Response:
-		traceback.print_exception(error, file=sys.stderr)
-		return Response.text(
-			"500 Internal Server Error",
-			Status.INTERNAL_SERVER_ERROR,
-		)
+			traceback.print_exception(error, file=sys.stderr)
+			return Response.error(InternalServerError())
 
 
 type Middleware = Callable[[Request, Context, Next], Response]
