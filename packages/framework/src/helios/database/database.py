@@ -13,9 +13,12 @@ class Database:
 		self.registry = registry
 
 	@contextmanager
-	def transaction(self) -> Generator[Store]:
+	def transaction(self) -> Generator[Transaction]:
 		# Closing the connection rolls back a transaction the block left open.
 		with connect(self.config) as connection:
 			connection.begin()
 			yield Store(connection, self.registry)
 			connection.commit()
+
+
+type Transaction = Store

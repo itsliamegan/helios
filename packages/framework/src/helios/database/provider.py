@@ -25,5 +25,5 @@ class Provider(Provider):
 		return Migrator(self.config, Migrations.load(self.config.migrations))
 
 	def store(self, context: Context) -> Generator[Store]:
-		with context.get(Database).transaction() as store:
-			yield store
+		with context.get(Database).transaction() as transaction:
+			yield transaction
