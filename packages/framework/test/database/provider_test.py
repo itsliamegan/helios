@@ -2,11 +2,11 @@ from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq, assert_is, assert_that
+from luna.test.assertion import assert_eq, assert_is, assert_is_instance, assert_that
 
 import helios.app
 from helios.app import Application
-from helios.database import Config, Model, Provider, Store
+from helios.database import Config, Database, Model, Provider, Store
 from helios.http import Method, Request, Response, Status, URL
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
@@ -182,6 +182,37 @@ def test_request_shares_transaction():
 		assert_eq(titles(path), ["Revised"])
 
 
+def test_commits_after_middleware_returns():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_schema(path)
+		seen = []
+
+		def observe(request, context, next):
+			response = next(request, context)
+			seen.append(titles(path))
+			return response
+
+		def create(request, context):
+			context.get(Store).create(Post, title="Intro")
+			return Response.empty(Status.OK)
+
+		app = Application(
+			helios.app.Config(),
+			Router([Route.get("/", create)]),
+			[Provider(Config(path), [Post])],
+			[observe],
+		)
+		app.boot()
+		try:
+			app.handle(request())
+		finally:
+			app.close()
+
+		assert_eq(seen, [[]])
+		assert_eq(titles(path), ["Intro"])
+
+
 def test_commit_failure_returns_error_and_leaves_no_row():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
@@ -225,3 +256,12 @@ def test_provider_registers_config_before_boot():
 		app = Application(helios.app.Config(), Router([]), [Provider(config, [Post])])
 
 		assert_is(app.container.get(Config), config)
+
+
+def test_provider_binds_database():
+	with TemporaryDirectory() as directory:
+		config = Config(Path(directory, "database.sqlite3"))
+
+		app = Application(helios.app.Config(), Router([]), [Provider(config, [Post])])
+
+		assert_is_instance(app.container.get(Database), Database)
