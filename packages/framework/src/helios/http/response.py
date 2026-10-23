@@ -4,6 +4,7 @@ from typing import Self
 
 from helios.url import URL
 
+from . import sse
 from .body import Body, Buffered, Stream
 from .cookie import Cookies
 from .error import HTTPError
@@ -68,7 +69,15 @@ class Response:
 	def stream(
 		cls,
 		chunks: Iterable[bytes],
+		content_type: str,
 		status: Status = Status.OK,
-		content_type: str = "text/event-stream",
 	) -> Self:
 		return cls(status, Headers({"Content-Type": content_type}), body=Stream(chunks))
+
+	@classmethod
+	def events(cls, items: Iterable[sse.Event | sse.Comment]) -> Self:
+		response = cls.stream(
+			sse.Events(items).encode(), "text/event-stream; charset=utf-8"
+		)
+		response.headers["Cache-Control"] = "no-cache"
+		return response

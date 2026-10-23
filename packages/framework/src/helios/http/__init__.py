@@ -1,6 +1,6 @@
 from helios.url import Query, URL
 
-from . import error
+from . import error, sse
 from .body import Body, Buffered, Stream, body
 from .cookie import Cookie, Cookies, SameSite
 from .error import UnsupportedMethodError
@@ -32,4 +32,5 @@ __all__ = [
 	"UnsupportedMethodError",
 	"body",
 	"error",
+	"sse",
 ]

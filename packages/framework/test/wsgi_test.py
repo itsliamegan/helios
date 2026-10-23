@@ -216,7 +216,7 @@ def test_adapts_content_length_from_encoded_body():
 
 def test_adapts_stream_without_content_length():
 	seen = []
-	res = Response.stream([b"data: first\n\n"])
+	res = Response.stream([b"first"], "text/plain")
 
 	def start_response(status, pairs, exc_info=None):
 		seen.extend(pairs)

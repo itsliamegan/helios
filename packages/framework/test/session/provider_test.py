@@ -614,7 +614,7 @@ def test_streamed_body_cannot_write_to_the_session():
 					errors.append(error)
 				yield b""
 
-			return Response.stream(chunks())
+			return Response.stream(chunks(), "text/plain")
 
 		response = handle(path, stream)
 		assert_is_instance(response.body, Stream)
@@ -639,7 +639,7 @@ def test_streamed_body_cannot_write_to_the_flash():
 					errors.append(error)
 				yield b""
 
-			return Response.stream(chunks())
+			return Response.stream(chunks(), "text/plain")
 
 		response = handle(path, stream)
 		assert_is_instance(response.body, Stream)
