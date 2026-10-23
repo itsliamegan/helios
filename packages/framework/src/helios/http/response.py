@@ -68,7 +68,7 @@ class Response:
 	def stream(
 		cls,
 		chunks: Iterable[bytes],
+		content_type: str,
 		status: Status = Status.OK,
-		content_type: str = "text/event-stream",
 	) -> Self:
 		return cls(status, Headers({"Content-Type": content_type}), body=Stream(chunks))

@@ -141,7 +141,7 @@ def test_releases_request_services_before_stream_is_read():
 
 	def index(request, context):
 		context.get(Visit)
-		return Response.stream(chunks())
+		return Response.stream(chunks(), "text/plain")
 
 	container = Container()
 	container.scoped(Visit, visit)
