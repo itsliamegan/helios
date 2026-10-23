@@ -8,13 +8,14 @@ from luna.test.assertion import (
 )
 
 from helios.app import Container, Context
-from helios.http import Method, Request, Response, Status, URL
+from helios.http import Method, Request, Response, Status
 from helios.routing import (
 	Group,
 	Pattern,
 	Route,
 	Router,
 )
+from helios.url import URL
 
 
 def handle(req, ctx):

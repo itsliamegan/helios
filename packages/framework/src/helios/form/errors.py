@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 @dataclass(init=False)
 class Errors:
+	"""Collects error messages, grouped by the field that produced them."""
+
 	messages: dict[str, list[str]]
 
 	def __init__(self, messages: Mapping[str, Sequence[str]] | None = None):

@@ -1,8 +1,9 @@
 from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Application, Config, Provider
-from helios.http import Method, Request, Response, Status, URL
+from helios.http import Method, Request, Response, Status
 from helios.routing import Route, Router, URLs
+from helios.url import URL
 
 
 class Moderator:

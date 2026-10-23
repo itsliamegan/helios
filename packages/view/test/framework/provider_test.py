@@ -8,8 +8,9 @@ from helios.app import Application, Config
 from helios.assets import Manifest
 import helios.assets.config
 import helios.assets.provider
-from helios.http import Method, Request, URL
+from helios.http import Method, Request
 from helios.routing import Route, Router
+from helios.url import URL
 import helios.view.config
 import helios.view.provider
 from helios.view.views import Views

@@ -3,12 +3,17 @@ from datetime import UTC, datetime
 from typing import Any
 import uuid
 
-from helios import http
+from helios import url
 
 type Scalar = int | float | str | bytes
 
 
 class Codec[T](ABC):
+	"""Converts one column's values between Python and SQLite.
+
+	A custom value type declares its codec as a nested class named `Codec`.
+	"""
+
 	@classmethod
 	def for_type(cls, annotation: object) -> Codec[Any] | None:
 		try:
@@ -33,6 +38,8 @@ class Codec[T](ABC):
 
 
 def encode[T](codec: Codec[T], value: T) -> Scalar:
+	"""Encode a value, refusing a result that SQLite cannot store as a scalar."""
+
 	encoded = codec.encode(value)
 	if isinstance(encoded, bool) or not isinstance(encoded, int | float | str | bytes):
 		raise TypeError(f"expected a SQLite scalar, got {type(encoded).__name__}")
@@ -91,6 +98,8 @@ class Int(Codec[int]):
 
 
 class UUID(Text[uuid.UUID]):
+	"""Stores a UUID as canonical text, so equal UUIDs compare equal in SQL."""
+
 	def check(self, value: object):
 		if not isinstance(value, uuid.UUID):
 			raise TypeError(f"expected a UUID, got {type(value).__name__}")
@@ -108,6 +117,8 @@ class UUID(Text[uuid.UUID]):
 
 
 class Date(Text[datetime]):
+	"""Stores an aware datetime as canonical UTC text, so text order is time order."""
+
 	FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 	def check(self, value: object):
@@ -130,17 +141,17 @@ class Date(Text[datetime]):
 		return decoded
 
 
-class URL(Text[http.URL]):
+class URL(Text[url.URL]):
 	def check(self, value: object):
-		if not isinstance(value, http.URL):
+		if not isinstance(value, url.URL):
 			raise TypeError(f"expected a URL, got {type(value).__name__}")
 
-	def encode(self, value: http.URL) -> Scalar:
+	def encode(self, value: url.URL) -> Scalar:
 		self.check(value)
 		return str(value)
 
-	def decode(self, value: Scalar) -> http.URL:
-		return http.URL.parse(self.text(value))
+	def decode(self, value: Scalar) -> url.URL:
+		return url.URL.parse(self.text(value))
 
 
 CODECS: dict[object, Codec[Any]] = {
@@ -149,5 +160,5 @@ CODECS: dict[object, Codec[Any]] = {
 	int: Int(),
 	uuid.UUID: UUID(),
 	datetime: Date(),
-	http.URL: URL(),
+	url.URL: URL(),
 }

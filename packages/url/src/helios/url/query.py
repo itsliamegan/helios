@@ -6,6 +6,12 @@ from urllib.parse import parse_qs, urlencode
 
 @dataclass(init=False)
 class Query:
+	"""A URL's query parameters by name and the query string that produced them.
+
+	A query built from parameters encodes them into its text, and a parsed query
+	keeps the text exactly as sent.
+	"""
+
 	text: str
 	parameters: dict[str, list[str]]
 

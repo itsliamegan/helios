@@ -3,17 +3,11 @@ from typing import cast
 from luna.test.assertion import assert_eq, assert_is, assert_is_instance
 
 from helios.app import Container, Kernel
-from helios.http import (
-	Input,
-	Method,
-	Request,
-	Response,
-	Status,
-	URL,
-)
+from helios.http import Input, Method, Request, Response, Status
 from helios.http.body import Stream
 from helios.http.error import BadRequestError, ContentTooLargeError, NotFoundError
 from helios.routing import Route, Router
+from helios.url import URL
 
 
 class Visit:

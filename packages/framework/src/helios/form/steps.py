@@ -11,6 +11,13 @@ if TYPE_CHECKING:
 
 @dataclass(init=False)
 class Steps[T]:
+	"""Filters or rules for a form's fields, keyed by field name.
+
+	A key like `"tags"` targets a field's whole value. A key like `"tags.*"`
+	targets each item of a list field. Per-item steps run before whole-field
+	steps.
+	"""
+
 	item: dict[str, list[T]]
 	field: dict[str, list[T]]
 

@@ -6,6 +6,8 @@ ITEM = "*"
 
 @dataclass
 class Key:
+	"""Names a field, optionally its items and a rule, as in `"tags.*.length"`."""
+
 	name: str
 	item: bool = False
 	rest: str = ""

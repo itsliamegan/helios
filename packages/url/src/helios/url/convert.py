@@ -4,6 +4,8 @@ import uuid
 
 
 class Converter[T](ABC):
+	"""Converts a path parameter between its text and its value."""
+
 	@classmethod
 	def for_name(cls, name: str) -> Converter[Any] | None:
 		return CONVERTERS.get(name)

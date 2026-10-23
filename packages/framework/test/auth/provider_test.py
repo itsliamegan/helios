@@ -16,10 +16,11 @@ import helios.auth
 from helios.auth import Authenticator
 from helios.database import Model, Store
 from helios.database.sqlite import Connection
-from helios.http import Method, Request, Response, URL
+from helios.http import Method, Request, Response
 from helios.routing import Route, Router
 from helios.session.session import Session
 from helios.session.sessions import Sessions
+from helios.url import URL
 from helios.view import Component
 import helios.view.config
 import helios.view.provider

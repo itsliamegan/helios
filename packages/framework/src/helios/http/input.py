@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 @dataclass(init=False)
 class Input:
+	"""A request's form fields by name, each name holding one or more values."""
+
 	items: dict[str, list[str]]
 
 	def __init__(self, items: Mapping[str, str | Sequence[str]] | None = None):

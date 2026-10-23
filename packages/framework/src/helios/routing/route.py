@@ -1,8 +1,8 @@
 from collections.abc import Callable, Iterator, Sequence
 from typing import Any, Concatenate, Self, TYPE_CHECKING
 
-from helios.http import Method, Request, Response, URL
-from helios.url import Pattern
+from helios.http import Method, Request, Response
+from helios.url import Pattern, URL
 
 if TYPE_CHECKING:
 	from helios.app import Context

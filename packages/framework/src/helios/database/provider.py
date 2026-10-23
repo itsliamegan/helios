@@ -11,6 +11,12 @@ from .store import Store
 
 
 class Provider(Provider):
+	"""Provides the database and a `Store` for each request.
+
+	A request's store is one transaction, which commits when the request
+	succeeds and rolls back when it fails.
+	"""
+
 	def __init__(self, config: Config, model_types: Iterable[type[Model]]):
 		self.config = config
 		self.database = Database(

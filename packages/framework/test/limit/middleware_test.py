@@ -7,12 +7,13 @@ from helios.app import Application, Container, Provider
 from helios.app import Config as AppConfig
 from helios.auth.authenticator import Authenticator
 from helios.database import Model
-from helios.http import Headers, Method, Request, Response, Status, URL
+from helios.http import Headers, Method, Request, Response, Status
 import helios.limit
 from helios.limit.config import Config
 from helios.routing import Route, Router
 from helios.session.session import Session
 from helios.session.sessions import Sessions
+from helios.url import URL
 
 
 class User(Model):

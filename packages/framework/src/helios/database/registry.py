@@ -5,6 +5,12 @@ from .model import Model
 
 
 class Registry:
+	"""The models one database stores, listed explicitly.
+
+	Annotations on registered models fall back to these models' names, so no
+	two registered models may share a class name.
+	"""
+
 	def __init__(self, model_types: Iterable[type[Model]]):
 		self.model_types: set[type[Model]] = set()
 		self.names: dict[str, type[Model]] = {}

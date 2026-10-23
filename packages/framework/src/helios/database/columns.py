@@ -4,6 +4,12 @@ from .column import Column
 
 
 class Columns(Mapping[str, Column]):
+	"""A model's columns by name, each resolved when it is read.
+
+	Membership and iteration do not resolve columns, so they work before a
+	forward-referenced type is declared.
+	"""
+
 	def __init__(self, declared: Mapping[str, Column]):
 		self.declared = declared
 

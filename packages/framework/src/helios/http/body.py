@@ -6,6 +6,8 @@ type Body = Buffered | Stream
 
 @dataclass
 class Buffered:
+	"""A body held in memory."""
+
 	content: str | bytes = ""
 
 	def to_bytes(self) -> bytes:
@@ -19,8 +21,6 @@ class Buffered:
 
 @dataclass
 class Stream:
+	"""A body sent in chunks as it is produced."""
+
 	chunks: Iterable[bytes]
-
-
-def body(content: str | bytes = "") -> Buffered:
-	return Buffered(content)

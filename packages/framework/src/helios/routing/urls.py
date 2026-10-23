@@ -1,7 +1,8 @@
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from helios.http import Method, Query, URL
+from helios.http import Method
+from helios.url import Query, URL
 
 from .router import Match, Router
 

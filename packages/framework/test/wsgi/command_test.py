@@ -12,8 +12,8 @@ import helios.app
 import helios.assets.config
 import helios.assets.provider
 from helios.console import Program
-from helios.http import URL
 from helios.routing import Router
+from helios.url import URL
 import helios.view.config
 import helios.view.provider
 from helios.wsgi import Application

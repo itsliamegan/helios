@@ -9,6 +9,8 @@ COLLECTIONS = (list, tuple, set, frozenset)
 
 @dataclass(init=False)
 class Submission:
+	"""The input and errors flashed by the last failed submission."""
+
 	input: Input | None
 	errors: Errors
 
@@ -17,13 +19,15 @@ class Submission:
 		self.errors = errors if errors is not None else Errors()
 
 	def value(self, name: str, default: object = "") -> str | list[str]:
-		is_collection = isinstance(default, COLLECTIONS)
 		if self.input is None:
+			# Nothing was flashed, so the form renders from its defaults.
 			return encode(default)
 
-		if is_collection:
+		if isinstance(default, COLLECTIONS):
 			return self.input.all(name)
 		else:
+			# A field missing from flashed input was submitted empty, as an
+			# unchecked checkbox is, so it does not fall back to its default.
 			return self.input.first(name) or ""
 
 	def error(self, name: str) -> str | None:

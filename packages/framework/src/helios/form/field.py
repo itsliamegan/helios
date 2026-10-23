@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 
 @dataclass
 class Field:
+	"""A single form field, how to parse it, and whether it has a default."""
+
 	name: str
 	parser: Parser[Any]
 	default: object = MISSING
@@ -60,8 +62,12 @@ class Field:
 		values = input.all(self.name)
 		value = input.first(self.name)
 		if self.is_list:
+			# A list field is only missing when it has no items, because it
+			# keeps its blank ones.
 			return len(values) == 0
 		else:
+			# Any other field is missing when it is absent or is a single blank
+			# value. Repeated values are not missing, so parsing rejects them.
 			return value is None or (len(values) == 1 and blank(value))
 
 	def parse(self, input: Input) -> Any:

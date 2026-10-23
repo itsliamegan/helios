@@ -7,38 +7,15 @@ from werkzeug.http import dump_cookie, parse_cookie
 
 from .header import Headers
 
-type SameSite = Literal["Lax", "Strict", "None"]
-
-
-@dataclass
-class Cookie:
-	name: str
-	value: str
-	path: str = "/"
-	expires: datetime | None = None
-	http_only: bool = False
-	secure: bool = False
-	same_site: SameSite | None = None
-
-	def __setattr__(self, name: str, value: object):
-		if name == "same_site" and value not in (None, "Lax", "Strict", "None"):
-			raise ValueError(f"unsupported SameSite value: {value!r}")
-		super().__setattr__(name, value)
-
-	def __str__(self) -> str:
-		return dump_cookie(
-			self.name,
-			self.value,
-			path=self.path,
-			expires=self.expires,
-			secure=self.secure,
-			httponly=self.http_only,
-			samesite=self.same_site,
-		)
-
 
 @dataclass(init=False)
 class Cookies:
+	"""The cookies parsed from a request or sent with a response.
+
+	Setting an existing name to a string changes only its value and keeps its
+	other attributes.
+	"""
+
 	cookies: dict[str, Cookie]
 
 	def __init__(self, pairs: Mapping[str, str] | None = None):
@@ -79,3 +56,35 @@ class Cookies:
 
 	def __contains__(self, name: object) -> bool:
 		return name in self.cookies
+
+
+@dataclass
+class Cookie:
+	"""A cookie parsed from a request or sent to a response."""
+
+	name: str
+	value: str
+	path: str = "/"
+	expires: datetime | None = None
+	http_only: bool = False
+	secure: bool = False
+	same_site: SameSite | None = None
+
+	def __setattr__(self, name: str, value: object):
+		if name == "same_site" and value not in (None, "Lax", "Strict", "None"):
+			raise ValueError(f"unsupported SameSite value: {value!r}")
+		super().__setattr__(name, value)
+
+	def __str__(self) -> str:
+		return dump_cookie(
+			self.name,
+			self.value,
+			path=self.path,
+			expires=self.expires,
+			secure=self.secure,
+			httponly=self.http_only,
+			samesite=self.same_site,
+		)
+
+
+type SameSite = Literal["Lax", "Strict", "None"]

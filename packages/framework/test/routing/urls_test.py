@@ -2,12 +2,13 @@ from uuid import UUID
 
 from luna.test.assertion import assert_eq, assert_not_none
 
-from helios.http import Query, Response, URL
+from helios.http import Response
 from helios.routing import (
 	Route,
 	Router,
 	URLs,
 )
+from helios.url import Query, URL
 
 
 def test_generates_absolute_route_with_query_explicitly():

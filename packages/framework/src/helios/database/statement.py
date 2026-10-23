@@ -2,8 +2,8 @@ from dataclasses import dataclass
 import re
 from typing import Any, Literal
 
-from .clause import Clause
 from .codec import Scalar
+from .condition import AnyOf
 
 type Statement = Select | Insert | Update | Delete | Raw
 
@@ -11,10 +11,10 @@ type Statement = Select | Insert | Update | Delete | Raw
 @dataclass
 class Select:
 	table: str
-	columns: tuple[Expression, ...]
-	where: tuple[Clause, ...] = ()
+	columns: tuple[ColumnExpression, ...]
+	where: tuple[AnyOf, ...] = ()
 	group_by: tuple[str, ...] = ()
-	ordering: tuple[tuple[str, Direction], ...] = ()
+	order_by: tuple[Order, ...] = ()
 	limit: int | None = None
 
 
@@ -28,13 +28,13 @@ class Insert:
 class Update:
 	table: str
 	values: dict[str, Scalar | None]
-	where: tuple[Clause, ...]
+	where: tuple[AnyOf, ...]
 
 
 @dataclass
 class Delete:
 	table: str
-	where: tuple[Clause, ...]
+	where: tuple[AnyOf, ...]
 
 
 @dataclass
@@ -77,7 +77,8 @@ class Raw:
 		return text[:77] + "..."
 
 
-type Expression = ColumnReference | Count
+# Anything a select lists as one of its columns.
+type ColumnExpression = ColumnReference | Count
 
 type Direction = Literal["asc", "desc"]
 
@@ -90,3 +91,9 @@ class ColumnReference:
 @dataclass
 class Count:
 	pass
+
+
+@dataclass
+class Order:
+	name: str
+	direction: Direction

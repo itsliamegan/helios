@@ -26,6 +26,23 @@ METADATA = {"fields"}
 
 @dataclass_transform(kw_only_default=True, eq_default=False)
 class Form:
+	"""Parses request input into typed values.
+
+	A subclass declares each field as a single, typed attribute.
+
+	A subclass specifies validation rules using the `rules` class attribute,
+	which declares rules per field, keyed by the field's name.
+
+	A subclass overrides error messages using the `messages` class attribute,
+	which overrides an error's wording by a string key. This key is composed of
+	the name of the field, a dot ".", then the name of the rule. Every field
+	also has two implicit keys: `required` when the field is missing, and
+	`invalid` when the field fails to parse.
+
+	A form only reads input. Checks that need data such as database records or
+	the current user belong to models or controllers.
+	"""
+
 	fields: ClassVar[dict[str, Field]] = {}
 	filters: ClassVar[Filters] = Filters()
 	rules: ClassVar[Rules] = Rules()
@@ -60,6 +77,14 @@ class Form:
 
 	@classmethod
 	def validate(cls, input: Input) -> tuple[Self, Errors]:
+		"""Return the form and any errors encountered during validation.
+
+		Each field goes through presence, parsing, filters, and rules, and stops
+		at its first failure. Absent and blank input both count as missing. A
+		missing optional field takes its default and skips the remaining steps.
+		A field that fails is left unset, so reading it raises `AttributeError`.
+		"""
+
 		form = cls.__new__(cls)
 		form._values = {}
 		errors = Errors()
@@ -80,6 +105,8 @@ class Form:
 				errors.add(name, cls.message(key, error.message, error.item))
 			except RuleError as error:
 				if error.key is None:
+					# A RuleError that reaches this point without a key is a
+					# bug, not invalid input.
 					raise
 				errors.add(name, cls.message(error.key, error.message, error.key.item))
 			else:

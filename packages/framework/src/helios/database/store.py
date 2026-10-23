@@ -3,9 +3,9 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from .clause import Clause
 from .codec import Scalar
 from .column import Column
+from .condition import AnyOf
 from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .load import Load
@@ -21,7 +21,8 @@ from .statement import Delete, Insert, Raw, Select, Statement, Update
 class Store:
 	"""A set of models stored as rows, read and written through one connection.
 
-	The store never begins, commits, or rolls back a transaction itself.
+	The store never begins, commits, or rolls back a transaction itself. Once
+	closed, it refuses every read and write with `RuntimeError`.
 	"""
 
 	def __init__(
@@ -42,6 +43,8 @@ class Store:
 		*args: P.args,
 		**values: P.kwargs,
 	) -> T:
+		"""Construct a model and insert it as a new row."""
+
 		registered = self.registry.get(cast(type[T], model_type))
 		model = model_type(*args, **values)
 		model._values["created_at"] = datetime.now(UTC)
@@ -54,6 +57,13 @@ class Store:
 		return model
 
 	def update(self, model: Model, **values: Any):
+		"""Write values to the model's row, then set them on the model.
+
+		Raise `NotFoundError` when no row matches, such as for a model that was
+		deleted or never stored. Changing a `belongs_to` ID unloads that
+		relationship.
+		"""
+
 		model_type = self.registry.get(type(model))
 		if not values:
 			raise ModelError(f"{model_type.__name__}.update requires values")
@@ -77,12 +87,19 @@ class Store:
 			model._loaded.pop(name, None)
 
 	def delete(self, model: Model):
+		"""Delete the model's row, raising `NotFoundError` when no row matches."""
+
 		model_type = self.registry.get(type(model))
 		statement = Delete(model_type.table, self.identifying(model))
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
 
 	def load[T: Model](self, models: T | Sequence[T], *paths: str):
+		"""Load relationship paths onto stored models of one type.
+
+		A path names relationships separated by dots, as in `"taggings.tag"`.
+		"""
+
 		if self.closed:
 			raise RuntimeError("the transaction is closed")
 
@@ -99,9 +116,9 @@ class Store:
 			raise ModelError("store.load can only be called with stored models")
 		Load(self, model_type, paths).load(models)
 
-	def identifying(self, model: Model) -> tuple[Clause, ...]:
+	def identifying(self, model: Model) -> tuple[AnyOf, ...]:
 		return (
-			Clause(
+			AnyOf(
 				(ConditionParser(self.registry, type(model)).parse({"id": model.id}),)
 			),
 		)
@@ -130,10 +147,14 @@ class Store:
 		sql: str,
 		parameters: Iterable[Any],
 	) -> list[T]:
+		"""Run raw SQL that selects exactly the model's columns."""
+
 		self.registry.get(model_type)
 		return self.models(model_type, Raw(sql, tuple(parameters)))
 
 	def close(self):
+		"""Refuse every later read and write."""
+
 		self.closed = True
 
 	def models[T: Model](self, model_type: type[T], statement: Statement) -> list[T]:

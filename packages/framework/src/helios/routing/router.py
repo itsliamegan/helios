@@ -2,8 +2,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
-from helios.http import Method, Request, Response, URL
+from helios.http import Method, Request, Response
 from helios.http.error import NotFoundError
+from helios.url import URL
 
 from .route import Group, Route
 

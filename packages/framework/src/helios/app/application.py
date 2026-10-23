@@ -1,8 +1,9 @@
 from collections.abc import Iterator, Sequence
 from typing import Self
 
-from helios.http import Request, Response, URL
+from helios.http import Request, Response
 from helios.routing import Router, URLs
+from helios.url import URL
 
 from .container import Container
 from .kernel import Kernel, Middleware

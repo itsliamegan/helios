@@ -13,7 +13,6 @@ from luna.test.assertion import (
 	assert_raises,
 )
 
-from helios import http
 from helios.database import (
 	Codec,
 	Config,
@@ -26,6 +25,7 @@ from helios.database import (
 	Store,
 )
 from helios.database.sqlite import Connection
+from helios.url import URL
 
 
 class Token:
@@ -54,7 +54,7 @@ class Record(Model):
 	count: int
 	active: bool
 	owner_id: UUID
-	link: http.URL
+	link: URL
 	published_at: datetime
 	note: str | None = None
 	token: Token
@@ -90,7 +90,7 @@ def record_values(name: str = "Intro"):
 		"count": 3,
 		"active": True,
 		"owner_id": uuid4(),
-		"link": http.URL.parse("https://example.com/posts/intro"),
+		"link": URL.parse("https://example.com/posts/intro"),
 		"published_at": datetime(2025, 1, 2, 3, 4, 5, 6, tzinfo=UTC),
 		"token": Token("secret"),
 	}
@@ -118,7 +118,7 @@ def test_crud_and_scalar_round_trip():
 			assert_eq(found.count, 3)
 			assert_eq(found.active, True)
 			assert_is_instance(found.owner_id, UUID)
-			assert_is_instance(found.link, http.URL)
+			assert_is_instance(found.link, URL)
 			assert_eq(found.published_at.tzinfo, UTC)
 			assert_eq(found.note, None)
 			assert_eq(found.token.value, "secret")

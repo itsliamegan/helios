@@ -5,7 +5,7 @@ from typing import Self
 
 from dotenv import dotenv_values
 
-from helios.http import URL
+from helios.url import URL
 
 
 class ConfigError(Exception):

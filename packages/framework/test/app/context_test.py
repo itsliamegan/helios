@@ -8,7 +8,8 @@ from luna.test.assertion import (
 )
 
 from helios.app import Container, Context
-from helios.http import Method, Request, URL
+from helios.http import Method, Request
+from helios.url import URL
 
 
 class Visit:

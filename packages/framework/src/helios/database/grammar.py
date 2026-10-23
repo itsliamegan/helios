@@ -2,15 +2,15 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Self
 
-from .clause import Clause, Comparison, Condition, Exists, Group, IsNull, Membership
+from .condition import AllOf, AnyOf, Comparison, Condition, Exists, IsNull, Membership
 from .sqlite import quote_identifier
 from .statement import (
+	ColumnExpression,
 	ColumnReference,
 	Count,
 	Delete,
-	Direction,
-	Expression,
 	Insert,
+	Order,
 	Raw,
 	Select,
 	Statement,
@@ -19,6 +19,12 @@ from .statement import (
 
 
 class Grammar:
+	"""Compiles statements into SQL and its parameters.
+
+	Model reads and writes become SQL only here. The store and queries build
+	statements instead. A raw statement passes through unchanged.
+	"""
+
 	def compile(self, statement: Statement) -> Fragment:
 		match statement:
 			case Select():
@@ -33,13 +39,15 @@ class Grammar:
 				return Fragment(sql, parameters)
 
 	def select(self, statement: Select) -> Fragment:
-		columns = ", ".join(self.expression(column) for column in statement.columns)
+		columns = ", ".join(
+			self.column_expression(column) for column in statement.columns
+		)
 		return Fragment.join(
 			[
 				Fragment(f"SELECT {columns} FROM {quote_identifier(statement.table)}"),
-				self.where(statement.where, Scope.of(statement.table)),
+				self.where(statement.where, Correlation.to(statement.table)),
 				self.group_by(statement.group_by),
-				self.order(statement.ordering),
+				self.order_by(statement.order_by),
 				self.limit(statement.limit),
 			]
 		)
@@ -63,7 +71,7 @@ class Grammar:
 					f"UPDATE {quote_identifier(statement.table)} SET {assignments}",
 					tuple(statement.values.values()),
 				),
-				self.where(statement.where, Scope.of(statement.table)),
+				self.where(statement.where, Correlation.to(statement.table)),
 			]
 		)
 
@@ -71,22 +79,22 @@ class Grammar:
 		return Fragment.join(
 			[
 				Fragment(f"DELETE FROM {quote_identifier(statement.table)}"),
-				self.where(statement.where, Scope.of(statement.table)),
+				self.where(statement.where, Correlation.to(statement.table)),
 			]
 		)
 
-	def expression(self, expression: Expression) -> str:
+	def column_expression(self, expression: ColumnExpression) -> str:
 		match expression:
 			case ColumnReference(name=name):
 				return quote_identifier(name)
 			case Count():
 				return "COUNT(*)"
 
-	def where(self, clauses: tuple[Clause, ...], scope: Scope) -> Fragment:
+	def where(self, clauses: tuple[AnyOf, ...], correlation: Correlation) -> Fragment:
 		if not clauses:
 			return Fragment("")
 		compiled = Fragment.join(
-			(self.clause(clause, scope) for clause in clauses),
+			(self.any_of(clause, correlation) for clause in clauses),
 			" AND ",
 		)
 		return Fragment.join([Fragment(" WHERE "), compiled])
@@ -98,39 +106,41 @@ class Grammar:
 			f" GROUP BY {", ".join(quote_identifier(name) for name in names)}"
 		)
 
-	def order(self, ordering: tuple[tuple[str, Direction], ...]) -> Fragment:
-		if not ordering:
+	def order_by(self, orders: tuple[Order, ...]) -> Fragment:
+		if not orders:
 			return Fragment("")
-		keys = ", ".join(
-			f"{quote_identifier(name)} {direction.upper()}"
-			for name, direction in ordering
+		terms = ", ".join(
+			f"{quote_identifier(order.name)} {order.direction.upper()}"
+			for order in orders
 		)
-		return Fragment(f" ORDER BY {keys}")
+		return Fragment(f" ORDER BY {terms}")
 
 	def limit(self, count: int | None) -> Fragment:
 		if count is None:
 			return Fragment("")
 		return Fragment(" LIMIT ?", (count,))
 
-	def clause(self, clause: Clause, scope: Scope) -> Fragment:
+	def any_of(self, clause: AnyOf, correlation: Correlation) -> Fragment:
 		groups = Fragment.join(
-			(self.group(group, scope) for group in clause.groups),
+			(self.all_of(group, correlation) for group in clause.groups),
 			" OR ",
 		)
+		# `IS NOT 1` also keeps rows where the clause is null, which `NOT` would
+		# drop, so a negated clause matches exactly the rows the clause does not.
 		negation = " IS NOT 1" if clause.negated else ""
 		return Fragment.join([Fragment("("), groups, Fragment(f"){negation}")])
 
-	def group(self, group: Group, scope: Scope) -> Fragment:
+	def all_of(self, group: AllOf, correlation: Correlation) -> Fragment:
 		conditions = Fragment.join(
-			(self.condition(condition, scope) for condition in group.conditions),
+			(self.condition(condition, correlation) for condition in group.conditions),
 			" AND ",
 		)
 		return Fragment.join([Fragment("("), conditions, Fragment(")")])
 
-	def condition(self, condition: Condition, scope: Scope) -> Fragment:
+	def condition(self, condition: Condition, correlation: Correlation) -> Fragment:
 		match condition:
-			case Comparison(name=name, operator=operator, value=value):
-				return Fragment(f"{quote_identifier(name)} {operator} ?", (value,))
+			case Comparison(name=name, comparator=comparator, value=value):
+				return Fragment(f"{quote_identifier(name)} {comparator} ?", (value,))
 			case IsNull(name=name):
 				return Fragment(f"{quote_identifier(name)} IS NULL")
 			case Membership(name=name, values=values, includes_null=includes_null):
@@ -140,39 +150,45 @@ class Grammar:
 					sql = f"({sql} OR {quote_identifier(name)} IS NULL)"
 				return Fragment(sql, values)
 			case Exists():
-				return self.exists(condition, scope)
+				return self.exists(condition, correlation)
 
-	def exists(self, condition: Exists, scope: Scope) -> Fragment:
-		alias = quote_identifier(scope.alias())
-		column = quote_identifier(condition.column)
+	def exists(self, condition: Exists, correlation: Correlation) -> Fragment:
+		alias = quote_identifier(correlation.alias())
+		inner_column = quote_identifier(condition.inner_column)
 		outer_column = quote_identifier(condition.outer_column)
 		return Fragment.join(
 			[
 				Fragment(
 					f"EXISTS (SELECT 1 FROM {quote_identifier(condition.table)} "
-					f"AS {alias} WHERE {alias}.{column} = "
-					f"{scope.reference}.{outer_column} AND "
+					f"AS {alias} WHERE {alias}.{inner_column} = "
+					f"{correlation.reference}.{outer_column} AND "
 				),
-				self.group(condition.group, scope.inside(alias)),
+				self.all_of(condition.group, correlation.inside(alias)),
 				Fragment(")"),
 			]
 		)
 
 
-class Scope:
+class Correlation:
+	"""The table a correlated subquery refers to at this point in a statement.
+
+	It also hands out the aliases its subqueries take, shared across the whole
+	statement.
+	"""
+
 	def __init__(self, reference: str, aliases: Aliases):
 		self.reference = reference
 		self.aliases = aliases
 
 	@classmethod
-	def of(cls, table: str) -> Self:
+	def to(cls, table: str) -> Self:
 		return cls(quote_identifier(table), Aliases(table))
 
 	def alias(self) -> str:
 		return self.aliases.next()
 
-	def inside(self, reference: str) -> Scope:
-		return Scope(reference, self.aliases)
+	def inside(self, reference: str) -> Correlation:
+		return Correlation(reference, self.aliases)
 
 
 class Aliases:
@@ -183,12 +199,15 @@ class Aliases:
 	def next(self) -> str:
 		self.count += 1
 		if f"r{self.count}" == self.table:
+			# This alias would shadow the outer table's name.
 			self.count += 1
 		return f"r{self.count}"
 
 
 @dataclass
 class Fragment:
+	"""SQL text and its parameters, in order."""
+
 	sql: str
 	parameters: tuple[Any, ...] = ()
 

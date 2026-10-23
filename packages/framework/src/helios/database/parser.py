@@ -2,20 +2,30 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Self, TypeIs
 
-from .clause import Comparison, Condition, Exists, Group, IsNull, Membership, Operator
 from .column import Column
+from .condition import (
+	AllOf,
+	Comparator,
+	Comparison,
+	Condition,
+	Exists,
+	IsNull,
+	Membership,
+)
 from .error import ModelError
 from .model import Model
 from .registry import Registry
 
 
 class ConditionParser:
+	"""Parses condition mappings, checking each key and value against the model."""
+
 	def __init__(self, registry: Registry, model_type: type[Model]):
 		self.registry = registry
 		self.model_type = model_type
 		self.subject = f"Query on {model_type.__name__}"
 
-	def parse(self, conditions: Mapping[str, Any]) -> Group:
+	def parse(self, conditions: Mapping[str, Any]) -> AllOf:
 		if not conditions:
 			raise ModelError(f"{self.subject} has an empty condition group")
 
@@ -32,14 +42,14 @@ class ConditionParser:
 
 	def build(
 		self, model_type: type[Model], terms: Sequence[Term], depth: int
-	) -> Group:
+	) -> AllOf:
 		conditions: list[Condition] = []
 		for item in split(terms, depth):
 			if isinstance(item, Term):
 				conditions.append(self.compare(model_type, item, depth))
 			else:
 				conditions.append(self.exists(model_type, item, depth))
-		return Group(tuple(conditions))
+		return AllOf(tuple(conditions))
 
 	def compare(self, model_type: type[Model], term: Term, depth: int) -> Condition:
 		name = term.key.path[depth]
@@ -77,6 +87,12 @@ class ConditionParser:
 
 
 def split(terms: Sequence[Term], depth: int) -> list[Term | list[Term]]:
+	"""Split terms into those ending at `depth` and those under each relationship.
+
+	Terms under the same relationship stay together, so they compile to one
+	`EXISTS` and match the same related row.
+	"""
+
 	items: list[Term | list[Term]] = []
 	nested: dict[str, list[Term]] = {}
 	for term in terms:
@@ -100,8 +116,10 @@ class Term:
 
 @dataclass
 class Key:
+	"""A condition key: a dotted path and an operator, as in `"author.name <"`."""
+
 	path: tuple[str, ...]
-	operator: Operator | Literal["in"]
+	operator: Operator
 
 	@classmethod
 	def parse(cls, text: str) -> Self:
@@ -132,6 +150,8 @@ class Key:
 
 OPERATORS = ("=", "<", "<=", ">", ">=", "in")
 
+type Operator = Comparator | Literal["in"]
 
-def is_operator(text: str) -> TypeIs[Operator | Literal["in"]]:
+
+def is_operator(text: str) -> TypeIs[Operator]:
 	return text in OPERATORS

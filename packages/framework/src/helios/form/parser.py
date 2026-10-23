@@ -4,8 +4,9 @@ import re
 from typing import Any, NewType, get_args, get_origin
 import uuid
 
-from helios import http
+from helios import url
 
+# A `str` field that is not trimmed. Blank input still counts as missing.
 Untrimmed = NewType("Untrimmed", str)
 
 
@@ -17,6 +18,12 @@ class ParseError(ValueError):
 
 
 class Parser[T](ABC):
+	"""Turns the strings sent under one input name into a field's value.
+
+	A parser for anything other than text ignores surrounding whitespace
+	itself, because it runs before filters.
+	"""
+
 	@classmethod
 	def for_type(cls, annotation: object) -> Parser[Any] | None:
 		if get_origin(annotation) is not list:
@@ -64,11 +71,11 @@ class UUID(Scalar[uuid.UUID]):
 			raise ParseError("must be a valid UUID") from error
 
 
-class URL(Scalar[http.URL]):
-	def parse(self, values: Sequence[str]) -> http.URL:
+class URL(Scalar[url.URL]):
+	def parse(self, values: Sequence[str]) -> url.URL:
 		raw = self.single(values).strip()
 		try:
-			return http.URL.parse(raw)
+			return url.URL.parse(raw)
 		except ValueError as error:
 			raise ParseError("must be a valid URL") from error
 
@@ -98,7 +105,7 @@ SCALARS: dict[Any, Parser[Any]] = {
 	bool: Bool(),
 	int: Int(),
 	uuid.UUID: UUID(),
-	http.URL: URL(),
+	url.URL: URL(),
 }
 
 

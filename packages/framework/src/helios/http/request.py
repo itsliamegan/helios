@@ -11,6 +11,11 @@ from .method import Method
 
 @dataclass(init=False)
 class Request:
+	"""An incoming HTTP request.
+
+	Its URL is absolute. Its cookies are parsed from its headers.
+	"""
+
 	method: Method
 	url: URL
 	headers: Headers

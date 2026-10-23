@@ -8,6 +8,12 @@ from .steps import Steps
 
 
 class Rules(Steps[Rule[Any]]):
+	"""Checks each field's value(s), raising `RuleError` on failure.
+
+	If an item fails a per-item rule, the failure is keyed on the field's name,
+	not the item's position.
+	"""
+
 	def check(self, field: Field, value: Any):
 		if field.is_list:
 			for item in value:

@@ -15,13 +15,12 @@ from helios.http import (
 	Headers,
 	Input,
 	Method,
-	Query,
 	Request,
 	Response,
 	Stream,
-	URL,
 )
 from helios.http.error import BadRequestError, ContentTooLargeError
+from helios.url import Query, URL
 
 
 class ResponseAdapter:

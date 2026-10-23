@@ -30,6 +30,21 @@ from .relationships import Relationships
 	field_specifiers=(generated, belongs_to, has_many, has_one),
 )
 class Model:
+	"""A record in a database.
+
+	A subclass indicates the table that its rows come from with the `table`
+	attribute. A subclass declares each column as an annotated attribute and
+	each relationship with `belongs_to`, `has_many`, or `has_one`. An annotation
+	can name a type declared later, because each attribute resolves on first
+	use.
+
+	Attributes are read-only; writes must be performed through the `Store`. A
+	model built by its constructor is never stored and has no `created_at`.
+
+	Two models are equal only when they are the same object, so compare `id` to
+	check for the same row.
+	"""
+
 	table: ClassVar[str] = ""
 	columns: ClassVar[Columns] = Columns({})
 	relationships: ClassVar[Relationships] = Relationships({})
@@ -51,6 +66,8 @@ class Model:
 
 	@classmethod
 	def hydrate(cls, values: Mapping[str, Any]) -> Self:
+		"""Build a stored model from its decoded column values."""
+
 		model = cls.__new__(cls)
 		model._values = {name: values[name] for name in cls.columns}
 		model._loaded = {}
@@ -93,6 +110,14 @@ class Model:
 
 	@classmethod
 	def fall_back_to(cls, namespace: Namespace):
+		"""Set pending annotations to resolve by name in `namespace`.
+
+		An annotation can name a type that its module imports only under
+		`TYPE_CHECKING`. Setting the fallback namespace here allows the
+		annotation to resolve to that type, if it is registered on the
+		namespace.
+		"""
+
 		attributes = [
 			*cls.columns.declared.values(),
 			*cls.relationships.declared.values(),

@@ -16,7 +16,8 @@ from helios.form import (
 )
 from helios.form.filter import Compact, Unspace, Upcase
 from helios.form.rule import Distinct, Length
-from helios.http import Input, URL
+from helios.http import Input
+from helios.url import URL
 
 
 class PostForm(Form):

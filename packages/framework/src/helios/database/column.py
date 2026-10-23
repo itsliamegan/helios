@@ -10,10 +10,20 @@ if TYPE_CHECKING:
 
 
 def generated(init: bool = False) -> Any:
+	"""Declare a column whose value is generated, such as `id`.
+
+	The column is not a constructor parameter unless `init` is true.
+	"""
+
 	return Column(init)
 
 
 class Column:
+	"""One column of a model, stored through the codec its annotation chooses.
+
+	`X | None` makes the column nullable. The annotation resolves on first use.
+	"""
+
 	name: str
 	declaration: Declaration
 	_codec: Codec[object]
