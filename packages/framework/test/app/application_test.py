@@ -199,6 +199,80 @@ def test_rejects_handling_before_boot():
 		app.handle(request())
 
 
+def test_rejects_handling_after_close():
+	app = Application(Config(), Router([]), [])
+	app.boot()
+	app.close()
+
+	with assert_raises(RuntimeError):
+		app.handle(request())
+
+
+def test_rejects_booting_twice():
+	events = []
+
+	class RecordingProvider(Provider):
+		def boot(self, application):
+			events.append("boot")
+
+	app = Application(Config(), Router([]), [RecordingProvider()])
+	app.boot()
+
+	with assert_raises(RuntimeError):
+		app.boot()
+	assert_eq(events, ["boot"])
+
+
+def test_rejects_booting_after_close():
+	events = []
+
+	class RecordingProvider(Provider):
+		def boot(self, application):
+			events.append("boot")
+
+	app = Application(Config(), Router([]), [RecordingProvider()])
+	app.close()
+
+	with assert_raises(RuntimeError):
+		app.boot()
+	assert_eq(events, [])
+
+
+def test_rejects_booting_after_failed_boot():
+	events = []
+
+	class Moderation(Provider):
+		def register(self, container):
+			container.singleton(Moderator, lambda container: Moderator())
+
+		def boot(self, application):
+			events.append("boot")
+			application.container.get(Moderator)
+
+	class Broken(Provider):
+		def boot(self, application):
+			raise ValueError("failed")
+
+	app = Application(Config(), Router([]), [Moderation(), Broken()])
+	with assert_raises(ValueError):
+		app.boot()
+
+	with assert_raises(RuntimeError):
+		app.boot()
+	assert_eq(events, ["boot"])
+
+
+def test_rejects_middleware_after_boot():
+	def middleware(request, context, next):
+		return next(request, context)
+
+	app = Application(Config(), Router([]), [])
+	app.boot()
+
+	with assert_raises(RuntimeError):
+		app.use(middleware)
+
+
 def test_closes_when_its_block_ends():
 	events = []
 

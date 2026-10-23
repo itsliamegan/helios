@@ -50,6 +50,11 @@ class Application:
 			raise
 
 	def boot(self):
+		if self.container.closed:
+			raise RuntimeError("the application is closed")
+		if self.kernel is not None:
+			raise RuntimeError("the application is already booted")
+
 		try:
 			for provider in self.providers:
 				provider.boot(self)
@@ -63,9 +68,17 @@ class Application:
 			raise
 
 	def use(self, middleware: Middleware):
+		# Providers add middleware to the application while booting, but the
+		# kernel copies the list when it's built. Reject adding middleware that
+		# would be added after this copy is made.
+		if self.kernel is not None:
+			raise RuntimeError("the application is already booted")
+
 		self.middlewares.use(middleware)
 
 	def handle(self, request: Request) -> Response:
+		if self.container.closed:
+			raise RuntimeError("the application is closed")
 		if self.kernel is None:
 			raise RuntimeError("the application is not booted")
 		return self.kernel.handle(request)
