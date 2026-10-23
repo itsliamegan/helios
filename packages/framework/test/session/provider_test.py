@@ -4,21 +4,25 @@ import multiprocessing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
+from typing import cast
 from uuid import uuid4
 
 from luna.test.assertion import (
 	assert_eq,
 	assert_is,
+	assert_is_instance,
 	assert_not_eq,
 	assert_not_in,
 	assert_not_none,
+	assert_raises,
 	assert_that,
 )
 import time_machine
 
-from helios.app import Application
+from helios.app import Application, Provider
 from helios.app import Config as AppConfig
 from helios.http import Headers, Method, Request, Response, Status, URL
+from helios.http.body import Stream
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
 import helios.session
@@ -561,3 +565,152 @@ def test_provider_registers_config_before_boot():
 		)
 
 		assert_is(app.container.get(helios.session.Config), config)
+
+
+class Outer(Provider):
+	"""Runs a middleware outside the session middleware."""
+
+	def __init__(self, middleware):
+		self.middleware = middleware
+
+	def boot(self, application: Application):
+		application.use(self.middleware)
+
+
+def handle(path: Path, route, outer=None) -> Response:
+	providers = [Outer(outer)] if outer is not None else []
+	app = Application(
+		AppConfig(),
+		Router([Route.get("/", route)]),
+		[
+			*providers,
+			helios.session.Provider(
+				helios.session.Config(),
+				Driver(path, path.with_suffix(".lock")),
+			),
+		],
+	)
+	app.boot()
+	try:
+		return app.handle(request())
+	finally:
+		app.close()
+
+
+def test_streamed_body_cannot_write_to_the_session():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		write_sessions(path)
+		errors = []
+
+		def stream(request, context):
+			session = context.get(Session)
+			session["message"] = "Hello"
+
+			def chunks():
+				try:
+					session["late"] = "Too late"
+				except RuntimeError as error:
+					errors.append(error)
+				yield b""
+
+			return Response.stream(chunks())
+
+		response = handle(path, stream)
+		assert_is_instance(response.body, Stream)
+		list(cast(Stream, response.body).chunks)
+
+		assert_eq([type(error) for error in errors], [RuntimeError])
+
+
+def test_streamed_body_cannot_write_to_the_flash():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		write_sessions(path)
+		errors = []
+
+		def stream(request, context):
+			flash = context.get(Flash)
+
+			def chunks():
+				try:
+					flash["notice"] = "Too late"
+				except RuntimeError as error:
+					errors.append(error)
+				yield b""
+
+			return Response.stream(chunks())
+
+		response = handle(path, stream)
+		assert_is_instance(response.body, Stream)
+		list(cast(Stream, response.body).chunks)
+
+		assert_eq([type(error) for error in errors], [RuntimeError])
+
+
+def test_failed_request_closes_its_sessions():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		write_sessions(path)
+		captured = []
+
+		def fail(request, context):
+			captured.append(context.get(Sessions))
+			captured.append(context.get(Session))
+			raise NotFoundError()
+
+		handle(path, fail)
+
+		sessions, session = captured
+		with assert_raises(RuntimeError) as put:
+			sessions.put(Session(uuid4()))
+		with assert_raises(RuntimeError) as write:
+			session["message"] = "Hello"
+		assert_is(type(put.exception), RuntimeError)
+		assert_is(type(write.exception), RuntimeError)
+
+
+def test_outer_middleware_cannot_write_to_the_flash():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		write_sessions(path)
+		errors = []
+
+		def outer(request, context, next):
+			response = next(request, context)
+			try:
+				context.get(Flash)["notice"] = "Too late"
+			except RuntimeError as error:
+				errors.append(error)
+			return response
+
+		def index(request, context):
+			context.get(Flash)
+			return Response.empty()
+
+		handle(path, index, outer)
+
+		assert_eq([type(error) for error in errors], [RuntimeError])
+
+
+def test_outer_middleware_cannot_rotate_the_session():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "sessions.json")
+		write_sessions(path)
+		errors = []
+
+		def outer(request, context, next):
+			response = next(request, context)
+			try:
+				context.get(Sessions).rotate(context.get(Session))
+			except RuntimeError as error:
+				errors.append(error)
+			return response
+
+		def index(request, context):
+			context.get(Session)["message"] = "Hello"
+			return Response.empty()
+
+		handle(path, index, outer)
+
+		assert_eq([type(error) for error in errors], [RuntimeError])
