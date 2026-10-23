@@ -89,7 +89,7 @@ def test_closes_source_when_encoding_is_closed_early():
 		finally:
 			events.append("closed")
 
-	chunks = sse.encode(posts())
+	chunks = sse.Events(posts()).encode()
 	assert_eq(next(chunks), b"data: First post\n\n")
 	chunks.close()
 

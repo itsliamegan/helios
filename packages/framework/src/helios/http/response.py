@@ -75,17 +75,9 @@ class Response:
 		return cls(status, Headers({"Content-Type": content_type}), body=Stream(chunks))
 
 	@classmethod
-	def event_stream(cls, items: Iterable[sse.Event | sse.Comment]) -> Self:
-		"""Stream server-sent events and comments.
-
-		The request context closes before the server reads the stream, so a
-		generator passed here runs after its handler has returned. Acquire
-		resources the stream owns, such as a subscription, inside the
-		generator's body, so that they are acquired only once delivery starts
-		and released when the server closes the stream. Use a short database
-		transaction for each operation rather than one held across a `yield`,
-		because a transaction holds the database's write lock.
-		"""
-		response = cls.stream(sse.encode(items), "text/event-stream; charset=utf-8")
+	def events(cls, items: Iterable[sse.Event | sse.Comment]) -> Self:
+		response = cls.stream(
+			sse.Events(items).encode(), "text/event-stream; charset=utf-8"
+		)
 		response.headers["Cache-Control"] = "no-cache"
 		return response

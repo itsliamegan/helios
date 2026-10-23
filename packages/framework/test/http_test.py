@@ -54,8 +54,8 @@ def test_creates_error_response():
 	assert_eq(str(response.body), "404 Not Found")
 
 
-def test_creates_event_stream_response():
-	response = Response.event_stream(
+def test_creates_events_response():
+	response = Response.events(
 		[
 			sse.Event("New post", event="post", id="1"),
 			sse.Comment("heartbeat"),

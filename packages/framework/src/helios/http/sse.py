@@ -3,6 +3,21 @@ from dataclasses import dataclass
 import re
 
 
+@dataclass
+class Events:
+	items: Iterable[Event | Comment]
+
+	def encode(self) -> Generator[bytes]:
+		try:
+			for item in self.items:
+				yield item.encode()
+		finally:
+			# A generator's own cleanup runs only if it is closed, which the
+			# server does when the client disconnects or the stream ends.
+			if isinstance(self.items, Generator):
+				self.items.close()
+
+
 @dataclass(init=False)
 class Event:
 	data: str
@@ -23,9 +38,10 @@ class Event:
 		lines = []
 		if self.event is not None:
 			lines.append(f"event: {self.event}")
-		# Markup escapes text it is combined with, so convert data to a plain
-		# string first.
-		for line in re.split(r"\r\n|\r|\n", str(self.data)):
+		# A Markup value escapes any text combined with it, so the lines are
+		# split from a plain string.
+		data = str(self.data)
+		for line in re.split(r"\r\n|\r|\n", data):
 			lines.append(f"data: {line}")
 		if self.id is not None:
 			lines.append(f"id: {self.id}")
@@ -46,17 +62,3 @@ class Comment:
 
 	def encode(self) -> bytes:
 		return f": {self.text}\n\n".encode()
-
-
-def encode(items: Iterable[Event | Comment]) -> Generator[bytes]:
-	"""Encode each event or comment in turn.
-
-	Closing the encoded stream closes `items` when it is a generator, so that
-	the generator's own cleanup runs when the client disconnects.
-	"""
-	try:
-		for item in items:
-			yield item.encode()
-	finally:
-		if isinstance(items, Generator):
-			items.close()
