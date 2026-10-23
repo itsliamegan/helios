@@ -16,6 +16,10 @@ class Flash:
 	def __init__(self, items: Mapping[str, Any] | None = None):
 		self.items = dict(items or {})
 		self._dirty = set()
+		self.closed = False
+
+	def close(self):
+		self.closed = True
 
 	def dirty(self) -> dict[str, Any]:
 		dirty = {}
@@ -36,6 +40,9 @@ class Flash:
 			return default
 
 	def __setitem__(self, name: str, value: Any):
+		if self.closed:
+			raise RuntimeError("the flash is closed")
+
 		self.items[name] = value
 		self._dirty.add(name)
 

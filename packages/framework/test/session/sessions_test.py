@@ -4,6 +4,7 @@ from uuid import uuid4
 from luna.test.assertion import (
 	assert_eq,
 	assert_in,
+	assert_is,
 	assert_not,
 	assert_not_eq,
 	assert_not_in,
@@ -85,3 +86,66 @@ def test_purges_sessions_using_configured_maximum_age():
 
 	assert_not_in(expired.id, sessions)
 	assert_in(active.id, sessions)
+
+
+def test_closed_sessions_refuse_putting():
+	sessions = Sessions()
+	sessions.close()
+
+	with assert_raises(RuntimeError) as raised:
+		sessions.put(Session(uuid4()))
+	assert_is(type(raised.exception), RuntimeError)
+
+
+def test_closed_sessions_refuse_removing():
+	id = uuid4()
+	sessions = Sessions({id: Session(id)})
+	sessions.close()
+
+	with assert_raises(RuntimeError) as raised:
+		sessions.remove(id)
+	assert_is(type(raised.exception), RuntimeError)
+
+
+def test_closed_sessions_refuse_rotating():
+	id = uuid4()
+	session = Session(id)
+	sessions = Sessions({id: session})
+	sessions.close()
+
+	with assert_raises(RuntimeError) as raised:
+		sessions.rotate(session)
+	assert_is(type(raised.exception), RuntimeError)
+
+
+def test_rotating_a_closed_session_is_refused():
+	id = uuid4()
+	session = Session(id)
+	sessions = Sessions({id: session})
+	session.close()
+
+	with assert_raises(RuntimeError) as raised:
+		sessions.rotate(session)
+	assert_is(type(raised.exception), RuntimeError)
+	assert_eq(session.id, id)
+
+
+def test_closing_sessions_closes_their_sessions():
+	id = uuid4()
+	sessions = Sessions({id: Session(id)})
+	sessions.close()
+
+	with assert_raises(RuntimeError) as raised:
+		sessions.get(id)["message"] = "Hello"
+	assert_is(type(raised.exception), RuntimeError)
+
+
+def test_closed_sessions_still_read():
+	id = uuid4()
+	session = Session(id, {"message": "Hello"})
+	sessions = Sessions({id: session})
+	sessions.close()
+
+	assert_is(sessions.get(id), session)
+	assert_in(id, sessions)
+	assert_not(sessions.is_dirty())
