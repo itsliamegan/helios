@@ -35,9 +35,12 @@ class Provider(Provider):
 	def sessions(self, context: Context) -> Generator[Sessions]:
 		with self.driver.open() as sessions:
 			sessions.purge(self.config.maximum_age)
-			yield sessions
-			if sessions.is_dirty():
-				self.driver.save(sessions)
+			try:
+				yield sessions
+				if sessions.is_dirty():
+					self.driver.save(sessions)
+			finally:
+				sessions.close()
 
 	def session(self, context: Context) -> Session:
 		request = context.get(Request)
@@ -68,18 +71,21 @@ class Provider(Provider):
 
 	def middleware(self, request: Request, context: Context, next: Next) -> Response:
 		response = next(request, context)
-		if context.failure is not None:
-			return response
 
 		flash = context.resolved(Flash)
-		if flash is not None and flash.is_dirty():
-			context.get(Session)["_flash"] = flash.dirty()
+		if flash is not None:
+			if context.failure is None and flash.is_dirty():
+				context.get(Session)["_flash"] = flash.dirty()
+			flash.close()
 
 		session = context.resolved(Session)
 		if session is None:
 			return response
-		sessions = context.get(Sessions)
+		if context.failure is not None:
+			session.close()
+			return response
 
+		sessions = context.get(Sessions)
 		if session.items:
 			if session.id not in sessions:
 				session.touch()
@@ -89,6 +95,7 @@ class Provider(Provider):
 		elif session.id in sessions:
 			sessions.remove(session.id)
 			response.cookies["session_id"] = self.cookie("", EPOCH)
+		session.close()
 		return response
 
 	def cookie(self, value: str, expires: datetime) -> Cookie:

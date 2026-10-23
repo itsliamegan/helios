@@ -21,15 +21,22 @@ class Sessions:
 	def __init__(self, items: Mapping[UUID, Session] | None = None):
 		self.items = dict(items or {})
 		self.dirty = False
+		self.closed = False
 
 	def get(self, id: UUID) -> Session:
 		return self.items[id]
 
 	def put(self, session: Session):
+		if self.closed:
+			raise RuntimeError("the sessions are closed")
+
 		self.items[session.id] = session
 		self.dirty = True
 
 	def remove(self, id: UUID):
+		if self.closed:
+			raise RuntimeError("the sessions are closed")
+
 		if self.items.pop(id, None) is not None:
 			self.dirty = True
 
@@ -39,6 +46,12 @@ class Sessions:
 				self.remove(id)
 
 	def rotate(self, session: Session):
+		if self.closed:
+			raise RuntimeError("the sessions are closed")
+
+		if session.closed:
+			raise RuntimeError("the session is closed")
+
 		stored = self.items.get(session.id)
 		if stored is not None and stored is not session:
 			raise RuntimeError("another session is stored under this ID")
@@ -58,3 +71,8 @@ class Sessions:
 
 	def __contains__(self, id: object) -> bool:
 		return id in self.items
+
+	def close(self):
+		self.closed = True
+		for session in self.items.values():
+			session.close()
