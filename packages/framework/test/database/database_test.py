@@ -3,7 +3,7 @@ from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq, assert_is_not, assert_raises
+from luna.test.assertion import assert_eq, assert_is, assert_is_not, assert_raises
 
 from helios.database import Database, DatabaseBusyError, Model
 from helios.database.registry import Registry
@@ -83,3 +83,35 @@ def test_each_transaction_opens_its_own_connection():
 			pass
 
 		assert_is_not(first.connection, second.connection)
+
+
+def test_store_is_closed_after_block_commits():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		connection = sqlite3.connect(path, autocommit=True)
+		connection.execute(SCHEMA)
+		connection.close()
+		database = Database(path, Registry([Post]))
+
+		with database.transaction() as store:
+			pass
+
+		with assert_raises(RuntimeError) as raised:
+			store.create(Post, title="Intro")
+		assert_is(type(raised.exception), RuntimeError)
+
+
+def test_store_is_closed_after_block_raises():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		connection = sqlite3.connect(path, autocommit=True)
+		connection.execute(SCHEMA)
+		connection.close()
+		database = Database(path, Registry([Post]))
+
+		with assert_raises(ValueError), database.transaction() as store:
+			raise ValueError("failed")
+
+		with assert_raises(RuntimeError) as raised:
+			store.create(Post, title="Intro")
+		assert_is(type(raised.exception), RuntimeError)

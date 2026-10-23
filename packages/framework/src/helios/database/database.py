@@ -30,8 +30,12 @@ class Database:
 		# Closing the connection rolls back a transaction the block left open.
 		with Connection.open(self.path, self.busy_timeout) as connection:
 			connection.begin()
-			yield Store(connection, self.registry)
-			connection.commit()
+			store = Store(connection, self.registry)
+			try:
+				yield store
+				connection.commit()
+			finally:
+				store.close()
 
 
 type Transaction = Store

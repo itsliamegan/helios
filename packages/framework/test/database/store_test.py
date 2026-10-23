@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import (
 	assert_eq,
+	assert_is,
 	assert_is_instance,
 	assert_is_not,
 	assert_raises,
@@ -608,5 +609,62 @@ def test_deleting_twice_raises_not_found():
 
 			with assert_raises(NotFoundError):
 				store.delete(model)
+		finally:
+			connection.close()
+
+
+class Post(Model):
+	table = "posts"
+
+	title: str
+
+
+def open_post_store(directory: str):
+	path = Path(directory, "app.sqlite")
+	create_database(
+		path,
+		"CREATE TABLE posts (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, title TEXT NOT NULL)",
+	)
+	connection = Connection.open(path)
+	connection.begin()
+	return connection, Store(connection, [Post])
+
+
+def test_closed_store_refuses_writes():
+	with TemporaryDirectory() as directory:
+		connection, store = open_post_store(directory)
+		try:
+			store.close()
+
+			with assert_raises(RuntimeError) as raised:
+				store.create(Post, title="Intro")
+			assert_is(type(raised.exception), RuntimeError)
+		finally:
+			connection.close()
+
+
+def test_closed_store_refuses_reads():
+	with TemporaryDirectory() as directory:
+		connection, store = open_post_store(directory)
+		try:
+			store.close()
+
+			with assert_raises(RuntimeError) as raised:
+				store.find_all(Post)
+			assert_is(type(raised.exception), RuntimeError)
+		finally:
+			connection.close()
+
+
+def test_closed_store_refuses_loads():
+	with TemporaryDirectory() as directory:
+		connection, store = open_post_store(directory)
+		try:
+			post = store.create(Post, title="Intro")
+			store.close()
+
+			with assert_raises(RuntimeError) as raised:
+				store.load(post)
+			assert_is(type(raised.exception), RuntimeError)
 		finally:
 			connection.close()

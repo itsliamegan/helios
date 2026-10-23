@@ -34,6 +34,10 @@ class Store:
 			model_types if isinstance(model_types, Registry) else Registry(model_types)
 		)
 		self.grammar = Grammar()
+		self.closed = False
+
+	def close(self):
+		self.closed = True
 
 	def create[**P, T: Model](
 		self,
@@ -82,6 +86,9 @@ class Store:
 			raise NotFoundError(model_type, model.id)
 
 	def load[T: Model](self, models: T | Sequence[T], *paths: str):
+		if self.closed:
+			raise RuntimeError("the transaction is closed")
+
 		if not isinstance(models, Sequence):
 			models = [models]
 		if not models:
@@ -150,6 +157,9 @@ class Store:
 		self,
 		statement: Statement,
 	) -> tuple[tuple[str, ...], list[tuple[Scalar | None, ...]]]:
+		if self.closed:
+			raise RuntimeError("the transaction is closed")
+
 		compiled = self.grammar.compile(statement)
 		cursor = self.connection.execute(compiled.sql, compiled.parameters)
 		try:
@@ -158,6 +168,9 @@ class Store:
 			cursor.close()
 
 	def write(self, statement: Statement) -> int:
+		if self.closed:
+			raise RuntimeError("the transaction is closed")
+
 		compiled = self.grammar.compile(statement)
 		cursor = self.connection.execute(compiled.sql, compiled.parameters)
 		try:
