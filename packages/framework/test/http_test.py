@@ -22,7 +22,9 @@ from helios.http import (
 	Response,
 	SameSite,
 	Status,
+	Stream,
 	URL,
+	sse,
 )
 from helios.http.error import NotFoundError
 
@@ -50,6 +52,29 @@ def test_creates_error_response():
 
 	assert_eq(response.status, Status.NOT_FOUND)
 	assert_eq(str(response.body), "404 Not Found")
+
+
+def test_creates_event_stream_response():
+	response = Response.event_stream(
+		[
+			sse.Event("New post", event="post", id="1"),
+			sse.Comment("heartbeat"),
+			sse.Event("New comment", event="comment", id="2"),
+		]
+	)
+
+	body = assert_is_instance(response.body, Stream)
+	assert_eq(response.status, Status.OK)
+	assert_eq(str(response.headers["Content-Type"]), "text/event-stream; charset=utf-8")
+	assert_eq(str(response.headers["Cache-Control"]), "no-cache")
+	assert_eq(
+		list(body.chunks),
+		[
+			b"event: post\ndata: New post\nid: 1\n\n",
+			b": heartbeat\n\n",
+			b"event: comment\ndata: New comment\nid: 2\n\n",
+		],
+	)
 
 
 def test_gets_request_referrer():
