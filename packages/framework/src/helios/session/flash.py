@@ -18,9 +18,6 @@ class Flash:
 		self._dirty = set()
 		self.closed = False
 
-	def close(self):
-		self.closed = True
-
 	def dirty(self) -> dict[str, Any]:
 		dirty = {}
 		for name in self._dirty:
@@ -48,3 +45,6 @@ class Flash:
 
 	def __contains__(self, name: object) -> bool:
 		return name in self.items
+
+	def close(self):
+		self.closed = True

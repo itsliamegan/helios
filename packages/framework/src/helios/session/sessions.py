@@ -23,11 +23,6 @@ class Sessions:
 		self.dirty = False
 		self.closed = False
 
-	def close(self):
-		self.closed = True
-		for session in self.items.values():
-			session.close()
-
 	def get(self, id: UUID) -> Session:
 		return self.items[id]
 
@@ -76,3 +71,8 @@ class Sessions:
 
 	def __contains__(self, id: object) -> bool:
 		return id in self.items
+
+	def close(self):
+		self.closed = True
+		for session in self.items.values():
+			session.close()

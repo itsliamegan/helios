@@ -36,9 +36,6 @@ class Store:
 		self.grammar = Grammar()
 		self.closed = False
 
-	def close(self):
-		self.closed = True
-
 	def create[**P, T: Model](
 		self,
 		model_type: Callable[P, T],
@@ -135,6 +132,9 @@ class Store:
 	) -> list[T]:
 		self.registry.get(model_type)
 		return self.models(model_type, Raw(sql, tuple(parameters)))
+
+	def close(self):
+		self.closed = True
 
 	def models[T: Model](self, model_type: type[T], statement: Statement) -> list[T]:
 		column_names, rows = self.read(statement)

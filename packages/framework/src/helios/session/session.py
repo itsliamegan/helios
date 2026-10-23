@@ -30,9 +30,6 @@ class Session:
 		self.dirty = False
 		self.closed = False
 
-	def close(self):
-		self.closed = True
-
 	def __getitem__(self, key: str) -> Any:
 		return self.items[key]
 
@@ -72,3 +69,6 @@ class Session:
 			self.last_active_at is not None
 			and self.last_active_at + maximum_age < datetime.now(UTC)
 		)
+
+	def close(self):
+		self.closed = True
