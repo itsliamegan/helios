@@ -1,4 +1,6 @@
+from abc import ABC
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from typing import Self
 
 from helios.http import Request, Response
@@ -9,20 +11,15 @@ from .container import Container
 from .kernel import Kernel, Middleware
 
 
-class Config:
-	def __init__(self, base_url: URL | None = None):
-		self.base_url = base_url
-
-
-class Provider:
-	def register(self, container: Container):
-		pass
-
-	def boot(self, application: Application):
-		pass
-
-
 class Application:
+	"""Coordinates services, providers, and middleware.
+
+	Constructing an application registers its providers. Booting an application
+	boots providers and builds the HTTP kernel. Once booted, the application can
+	handle HTTP requests and cannot change its middleware stack. Closing the
+	application releases its services.
+	"""
+
 	def __init__(
 		self,
 		config: Config,
@@ -94,6 +91,18 @@ class Application:
 		self.close()
 
 
+class Provider(ABC):
+	"""Adds services and behavior to an application.
+
+	Every provider registers its bindings before any provider boots. Booting
+	can resolve other providers' services and add middleware.
+	"""
+
+	def register(self, container: Container): ...
+
+	def boot(self, application: Application): ...
+
+
 class Middlewares:
 	"""An application's middleware kept in two tiers.
 
@@ -111,3 +120,8 @@ class Middlewares:
 
 	def use(self, middleware: Middleware):
 		self.provided.append(middleware)
+
+
+@dataclass
+class Config:
+	base_url: URL | None = None

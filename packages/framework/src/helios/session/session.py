@@ -10,7 +10,8 @@ class Session:
 	"""A set of items kept for one visitor between requests.
 
 	A session is identified by an ID. Changing a session's items or its activity
-	date marks it as dirty.
+	date marks it as dirty. Once closed, it refuses changes with `RuntimeError`,
+	but its items can still be read.
 	"""
 
 	id: UUID

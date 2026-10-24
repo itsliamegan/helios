@@ -1,7 +1,12 @@
+from dataclasses import dataclass
 from datetime import timedelta
 
 
+@dataclass(init=False)
 class Config:
+	secure: bool
+	maximum_age: timedelta
+
 	def __init__(
 		self,
 		secure: bool = False,

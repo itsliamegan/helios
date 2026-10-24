@@ -17,6 +17,20 @@ EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 class Provider(Provider):
+	"""Provides each request's sessions, its visitor's session, and its flash.
+
+	A request's sessions are loaded under the driver's lock, which is held until
+	the request ends. They are saved only when the request succeeds and changed
+	them. The visitor's session comes from the `session_id` cookie, and it is
+	stored once it holds items. Each response renews the cookie, and a session
+	emptied of items is removed along with its cookie.
+
+	The flash is read from the session and written back to it only when the
+	request succeeds. Once a response passes the session middleware, the flash
+	and session are closed, so outer middleware and streamed bodies cannot
+	change them.
+	"""
+
 	def __init__(self, config: Config, driver: Driver):
 		self.config = config
 		self.driver = driver

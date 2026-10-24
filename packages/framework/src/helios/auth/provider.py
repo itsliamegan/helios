@@ -1,16 +1,16 @@
-from uuid import UUID
-
 from helios.app import Application, Container, Context, Provider
-from helios.database import Model, NotFoundError, Store
+from helios.database import Model, Store
 from helios.session.session import Session
 from helios.session.sessions import Sessions
 from helios.view import View
 from helios.view.composer import Composers
 
-from .authenticator import Authenticator, SESSION_KEY
+from .authenticator import Authenticator
 
 
 class Provider[U: Model](Provider):
+	"""Provides each request's authentication service."""
+
 	def __init__(self, user_type: type[U]):
 		self.user_type = user_type
 
@@ -25,23 +25,9 @@ class Provider[U: Model](Provider):
 		view.share("auth", context.get(Authenticator))
 
 	def authenticator(self, context: Context) -> Authenticator[U]:
-		session = context.get(Session)
-		user = self.user(session, context.get(Store))
-		if user is None and SESSION_KEY in session:
-			del session[SESSION_KEY]
-		return Authenticator(session, context.get(Sessions), user)
-
-	def user(self, session: Session, store: Store) -> U | None:
-		if SESSION_KEY not in session:
-			return None
-		raw_id = session[SESSION_KEY]
-		if not isinstance(raw_id, str):
-			return None
-		try:
-			id = UUID(raw_id)
-		except ValueError:
-			return None
-		try:
-			return store.find_one(self.user_type, id)
-		except NotFoundError:
-			return None
+		return Authenticator.read(
+			context.get(Session),
+			context.get(Sessions),
+			context.get(Store),
+			self.user_type,
+		)
