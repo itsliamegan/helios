@@ -9,6 +9,13 @@ from .adapt import RequestAdapter, ResponseAdapter
 
 
 class Application(helios.app.Application):
+	"""An application served over WSGI.
+
+	A request that cannot be adapted, such as one with an invalid `Host`
+	header or oversized form data, gets its error response without reaching
+	the application.
+	"""
+
 	def __call__(
 		self,
 		environment: WSGIEnvironment,

@@ -24,6 +24,12 @@ from helios.url import Query, URL
 
 
 class ResponseAdapter:
+	"""Sends a response through WSGI.
+
+	A buffered body gets a `Content-Length` unless the response already has one.
+	A streamed body is sent as its iterable produces it.
+	"""
+
 	def __init__(self, response: Response, start_response: StartResponse):
 		self.response = response
 		self.start_response = start_response
@@ -45,6 +51,13 @@ class ResponseAdapter:
 
 
 class RequestAdapter:
+	"""Builds a request from a WSGI environment.
+
+	Form data is parsed only from URL-encoded and multipart bodies. A
+	URL-encoded body is limited to 500 KB, and a multipart body to 1,000 parts
+	and 500 KB of fields other than files. Uploaded files have no size limit.
+	"""
+
 	def __init__(self, environment: WSGIEnvironment):
 		self.environment = environment
 

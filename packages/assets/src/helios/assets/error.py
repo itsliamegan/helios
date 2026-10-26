@@ -1,14 +1,14 @@
 class CompileError(RuntimeError):
-	pass
+	"""Raised when esbuild fails or a script imports a stylesheet."""
 
 
 class EntryNotFoundError(LookupError):
-	pass
+	"""Raised when a template includes an asset that the manifest lacks."""
 
 
 class BundlerNotFoundError(LookupError):
-	pass
+	"""Raised when esbuild is not installed in the project."""
 
 
 class ManifestNotFoundError(LookupError):
-	pass
+	"""Raised when the assets have not been compiled."""

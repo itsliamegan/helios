@@ -6,19 +6,23 @@ from helios.http.error import HTTPError
 
 
 class RateLimitedError(HTTPError):
+	"""Raised when a key has made more requests than its limit in one window."""
+
 	status = Status.TOO_MANY_REQUESTS
 
 
-@dataclass(init=False)
 class RateLimiter:
-	limit: int
-	window: timedelta
-	entries: dict[str, Entry]
+	"""Counts requests per key, raising `RateLimitedError` past the limit.
+
+	A key's window starts at its first request and lasts `window`. Counts are
+	kept in memory, so each process limits separately and forgets its counts
+	when it restarts.
+	"""
 
 	def __init__(self, limit: int, window: timedelta):
 		self.limit = limit
 		self.window = window
-		self.entries = {}
+		self.entries: dict[str, Entry] = {}
 
 	def hit(self, key: str):
 		now = datetime.now(UTC)
@@ -33,5 +37,7 @@ class RateLimiter:
 
 @dataclass
 class Entry:
+	"""A key's request count within its current window."""
+
 	started: datetime
 	count: int

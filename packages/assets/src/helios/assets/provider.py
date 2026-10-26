@@ -7,6 +7,12 @@ from .manifest import Manifest
 
 
 class Provider(Provider):
+	"""Provides `Assets` from the compiled manifest.
+
+	The manifest is read while booting, so an application whose assets are not
+	compiled fails to start.
+	"""
+
 	def __init__(self, config: Config):
 		self.config = config
 

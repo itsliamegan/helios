@@ -8,7 +8,7 @@ from .manifest import Manifest
 
 @dataclass
 class Assets:
-	"""A generator for tags used to include assets by their compiled path.
+	"""Generates tags used to include assets by their compiled path.
 
 	Paths are prefixed with a constant URL prefix that ends in a slash.
 	"""

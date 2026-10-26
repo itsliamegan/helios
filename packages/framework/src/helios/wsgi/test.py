@@ -8,6 +8,8 @@ from .application import Application
 
 
 class TestClient:
+	"""Sends requests to an application in tests, keeping cookies between them."""
+
 	def __init__(self, app: Application):
 		self.client = Client(app, use_cookies=True)
 

@@ -7,6 +7,13 @@ from .limiter import RateLimiter
 
 
 class Middleware:
+	"""Limits signed-out visitors' requests, keyed by a request header's value.
+
+	Signed-in users and requests without the header are never limited. The
+	header must be one that a trusted proxy sets, such as the client's address,
+	because a client can send any value or leave the header out.
+	"""
+
 	def __init__(self, config: Config):
 		self.header = config.header
 		self.limiter = RateLimiter(config.limit, config.window)
