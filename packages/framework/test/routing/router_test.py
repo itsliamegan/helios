@@ -7,12 +7,11 @@ from helios.http import Method, Request, Response, Status
 from helios.routing import (
 	Group,
 	Match,
-	Pattern,
 	Route,
 	RouteNotFoundError,
 	Router,
 )
-from helios.url import URL
+from helios.url import Pattern, URL
 
 
 def handle(req, ctx):

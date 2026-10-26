@@ -3,7 +3,7 @@ from jinja2 import TemplateNotFound, TemplateSyntaxError
 
 
 class ComponentError(TypeError):
-	pass
+	"""Raised when a component class is declared incorrectly."""
 
 
 class TemplateError(Exception):

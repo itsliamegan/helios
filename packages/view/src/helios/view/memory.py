@@ -4,6 +4,8 @@ from .source import Driver, Source
 
 
 class Driver(Driver):
+	"""Reads templates from a mapping of names to text."""
+
 	def __init__(self, templates: Mapping[str, str]):
 		self.templates = templates
 

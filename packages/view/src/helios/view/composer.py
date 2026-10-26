@@ -17,4 +17,5 @@ class Composers:
 			composer(view, context)
 
 
+# A composer shares a value from the request's context for any view to access.
 type Composer = Callable[[View, Context], None]

@@ -10,6 +10,8 @@ from .view import View
 
 
 class Views:
+	"""Renders a request's views as responses with composed values."""
+
 	def __init__(self, engine: Engine, composers: Composers, context: Context):
 		self.engine = engine
 		self.composers = composers

@@ -14,6 +14,13 @@ from .views import Views
 
 
 class Provider(Provider):
+	"""Provides the template engine and each request's `Views`.
+
+	The engine is built while booting, so a template error stops the
+	application from starting. `urls` and `assets` become template globals
+	when they are bound.
+	"""
+
 	def __init__(
 		self,
 		config: Config,
