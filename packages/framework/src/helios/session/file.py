@@ -14,10 +14,16 @@ from .sessions import Sessions
 
 
 class DriverError(RuntimeError):
-	pass
+	"""Raised when the session file or its lock cannot be read or written."""
 
 
 class Driver:
+	"""Keeps every session in one JSON file.
+
+	The session file must exist before the first request, holding at least
+	`{}`. Opening the driver holds a lock on a separate lock file.
+	"""
+
 	def __init__(self, path: Path, lock_path: Path):
 		self.path = path
 		self.lock_path = lock_path
@@ -57,6 +63,7 @@ class Driver:
 			) as temporary_file:
 				temporary_path = Path(temporary_file.name)
 				temporary_file.write(serialized)
+				# The new file keeps the permissions of the file it replaces.
 				if mode is not None:
 					os.fchmod(temporary_file.fileno(), mode)
 			os.replace(temporary_path, self.path)
@@ -70,6 +77,8 @@ class Driver:
 
 
 class FileScope:
+	"""Holds the lock while the sessions loaded under it are in use."""
+
 	def __init__(self, driver: Driver):
 		self.driver = driver
 		self.lock: TextIO | None = None

@@ -11,19 +11,46 @@ if TYPE_CHECKING:
 	from .model import Model
 
 
+# Each `init` parameter tells type checkers that a relationship is not a
+# constructor parameter.
+
+
 def belongs_to(id_name: str, *, init: Literal[False] = False) -> Any:
+	"""Declare the model that this model identifies in its `id_name` column.
+
+	Annotate it with the model type, adding `| None` exactly when that column
+	is nullable.
+	"""
+
 	return BelongsTo(id_name)
 
 
 def has_many(id_name: str, *, init: Literal[False] = False) -> Any:
+	"""Declare the models that identify this model in their `id_name` column.
+
+	Annotate it as a list of the model type.
+	"""
+
 	return HasMany(id_name)
 
 
 def has_one(id_name: str, *, init: Literal[False] = False) -> Any:
+	"""Declare a model that identifies this model in its `id_name` column.
+
+	Annotate it as `<model> | None`. The schema must keep the column unique. A
+	second matching row is a `DatabaseError` when the relationship loads.
+	"""
+
 	return HasOne(id_name)
 
 
 class Relationship(ABC):
+	"""A model attribute that holds related models once they are loaded.
+
+	A loaded relationship is a snapshot; later writes do not change it. Updating
+	a `belongs_to` ID unloads the associated relationship.
+	"""
+
 	plural = False
 
 	name: str
@@ -75,6 +102,8 @@ class Relationship(ABC):
 		try:
 			return instance._loaded[self.name]
 		except KeyError:
+			# Not an `AttributeError`, which templates would report as a missing
+			# attribute rather than an unloaded relationship.
 			raise ModelError(f"{self.label} is not loaded") from None
 
 	def __set__(self, instance: Model, value: object):

@@ -1,24 +1,32 @@
 from collections.abc import Mapping
+from dataclasses import dataclass
 import os
 from pathlib import Path
 from typing import Self
 
 from dotenv import dotenv_values
 
-from helios.http import URL
+from helios.url import URL
 
 
 class ConfigError(Exception):
-	pass
+	"""Raised for a missing or invalid configuration value."""
 
 
 TRUE_VALUES = {"true", "yes", "on", "1"}
 FALSE_VALUES = {"false", "no", "off", "0"}
 
 
+@dataclass
 class Environment:
-	def __init__(self, values: Mapping[str, str]):
-		self.values = values
+	"""Configuration values from the process environment and/or an `.env` file.
+
+	The process environment takes precedence over the file. A blank value counts
+	as missing. Each reader returns its default for a missing value and raises
+	`ConfigError` when there is no default.
+	"""
+
+	values: Mapping[str, str]
 
 	@classmethod
 	def load(

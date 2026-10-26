@@ -14,6 +14,8 @@ from .status import Status
 
 @dataclass(init=False)
 class Response:
+	"""An outgoing HTTP response."""
+
 	status: Status
 	headers: Headers
 	cookies: Cookies
@@ -49,6 +51,8 @@ class Response:
 
 	@classmethod
 	def file(cls, content: bytes, filename: str, content_type: str) -> Self:
+		"""Build a response that downloads `content` as a file named `filename`."""
+
 		return cls(
 			Status.OK,
 			Headers(
@@ -72,10 +76,14 @@ class Response:
 		content_type: str,
 		status: Status = Status.OK,
 	) -> Self:
+		"""Build a response that sends each chunk as the iterable produces it."""
+
 		return cls(status, Headers({"Content-Type": content_type}), body=Stream(chunks))
 
 	@classmethod
 	def events(cls, items: Iterable[sse.Event | sse.Comment]) -> Self:
+		"""Build a response that streams server-sent events."""
+
 		response = cls.stream(
 			sse.Events(items).encode(), "text/event-stream; charset=utf-8"
 		)

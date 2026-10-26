@@ -7,13 +7,21 @@ from .column import Column
 
 
 @dataclass
-class Clause:
-	groups: tuple[Group, ...]
+class AnyOf:
+	"""Matches a row that meets at least one group.
+
+	Negated, it matches exactly the rows it otherwise would not. A statement's
+	clauses are each an `AnyOf`, and a row must meet all of them.
+	"""
+
+	groups: tuple[AllOf, ...]
 	negated: bool = False
 
 
 @dataclass
-class Group:
+class AllOf:
+	"""Matches a row that meets every condition."""
+
 	conditions: tuple[Condition, ...]
 
 
@@ -23,16 +31,16 @@ type Condition = Comparison | IsNull | Membership | Exists
 @dataclass
 class Comparison:
 	name: str
-	operator: Operator
+	comparator: Comparator
 	value: Scalar
 
 	@classmethod
-	def parse(cls, column: Column, operator: Operator, value: object) -> Self:
+	def parse(cls, column: Column, comparator: Comparator, value: object) -> Self:
 		if value is None:
 			raise ValueError("cannot compare with None")
 
 		column.check(value)
-		return cls(column.name, operator, encode(column.codec, value))
+		return cls(column.name, comparator, encode(column.codec, value))
 
 
 @dataclass
@@ -72,10 +80,16 @@ class Membership:
 
 @dataclass
 class Exists:
+	"""Matches a related row that meets `group`.
+
+	The related row is in `table`, and its `inner_column` equals the outer
+	row's `outer_column`.
+	"""
+
 	table: str
-	column: str
+	inner_column: str
 	outer_column: str
-	group: Group
+	group: AllOf
 
 
-type Operator = Literal["=", "<", "<=", ">", ">="]
+type Comparator = Literal["=", "<", "<=", ">", ">="]

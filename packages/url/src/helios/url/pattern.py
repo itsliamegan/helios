@@ -11,6 +11,16 @@ from .url import URL
 
 @dataclass
 class Pattern:
+	"""A route's path pattern, such as `/posts/` or `/posts/{id:uuid}`.
+
+	Each slash-separated segment is either raw text or a parameter, the latter
+	of which can be followed by raw text itself. A parameter can declare a
+	converter with a colon, as in `/posts/{slug:str}`. A parameter's value is
+	letters, digits, underscores, and hyphens.
+
+	A trailing slash is optional when matching and is kept when building a path.
+	"""
+
 	segments: tuple[Text | Parameter, ...]
 	trailing_slash: bool = False
 
@@ -47,6 +57,11 @@ class Pattern:
 		return not self.segments and not self.trailing_slash
 
 	def prefixed(self, prefix: Pattern) -> Self:
+		"""Return this pattern under `prefix`.
+
+		An empty pattern takes the prefix's trailing slash.
+		"""
+
 		if self.is_empty:
 			return type(self)(prefix.segments, prefix.trailing_slash)
 		else:
@@ -103,6 +118,8 @@ class Text:
 
 @dataclass
 class Parameter:
+	"""A named segment and its converter, as in `{id:uuid}`, and any text after it."""
+
 	syntax: ClassVar[re.Pattern[str]] = re.compile(r"{(\w+)(?::(\w+))?}([^{}]*)")
 	value_syntax: ClassVar[re.Pattern[str]] = re.compile(r"[\w-]+")
 
@@ -129,6 +146,8 @@ class Parameter:
 
 	def format(self, value: Any) -> str:
 		encoded = quote(self.converter.format(value), safe="")
+		# A value the pattern could not match would build a path that does not
+		# route back.
 		if self.value_syntax.fullmatch(encoded) is None:
 			raise ValueError(f"invalid route parameter: {self.name}")
 		return encoded + self.suffix

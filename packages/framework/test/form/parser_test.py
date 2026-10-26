@@ -9,7 +9,7 @@ from luna.test.assertion import (
 
 from helios.form import parser
 from helios.form.parser import ParseError
-from helios.http import URL
+from helios.url import URL
 
 
 def test_parses_strings_without_coercion():

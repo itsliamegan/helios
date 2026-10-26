@@ -38,4 +38,7 @@ class Database:
 				store.close()
 
 
+# A transaction is a `Store` for now. Callers name it `Transaction`, so their
+# code stays correct once `Transaction` is its own class and `Store` is built
+# over it.
 type Transaction = Store

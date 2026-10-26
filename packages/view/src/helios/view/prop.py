@@ -9,6 +9,8 @@ if TYPE_CHECKING:
 
 @dataclass
 class Prop:
+	"""A prop declared on a component subclass."""
+
 	declaration: Declaration
 
 	@property

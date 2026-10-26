@@ -8,11 +8,11 @@ if TYPE_CHECKING:
 
 
 class ModelError(TypeError):
-	pass
+	"""Raised when a model, query, or load is declared or used incorrectly."""
 
 
 class DatabaseError(RuntimeError):
-	pass
+	"""Raised when the database fails or holds rows its models cannot read."""
 
 
 class DatabaseBusyError(DatabaseError):
@@ -24,6 +24,8 @@ class ScriptError(DatabaseError):
 
 
 class NotFoundError(BaseNotFoundError):
+	"""Raised when no row has a model's ID. Left uncaught, it renders as a 404."""
+
 	def __init__(self, model_type: type[Model], id: UUID):
 		self.model_type = model_type
 		self.id = id

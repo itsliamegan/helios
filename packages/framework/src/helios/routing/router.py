@@ -2,8 +2,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
-from helios.http import Method, Request, Response, URL
+from helios.http import Method, Request, Response
 from helios.http.error import NotFoundError
+from helios.url import URL
 
 from .route import Group, Route
 
@@ -12,16 +13,18 @@ if TYPE_CHECKING:
 
 
 class RouteNotFoundError(LookupError):
-	pass
-
-
-@dataclass
-class Match:
-	route: Route
-	parameters: dict[str, Any]
+	"""Raised when a path is built for a route name that does not exist."""
 
 
 class Router:
+	"""Dispatches each request to the first route that matches it.
+
+	Routes are tried in the order they were declared, so a route with a literal
+	segment must come before a route whose parameter would also match it. A
+	request that matches no route raises `NotFoundError`. Route names must be
+	unique.
+	"""
+
 	def __init__(self, routes: Sequence[Route | Group]):
 		self.routes = list(Group(routes))
 		self.named: dict[str, Route] = {}
@@ -49,3 +52,11 @@ class Router:
 		if match is None:
 			raise NotFoundError()
 		return match.route(request, context, **match.parameters)
+
+
+@dataclass
+class Match:
+	"""A matched route and its converted parameters."""
+
+	route: Route
+	parameters: dict[str, Any]

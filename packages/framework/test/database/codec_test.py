@@ -7,18 +7,18 @@ from luna.test.assertion import (
 	assert_raises,
 )
 
-from helios import http
+from helios import url
 from helios.database.codec import Bool, Codec, Date, Int, Scalar, Str, URL, UUID, encode
 
 
 def test_round_trips_scalar_codecs():
 	identifier = uuid4()
-	url = http.URL.parse("https://example.com/search?q=today")
+	link = url.URL.parse("https://example.com/search?q=today")
 
 	assert_eq(Str().decode(Str().encode("title")), "title")
 	assert_eq(Int().decode(Int().encode(3)), 3)
 	assert_eq(UUID().decode(UUID().encode(identifier)), identifier)
-	assert_eq(str(URL().decode(URL().encode(url))), str(url))
+	assert_eq(str(URL().decode(URL().encode(link))), str(link))
 
 
 def test_distinguishes_integers_and_booleans():

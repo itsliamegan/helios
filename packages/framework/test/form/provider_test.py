@@ -6,9 +6,10 @@ from luna.test.assertion import assert_eq, assert_that
 from helios.app import Application, Config, Container, Provider
 import helios.form
 from helios.form import Errors, Submission, Submissions
-from helios.http import Input, Method, Request, Response, URL
+from helios.http import Input, Method, Request, Response
 from helios.routing import Route, Router
 from helios.session import Flash
+from helios.url import URL
 from helios.view import Component
 import helios.view.config
 import helios.view.provider

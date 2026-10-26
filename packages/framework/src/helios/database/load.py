@@ -10,6 +10,14 @@ if TYPE_CHECKING:
 
 
 class Load:
+	"""Loads relationship paths onto models of one type.
+
+	Each path segment runs one query per batch of IDs, and paths that share a
+	prefix query it once. Every segment is queried again even when it is
+	already loaded. Each row becomes one object, shared by every model that
+	refers to it.
+	"""
+
 	def __init__(self, store: Store, model_type: type[Model], paths: Iterable[str]):
 		self.store = store
 		self.model_type = model_type
@@ -95,6 +103,8 @@ class Load:
 
 
 class Branch:
+	"""One relationship in a load, with the relationships loaded beneath it."""
+
 	def __init__(self, relationship: Relationship):
 		self.relationship = relationship
 		self.branches: dict[str, Branch] = {}

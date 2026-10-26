@@ -108,4 +108,6 @@ class Scoped:
 
 
 def unparameterized(key: type[Any]) -> type[Any]:
+	"""Remove a key's type arguments, which are not checked at runtime."""
+
 	return get_origin(key) or key

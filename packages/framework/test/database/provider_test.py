@@ -7,9 +7,10 @@ from luna.test.assertion import assert_eq, assert_is, assert_is_instance, assert
 import helios.app
 from helios.app import Application
 from helios.database import Config, Database, Model, Provider, Store
-from helios.http import Method, Request, Response, Status, URL
+from helios.http import Method, Request, Response, Status
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
+from helios.url import URL
 
 
 class Post(Model):

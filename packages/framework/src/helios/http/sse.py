@@ -5,6 +5,8 @@ import re
 
 @dataclass
 class Events:
+	"""Encodes a stream of events and comments as server-sent event text."""
+
 	items: Iterable[Event | Comment]
 
 	def encode(self) -> Generator[bytes]:
@@ -20,6 +22,12 @@ class Events:
 
 @dataclass(init=False)
 class Event:
+	"""One server-sent event.
+
+	Each line of `data` is sent as its own `data` field, and the client joins
+	them back with newlines.
+	"""
+
 	data: str
 	event: str | None
 	id: str | None
@@ -52,6 +60,8 @@ class Event:
 
 @dataclass(init=False)
 class Comment:
+	"""A line that clients ignore."""
+
 	text: str
 
 	def __init__(self, text: str):

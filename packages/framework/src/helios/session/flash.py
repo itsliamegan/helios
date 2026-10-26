@@ -8,6 +8,8 @@ class Flash:
 	"""A set of items kept only for the next request and cleared afterwards.
 
 	Setting an item marks it as dirty. Only dirty items reach the next request.
+	Once closed, it refuses changes with `RuntimeError`, but its items can still
+	be read.
 	"""
 
 	items: dict[str, Any]

@@ -21,7 +21,7 @@ import time_machine
 
 from helios.app import Application, Provider
 from helios.app import Config as AppConfig
-from helios.http import Headers, Method, Request, Response, Status, URL
+from helios.http import Headers, Method, Request, Response, Status
 from helios.http.body import Stream
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
@@ -30,6 +30,7 @@ from helios.session import Flash
 from helios.session.file import Driver
 from helios.session.session import Session
 from helios.session.sessions import Sessions
+from helios.url import URL
 from helios.view import Component
 import helios.view.config
 import helios.view.provider

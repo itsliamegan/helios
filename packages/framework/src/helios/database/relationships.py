@@ -4,6 +4,12 @@ from .relationship import Relationship
 
 
 class Relationships(Mapping[str, Relationship]):
+	"""A model's relationships by name, each resolved and checked when first read.
+
+	Membership and iteration do not resolve relationships, so they work before
+	a forward-referenced model is declared.
+	"""
+
 	def __init__(self, declared: Mapping[str, Relationship]):
 		self.declared = declared
 		self.checked: set[str] = set()

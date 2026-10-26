@@ -21,6 +21,17 @@ from .view import View
 
 
 class Engine:
+	"""Renders views and components from templates.
+
+	Every template compiles when the engine is built, so a syntax error fails
+	at startup. An undefined variable raises, and `None` renders as an empty
+	string. Components become template globals named after their classes,
+	which must not collide with each other or with helper globals.
+
+	A view that names a layout renders inside it, as the layout's `content`,
+	and the sections it sets reach the layout as `sections`.
+	"""
+
 	def __init__(
 		self,
 		driver: Driver,
@@ -111,6 +122,8 @@ class Engine:
 
 
 class Loader(BaseLoader):
+	"""Finds a template in the main driver, then in each fallback in order."""
+
 	def __init__(self, driver: Driver, fallbacks: Sequence[Driver]):
 		self.drivers = [driver, *fallbacks]
 

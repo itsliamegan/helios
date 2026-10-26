@@ -24,6 +24,17 @@ CI runs these steps on every pull request.
 - Generic helpers that are not specific to Helios, such as inflection and
   case handling, belong in Luna.
 - Only a provider reads its `Config`. Services take the values they use.
+- `Model`, `Form`, and `Component` declare their contents with bare class
+  annotations (`title: str`) through one shared mechanism. Do not add wrapper
+  types such as `Attribute[str]`, and do not give one of them a different
+  declaration style.
+- A `Model`, `Form`, or `Component` subclass lists exactly one base, the
+  framework base. Share behavior by composition.
+- Keyed classes such as `Session`, `Headers`, `Input`, and `Query` are not
+  `Mapping`s. Write `__contains__(self, name: object)` by hand rather than
+  inheriting the mapping API.
+- Collection parameters take `Mapping` or `Sequence`. Use `dict` or `list` only
+  where appropriate.
 - Tests share one blog domain. Its models are `Post`, `Author`, `Comment`, and
   `Tag`. Its services, for tests that bind them, are `Moderator` and
   `Newsletter` for the application and `Reader` and `Visit` for a request.

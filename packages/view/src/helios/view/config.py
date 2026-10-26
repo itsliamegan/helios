@@ -1,6 +1,7 @@
+from dataclasses import dataclass
 from pathlib import Path
 
 
+@dataclass
 class Config:
-	def __init__(self, directory: Path):
-		self.directory = directory
+	directory: Path

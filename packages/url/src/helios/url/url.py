@@ -5,6 +5,15 @@ from .query import Query
 
 
 class URL:
+	"""A relative or absolute URL.
+
+	A URL keeps each component as written, so a parsed URL prints back
+	unchanged. Its user, password, query, and fragment stay percent-encoded.
+
+	A relative URL has only a path and a query, and an absolute URL also has a
+	scheme and a host.
+	"""
+
 	def __init__(
 		self,
 		path: str,
@@ -41,6 +50,8 @@ class URL:
 
 	@classmethod
 	def parse(cls, raw: str) -> Self:
+		"""Parse a URL, keeping each component as written."""
+
 		parts = urlsplit(raw)
 		if parts.scheme and not parts.netloc:
 			raise ValueError(f"absolute URL has no host: {raw!r}")

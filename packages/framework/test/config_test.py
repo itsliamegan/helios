@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 from luna.test.assertion import assert_eq, assert_raises
 
 from helios.config import ConfigError, Environment
-from helios.http import URL
+from helios.url import URL
 
 
 def test_loads_path():

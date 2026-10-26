@@ -6,6 +6,8 @@ from helios.database import Codec, Scalar
 
 
 class Password:
+	"""A password stored only as its hashed digest."""
+
 	def __init__(self, digest: Digest):
 		self.digest = digest
 
@@ -33,6 +35,8 @@ class Password:
 
 
 class Digest:
+	"""A salted hash of a password in its encoded text form."""
+
 	method: str = "scrypt"
 
 	def __init__(self, encoded: str):

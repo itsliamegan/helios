@@ -9,6 +9,8 @@ from markupsafe import Markup
 if TYPE_CHECKING:
 	from .engine import Engine
 
+# The view being rendered, which components and template tags reach without
+# being passed it.
 current: ContextVar[Rendering] = ContextVar("current")
 
 

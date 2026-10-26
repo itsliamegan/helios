@@ -16,6 +16,11 @@ class RuleError(ValueError):
 
 
 class Rule[T](ABC):
+	"""Checks a field's value, raising `RuleError` on failure.
+
+	A rule's `name` is the key used to override its message.
+	"""
+
 	name: ClassVar[str]
 
 	@abstractmethod

@@ -12,6 +12,12 @@ class Submissions:
 		self._flash = flash
 
 	def flash(self, errors: Errors, input: Input | None = None):
+		"""Flash errors, and form input when given, to the next request.
+
+		Omit `input` if a form includes secret information that should not be
+		written to the session.
+		"""
+
 		self._flash[ERRORS_KEY] = {
 			name: list(messages) for name, messages in errors.messages.items()
 		}

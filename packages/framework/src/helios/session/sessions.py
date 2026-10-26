@@ -12,7 +12,8 @@ class Sessions:
 
 	Adding, removing, or rotating a stored session marks the set as dirty. The
 	set is also dirty when any of its sessions are dirty. Purging removes every
-	session that has expired.
+	session that has expired. Once closed, the set and its sessions refuse
+	changes with `RuntimeError`, but they can still be read.
 	"""
 
 	items: dict[UUID, Session]
@@ -46,6 +47,8 @@ class Sessions:
 				self.remove(id)
 
 	def rotate(self, session: Session):
+		"""Give a session a new ID, so its old ID stops identifying it."""
+
 		if self.closed:
 			raise RuntimeError("the sessions are closed")
 

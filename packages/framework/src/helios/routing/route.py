@@ -1,17 +1,36 @@
 from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass
 from typing import Any, Concatenate, Self, TYPE_CHECKING
 
-from helios.http import Method, Request, Response, URL
-from helios.url import Pattern
+from helios.http import Method, Request, Response
+from helios.url import Pattern, URL
 
 if TYPE_CHECKING:
 	from helios.app import Context
 
+# A handler takes the request, its context, and the route's parameters by name.
 type Handler[**P] = Callable[Concatenate[Request, Context, P], Response]
+
+# A guard takes the request, its context, and the route's parameters by name.
+# Returning a response answers the request in place of the handler, and
+# returning `None` lets the request through.
 type Guard[**P] = Callable[Concatenate[Request, Context, P], Response | None]
 
 
+@dataclass(init=False)
 class Route:
+	"""A response handler matched to a method and path pattern.
+
+	Calling a route runs its guards in order and then its handler unless a
+	guard answers the request first.
+	"""
+
+	method: Method
+	pattern: Pattern
+	handler: Handler[...]
+	guards: Sequence[Guard[...]]
+	name: str | None
+
 	def __init__(
 		self,
 		method: Method,
@@ -77,6 +96,8 @@ class Route:
 		return cls(Method.DELETE, Pattern.parse(pattern), handler, guards, name)
 
 	def within(self, prefix: Pattern, guards: Sequence[Guard[...]]) -> Route:
+		"""Return this route under a prefix, with `guards` running before its own."""
+
 		pattern = self.pattern.prefixed(prefix)
 		if pattern == self.pattern and not guards:
 			return self
@@ -102,14 +123,19 @@ class Route:
 				return response
 		return self.handler(request, context, **parameters)
 
-	def __repr__(self) -> str:
-		return (
-			f"Route({self.method!r}, {self.pattern!r}, {self.handler!r}, "
-			f"name={self.name!r})"
-		)
 
-
+@dataclass(init=False)
 class Group:
+	"""Routes and groups that share a path prefix and guards.
+
+	A group's guards run before those of everything inside it. Iterating a group
+	flattens it into routes in the order they were declared.
+	"""
+
+	routes: list[Route | Group]
+	prefix: Pattern
+	guards: Sequence[Guard[...]]
+
 	def __init__(
 		self,
 		routes: Sequence[Route | Group],

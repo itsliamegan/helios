@@ -2,15 +2,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 
-@dataclass
-class File:
-	content: bytes
-	filename: str
-	content_type: str
-
-
 @dataclass(init=False)
 class Files:
+	"""A request's uploaded files by input name."""
+
 	items: dict[str, list[File]]
 
 	def __init__(self, items: Mapping[str, File | Sequence[File]] | None = None):
@@ -30,3 +25,12 @@ class Files:
 
 	def __contains__(self, name: object) -> bool:
 		return name in self.items
+
+
+@dataclass
+class File:
+	"""An uploaded file including its name, contents, and file type."""
+
+	content: bytes
+	filename: str
+	content_type: str

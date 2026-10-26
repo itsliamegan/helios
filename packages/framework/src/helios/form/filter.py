@@ -3,6 +3,14 @@ from dataclasses import dataclass
 
 
 class Filter[T](ABC):
+	"""Transforms a field's value into a value of the same type.
+
+	A filter is named for the operation that it performs, such as `Trim` or
+	`Compact`.
+
+	A filter can never fail. Any check that might fail is a `Rule`.
+	"""
+
 	@abstractmethod
 	def apply(self, value: T) -> T: ...
 

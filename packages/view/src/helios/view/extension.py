@@ -11,6 +11,11 @@ from .rendering import current
 
 
 class RenderExtension(Extension):
+	"""Adds the `render` tag, which renders a component with its body as `content`.
+
+	A blank body passes no `content`.
+	"""
+
 	tags = {"render"}
 	counter = count()
 

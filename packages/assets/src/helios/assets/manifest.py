@@ -6,7 +6,7 @@ from typing import Self
 
 @dataclass
 class Manifest:
-	"""A record of each asset's entry name mapped to its compiled file name.
+	"""Records each asset's entry name mapped to its compiled file name.
 
 	Bucketed by asset type.
 	"""

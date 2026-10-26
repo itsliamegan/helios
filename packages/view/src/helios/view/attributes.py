@@ -10,6 +10,20 @@ GLOBAL_ATTRIBUTES = {"class", "id", "hidden"}
 
 @dataclass(init=False, eq=False)
 class Attributes:
+	"""A bag of HTML attributes.
+
+	Names provided to the constructor should use underscores, e.g.
+	`data_controller`. Names will be rendered as HTML using dashes, e.g.
+	`data-controller`.
+
+	Boolean attribute values are converted to a present or absent attribute, so
+	setting an attribute to `True` will render its name whereas setting it to
+	`False` or `None` will omit it entirely.
+
+	The `class` attribute can hold a list of class names that will be joined
+	together when rendered as HTML.
+	"""
+
 	values: dict[str, Any]
 
 	def __init__(self, **values: Any):
@@ -31,6 +45,12 @@ class Attributes:
 		return set(self.values)
 
 	def merge(self, **defaults: Any) -> Attributes:
+		"""Return a new set of attributes using the defaults provided.
+
+		An existing value for the `class` attribute will be combined with a
+		provided one. Otherwise an existing value will overwrite a provided one.
+		"""
+
 		merged = Attributes(**defaults).values
 		for name, value in self.values.items():
 			if name == "class" and name in merged:

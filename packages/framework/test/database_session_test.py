@@ -9,10 +9,11 @@ import helios.app
 import helios.auth
 import helios.database
 from helios.database import Model, Store
-from helios.http import Headers, Method, Request, Response, Status, URL
+from helios.http import Headers, Method, Request, Response, Status
 from helios.routing import Route, Router
 import helios.session
 from helios.session.file import Driver
+from helios.url import URL
 
 
 class User(Model):

@@ -23,10 +23,10 @@ from helios.http import (
 	SameSite,
 	Status,
 	Stream,
-	URL,
 	sse,
 )
 from helios.http.error import NotFoundError
+from helios.url import URL
 
 
 def test_encodes_text_and_binary_bodies():

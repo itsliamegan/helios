@@ -6,6 +6,8 @@ from typing import Any, Self
 
 @dataclass(init=False)
 class Helpers:
+	"""Template filters and globals."""
+
 	filters: dict[str, Callable[..., Any]]
 	globals: dict[str, Any]
 

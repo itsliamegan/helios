@@ -12,11 +12,11 @@ from helios.http import (
 	Method,
 	Response,
 	Status,
-	URL,
 	UnsupportedMethodError,
 )
 from helios.http.error import BadRequestError, ContentTooLargeError
 from helios.routing import Route, Router
+from helios.url import URL
 from helios.wsgi import Application
 from helios.wsgi.adapt import RequestAdapter, ResponseAdapter
 from helios.wsgi.test import TestClient

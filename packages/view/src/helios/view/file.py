@@ -4,6 +4,12 @@ from .source import Driver, Source
 
 
 class Driver(Driver):
+	"""Reads `.html` templates from a directory.
+
+	A template is named by its path without the suffix, as in `posts/show`.
+	Hidden files and folders are skipped.
+	"""
+
 	def __init__(self, directory: Path):
 		self.directory = directory
 

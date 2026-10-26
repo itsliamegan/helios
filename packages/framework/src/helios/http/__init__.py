@@ -1,7 +1,5 @@
-from helios.url import Query, URL
-
 from . import error, sse
-from .body import Body, Buffered, Stream, body
+from .body import Body, Buffered, Stream
 from .cookie import Cookie, Cookies, SameSite
 from .error import UnsupportedMethodError
 from .file import File, Files
@@ -13,7 +11,6 @@ from .response import Response
 from .status import Status
 
 __all__ = [
-	"URL",
 	"Body",
 	"Buffered",
 	"Cookie",
@@ -23,14 +20,12 @@ __all__ = [
 	"Headers",
 	"Input",
 	"Method",
-	"Query",
 	"Request",
 	"Response",
 	"SameSite",
 	"Status",
 	"Stream",
 	"UnsupportedMethodError",
-	"body",
 	"error",
 	"sse",
 ]

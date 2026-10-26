@@ -16,6 +16,14 @@ from .context import Context
 
 
 class Kernel:
+	"""Runs each request through a chain of middleware to the router.
+
+	An `HTTPError` renders as a response at the layer that raised it, so the
+	middleware around that layer still receives a response. Any other error
+	becomes a server error at the outermost layer, past every middleware. In
+	both cases, the request's context records the first error as its failure.
+	"""
+
 	def __init__(
 		self,
 		container: Container,
@@ -67,6 +75,12 @@ class Kernel:
 		context: Context,
 		next: Next,
 	) -> Response:
+		"""Take the method from a `_method` form field, if one was sent.
+
+		HTML forms can only send `GET` and `POST`, so this lets a form send the
+		other methods. The field is removed from the input.
+		"""
+
 		raw_method = request.input.first("_method")
 		if raw_method is not None:
 			del request.input["_method"]
