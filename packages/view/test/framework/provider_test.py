@@ -49,6 +49,30 @@ def test_provider_shares_urls_with_templates():
 	assert_eq(str(response.body), '<a href="/posts/7">Post</a>')
 
 
+def test_provider_shares_current_route_with_templates():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("show.html").write_text(
+			'{% if urls.route_is("posts.*") %}active{% endif %}'
+		)
+
+		def show(request, context, id):
+			return context.get(Views).render("show")
+
+		app = Application(
+			Config(URL.parse("https://example.com")),
+			Router([Route.get("/posts/{id}", show, name="posts.show")]),
+			[helios.view.provider.Provider(helios.view.config.Config(views_dir))],
+		)
+		app.boot()
+		try:
+			response = app.handle(Request(Method.GET, URL("/posts/7")))
+		finally:
+			app.close()
+
+	assert_eq(str(response.body), "active")
+
+
 def test_provider_shares_assets_with_templates():
 	with TemporaryDirectory() as dir:
 		views_dir = Path(dir, "views")
