@@ -4,6 +4,7 @@ from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Container, Context
 from helios.http import Method, Request, Response, Status
+from helios.http.error import NotFoundError
 from helios.routing import (
 	Group,
 	Match,
@@ -31,6 +32,33 @@ def test_dispatches_directly():
 	res = router(request, context(request))
 
 	assert_eq(res.status, Status.OK)
+
+
+def test_records_dispatched_match_on_context():
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+	route = Route.get(
+		"/posts/{id:uuid}",
+		lambda req, ctx, id: Response.empty(),
+		name="posts.show",
+	)
+	router = Router([route])
+	request = Request(Method.GET, URL(f"/posts/{id}"))
+	context_ = context(request)
+
+	router(request, context_)
+
+	assert_eq(context_.match, Match(route, {"id": id}))
+
+
+def test_leaves_context_match_unset_without_route():
+	router = Router([Route.get("/posts", handle)])
+	request = Request(Method.GET, URL("/missing"))
+	context_ = context(request)
+
+	with assert_raises(NotFoundError):
+		router(request, context_)
+
+	assert_eq(context_.match, None)
 
 
 def test_routes_to_root():
@@ -321,3 +349,74 @@ def test_rejects_duplicate_route_names():
 				),
 			]
 		)
+
+
+def test_match_is_named_exactly():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	assert_eq(match.named("posts.show"), True)
+
+
+def test_match_isnt_named_by_other_name():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	assert_eq(match.named("posts.index"), False)
+
+
+def test_match_is_named_by_prefix():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	assert_eq(match.named("posts.*"), True)
+
+
+def test_prefix_matches_nested_names():
+	route = Route.get("/posts/{id}/comments", handle, name="posts.comments.index")
+	match = Match(route, {})
+
+	assert_eq(match.named("posts.*"), True)
+
+
+def test_prefix_doesnt_match_bare_prefix():
+	match = Match(Route.get("/posts", handle, name="posts"), {})
+
+	assert_eq(match.named("posts.*"), False)
+
+
+def test_match_is_named_by_any_pattern():
+	match = Match(Route.get("/comments/{id}", handle, name="comments.show"), {})
+
+	assert_eq(match.named("posts.*", "comments.*"), True)
+
+
+def test_unnamed_match_isnt_named():
+	match = Match(Route.get("/posts", handle), {})
+
+	assert_eq(match.named("posts.index", "posts.*"), False)
+
+
+def test_rejects_wildcard_before_suffix():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	with assert_raises(ValueError):
+		match.named("*.show")
+
+
+def test_rejects_wildcard_without_dot():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	with assert_raises(ValueError):
+		match.named("posts*")
+
+
+def test_rejects_wildcard_without_prefix():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	with assert_raises(ValueError):
+		match.named(".*")
+
+
+def test_rejects_invalid_pattern_for_unnamed_route():
+	match = Match(Route.get("/posts", handle), {})
+
+	with assert_raises(ValueError):
+		match.named("*.show")

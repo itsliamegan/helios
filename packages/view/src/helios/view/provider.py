@@ -10,6 +10,7 @@ from .config import Config
 from .engine import Engine
 from .file import Driver
 from .helpers import Helpers
+from .view import View
 from .views import Views
 
 
@@ -18,7 +19,8 @@ class Provider(Provider):
 
 	The engine is built while booting, so a template error stops the
 	application from starting. `urls` and `assets` become template globals
-	when they are bound.
+	when they are bound. Within a request, `urls` also knows the route the
+	request matched.
 	"""
 
 	def __init__(
@@ -39,6 +41,11 @@ class Provider(Provider):
 
 	def boot(self, application: Application):
 		application.container.get(Engine)
+		if application.container.bound(URLs):
+			application.container.get(Composers).add(self.compose)
+
+	def compose(self, view: View, context: Context):
+		view.share("urls", context.get(URLs).matched(context.match))
 
 	def engine(self, container: Container) -> Engine:
 		helpers = Helpers()

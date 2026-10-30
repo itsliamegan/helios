@@ -14,11 +14,17 @@ class URLs:
 	it takes the scheme, host, and port of the base URL.
 	"""
 
-	def __init__(self, router: Router, base_url: URL):
+	def __init__(
+		self,
+		router: Router,
+		base_url: URL,
+		match: Match | None = None,
+	):
 		if base_url.scheme is None or base_url.host is None:
 			raise ValueError("base URL must be absolute")
 		self.router = router
 		self.base_url = base_url
+		self._match = match
 
 	def route(
 		self,
@@ -40,6 +46,13 @@ class URLs:
 			port=self.base_url.port,
 		)
 
+	def route_is(self, *patterns: str) -> bool:
+		"""Return whether the current route's name matches any of `patterns`."""
+
+		if self._match is None:
+			return False
+		return self._match.named(*patterns)
+
 	def match(self, url: URL | str | None) -> Match | None:
 		"""Match a URL's path to a `GET` route.
 
@@ -54,3 +67,8 @@ class URLs:
 			except ValueError:
 				return None
 		return self.router.match(Method.GET, url)
+
+	def matched(self, match: Match | None) -> URLs:
+		"""Return a copy of these URLs whose current route is `match`."""
+
+		return URLs(self.router, self.base_url, match=match)

@@ -4,6 +4,7 @@ from luna.test.assertion import assert_eq, assert_not_none
 
 from helios.http import Response
 from helios.routing import (
+	Match,
 	Route,
 	Router,
 	URLs,
@@ -63,6 +64,43 @@ def test_generates_relative_route_by_default():
 	url = urls.route("posts.index")
 
 	assert_eq(str(url), "/posts/")
+
+
+def test_route_is_checks_match():
+	show = Route.get(
+		"/posts/{id:uuid}",
+		lambda req, ctx, id: Response.empty(),
+		name="posts.show",
+	)
+	urls = URLs(Router([show]), URL.parse("https://cork.example"))
+
+	matched = urls.matched(Match(show, {}))
+
+	assert_eq(matched.route_is("posts.*"), True)
+
+
+def test_route_is_false_without_match():
+	show = Route.get(
+		"/posts/{id:uuid}",
+		lambda req, ctx, id: Response.empty(),
+		name="posts.show",
+	)
+	urls = URLs(Router([show]), URL.parse("https://cork.example"))
+
+	assert_eq(urls.route_is("posts.*"), False)
+
+
+def test_matched_urls_generate_routes():
+	index = Route.get(
+		"/posts/",
+		lambda req, ctx: Response.empty(),
+		name="posts.index",
+	)
+	urls = URLs(Router([index]), URL.parse("https://cork.example"))
+
+	url = urls.matched(Match(index, {})).route("posts.index", absolute=True)
+
+	assert_eq(str(url), "https://cork.example/posts/")
 
 
 def matchable_urls():

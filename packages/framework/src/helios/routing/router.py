@@ -51,6 +51,7 @@ class Router:
 		match = self.match(request.method, request.url)
 		if match is None:
 			raise NotFoundError()
+		context.match = match
 		return match.route(request, context, **match.parameters)
 
 
@@ -60,3 +61,28 @@ class Match:
 
 	route: Route
 	parameters: dict[str, Any]
+
+	def named(self, *patterns: str) -> bool:
+		"""Return whether the route's name matches any of `patterns`.
+
+		A pattern is a route name or prefix followed by `.*`, which matches
+		every name under that prefix.
+		"""
+
+		for pattern in patterns:
+			prefix = pattern.removesuffix(".*")
+			if "*" in prefix:
+				raise ValueError(f"invalid route name pattern: {pattern}")
+			if prefix == "":
+				raise ValueError(f"invalid route name pattern: {pattern}")
+
+		name = self.route.name
+		if name is None:
+			return False
+
+		for pattern in patterns:
+			if (
+				pattern.endswith(".*") and name.startswith(pattern.removesuffix("*"))
+			) or name == pattern:
+				return True
+		return False
