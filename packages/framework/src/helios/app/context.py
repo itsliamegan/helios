@@ -15,7 +15,7 @@ class Context:
 	delegate to the container, so an application service can be resolved
 	through the context.
 
-	The context records the match the router dispatched to, and the first error
+	The context records the match the router dispatched to and the first error
 	the kernel encountered as the request's failure.
 	"""
 

@@ -12,9 +12,6 @@ class URLs:
 
 	A built URL is relative unless it is requested as absolute, in which case
 	it takes the scheme, host, and port of the base URL.
-
-	URLs made for a request know the route it matched. Application-wide URLs
-	have no current route.
 	"""
 
 	def __init__(

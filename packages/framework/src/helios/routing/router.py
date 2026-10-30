@@ -65,7 +65,7 @@ class Match:
 	def named(self, *patterns: str) -> bool:
 		"""Return whether the route's name matches any of `patterns`.
 
-		A pattern is an exact name, or a prefix followed by `.*`, which matches
+		A pattern is a route name or a prefix followed by `.*`, which matches
 		every name under that prefix.
 		"""
 
@@ -81,9 +81,8 @@ class Match:
 			return False
 
 		for pattern in patterns:
-			if pattern.endswith(".*"):
-				if name.startswith(pattern.removesuffix("*")):
-					return True
-			elif name == pattern:
+			if (
+				pattern.endswith(".*") and name.startswith(pattern.removesuffix("*"))
+			) or name == pattern:
 				return True
 		return False
