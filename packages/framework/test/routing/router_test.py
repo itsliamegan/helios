@@ -4,6 +4,7 @@ from luna.test.assertion import assert_eq, assert_raises
 
 from helios.app import Container, Context
 from helios.http import Method, Request, Response, Status
+from helios.http.error import NotFoundError
 from helios.routing import (
 	Group,
 	Match,
@@ -31,6 +32,33 @@ def test_dispatches_directly():
 	res = router(request, context(request))
 
 	assert_eq(res.status, Status.OK)
+
+
+def test_records_dispatched_match_on_context():
+	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
+	route = Route.get(
+		"/posts/{id:uuid}",
+		lambda req, ctx, id: Response.empty(),
+		name="posts.show",
+	)
+	router = Router([route])
+	request = Request(Method.GET, URL(f"/posts/{id}"))
+	context_ = context(request)
+
+	router(request, context_)
+
+	assert_eq(context_.match, Match(route, {"id": id}))
+
+
+def test_leaves_context_match_unset_without_route():
+	router = Router([Route.get("/posts", handle)])
+	request = Request(Method.GET, URL("/missing"))
+	context_ = context(request)
+
+	with assert_raises(NotFoundError):
+		router(request, context_)
+
+	assert_eq(context_.match, None)
 
 
 def test_routes_to_root():

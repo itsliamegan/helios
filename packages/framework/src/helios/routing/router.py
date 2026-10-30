@@ -51,6 +51,7 @@ class Router:
 		match = self.match(request.method, request.url)
 		if match is None:
 			raise NotFoundError()
+		context.match = match
 		return match.route(request, context, **match.parameters)
 
 

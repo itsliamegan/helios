@@ -1,6 +1,7 @@
 from typing import Self
 
 from helios.http import Request
+from helios.routing import Match
 
 from .container import Container, Instance, Scoped, Singleton, unparameterized
 from .services import Services
@@ -14,14 +15,15 @@ class Context:
 	delegate to the container, so an application service can be resolved
 	through the context.
 
-	The context records the first error the kernel encountered as the request's
-	failure.
+	The context records the match the router dispatched to, and the first error
+	the kernel encountered as the request's failure.
 	"""
 
 	def __init__(self, container: Container, request: Request):
 		self.container = container
 		self.request = request
 		self.services = Services({Request: request})
+		self.match: Match | None = None
 		self.failure: Exception | None = None
 		self.closed = False
 
