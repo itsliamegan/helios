@@ -321,3 +321,74 @@ def test_rejects_duplicate_route_names():
 				),
 			]
 		)
+
+
+def test_match_is_named_exactly():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	assert_eq(match.named("posts.show"), True)
+
+
+def test_match_isnt_named_by_other_name():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	assert_eq(match.named("posts.index"), False)
+
+
+def test_match_is_named_by_prefix():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	assert_eq(match.named("posts.*"), True)
+
+
+def test_prefix_matches_nested_names():
+	route = Route.get("/posts/{id}/comments", handle, name="posts.comments.index")
+	match = Match(route, {})
+
+	assert_eq(match.named("posts.*"), True)
+
+
+def test_prefix_doesnt_match_bare_prefix():
+	match = Match(Route.get("/posts", handle, name="posts"), {})
+
+	assert_eq(match.named("posts.*"), False)
+
+
+def test_match_is_named_by_any_pattern():
+	match = Match(Route.get("/comments/{id}", handle, name="comments.show"), {})
+
+	assert_eq(match.named("posts.*", "comments.*"), True)
+
+
+def test_unnamed_match_isnt_named():
+	match = Match(Route.get("/posts", handle), {})
+
+	assert_eq(match.named("posts.index", "posts.*"), False)
+
+
+def test_rejects_wildcard_before_suffix():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	with assert_raises(ValueError):
+		match.named("*.show")
+
+
+def test_rejects_wildcard_without_dot():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	with assert_raises(ValueError):
+		match.named("posts*")
+
+
+def test_rejects_wildcard_without_prefix():
+	match = Match(Route.get("/posts/{id}", handle, name="posts.show"), {})
+
+	with assert_raises(ValueError):
+		match.named(".*")
+
+
+def test_rejects_invalid_pattern_for_unnamed_route():
+	match = Match(Route.get("/posts", handle), {})
+
+	with assert_raises(ValueError):
+		match.named("*.show")
