@@ -11,10 +11,7 @@ module first, then write against it.
 
 ## Workflow
 
-Always ensure the test suite passes, the formatter is clean, and the type
-checker reports no errors before considering any work complete.
-
-CI runs these steps on every pull request.
+CI runs the tests, linter, and type checker on every pull request.
 
 ## Conventions
 
