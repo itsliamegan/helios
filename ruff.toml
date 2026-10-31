@@ -1,0 +1,31 @@
+target-version = "py315"
+
+[format]
+indent-style = "tab"
+nested-string-quote-style = "preferred"
+quote-style = "double"
+
+[lint]
+extend-select = [
+	"D200",
+	"D205",
+	"D209",
+	"D212",
+	"TID251",
+]
+ignore = [
+	"BLE001",
+	"G010",
+	"RUF012",
+]
+
+[lint.flake8-tidy-imports.banned-api]
+"dataclasses.field".msg = "Call the constructor explicitly."
+"dataclasses.replace".msg = "Call the constructor explicitly."
+"functools.partial".msg = "Defer the call with a lambda."
+
+[lint.isort]
+case-sensitive = true
+known-first-party = ["helios"]
+force-sort-within-sections = true
+order-by-type = false
