@@ -2,10 +2,10 @@ from typing import cast
 
 from luna.test.assertion import assert_eq, assert_is, assert_is_instance
 
-from helios.app import Container, Kernel
+from helios.app import Container, Kernel, Middlewares
 from helios.http import Headers, Input, Method, Request, Response, Status
 from helios.http.body import Stream
-from helios.http.error import BadRequestError, ContentTooLargeError, NotFoundError
+from helios.http.error import NotFoundError
 from helios.routing import Route, Router
 from helios.url import URL
 
@@ -20,61 +20,6 @@ class Reader:
 
 def request() -> Request:
 	return Request(Method.GET, URL("/"))
-
-
-def test_records_raised_error_as_failure_for_outer_middleware():
-	seen = []
-
-	def observe(request, context, next):
-		response = next(request, context)
-		seen.append(context.failure)
-		return response
-
-	kernel = Kernel(Container(), Router([]), [observe])
-	response = kernel.handle(request())
-
-	assert_eq(response.status, Status.NOT_FOUND)
-	assert_is_instance(seen[0], NotFoundError)
-
-
-def test_records_error_raised_by_inner_middleware_as_failure():
-	seen = []
-
-	def observe(request, context, next):
-		response = next(request, context)
-		seen.append(context.failure)
-		return response
-
-	def refuse(request, context, next):
-		raise ContentTooLargeError()
-
-	kernel = Kernel(Container(), Router([]), [observe, refuse])
-	response = kernel.handle(request())
-
-	assert_eq(response.status, Status.CONTENT_TOO_LARGE)
-	assert_is_instance(seen[0], ContentTooLargeError)
-
-
-def test_keeps_first_failure_when_outer_middleware_raises():
-	seen = []
-
-	def observe(request, context, next):
-		response = next(request, context)
-		seen.append(context.failure)
-		return response
-
-	def reject(request, context, next):
-		next(request, context)
-		raise BadRequestError()
-
-	def refuse(request, context, next):
-		raise ContentTooLargeError()
-
-	kernel = Kernel(Container(), Router([]), [observe, reject, refuse])
-	response = kernel.handle(request())
-
-	assert_eq(response.status, Status.BAD_REQUEST)
-	assert_is_instance(seen[0], ContentTooLargeError)
 
 
 def test_releases_request_services_with_raised_http_error():
@@ -93,7 +38,7 @@ def test_releases_request_services_with_raised_http_error():
 
 	container = Container()
 	container.scoped(Visit, visit)
-	kernel = Kernel(container, Router([]), [resolve])
+	kernel = Kernel(container, Router([]), Middlewares([resolve]))
 	kernel.handle(request())
 
 	assert_is_instance(seen[0], NotFoundError)
@@ -115,7 +60,7 @@ def test_releases_request_services_with_unexpected_error():
 
 	container = Container()
 	container.scoped(Visit, visit)
-	kernel = Kernel(container, Router([Route.get("/", index)]), [])
+	kernel = Kernel(container, Router([Route.get("/", index)]), Middlewares())
 	kernel.handle(request())
 
 	assert_is_instance(seen[0], ValueError)
@@ -139,7 +84,7 @@ def test_releases_request_services_before_stream_is_read():
 
 	container = Container()
 	container.scoped(Visit, visit)
-	kernel = Kernel(container, Router([Route.get("/", index)]), [])
+	kernel = Kernel(container, Router([Route.get("/", index)]), Middlewares())
 	response = kernel.handle(request())
 	body = cast(Stream, response.body)
 
@@ -159,7 +104,7 @@ def test_release_error_becomes_server_error_response():
 
 	container = Container()
 	container.scoped(Visit, visit)
-	kernel = Kernel(container, Router([Route.get("/", index)]), [])
+	kernel = Kernel(container, Router([Route.get("/", index)]), Middlewares())
 	response = kernel.handle(request())
 
 	assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
@@ -188,7 +133,7 @@ def test_cleanups_after_failed_release_see_its_error():
 	container = Container()
 	container.scoped(Reader, reader)
 	container.scoped(Visit, visit)
-	kernel = Kernel(container, Router([Route.get("/", index)]), [])
+	kernel = Kernel(container, Router([Route.get("/", index)]), Middlewares())
 	kernel.handle(request())
 
 	assert_is(seen[0], failure)
@@ -217,7 +162,7 @@ def test_unexpected_errors_skip_response_middleware_and_close_resources():
 	kernel = Kernel(
 		container,
 		Router([Route.get("/", index)]),
-		[observe],
+		Middlewares([observe]),
 	)
 	response = kernel.handle(request())
 
@@ -239,7 +184,7 @@ def test_returned_error_response_is_not_a_failure():
 	kernel = Kernel(
 		Container(),
 		Router([Route.get("/", index)]),
-		[observe],
+		Middlewares([observe]),
 	)
 	kernel.handle(request())
 
@@ -253,7 +198,7 @@ def test_overrides_method_from_input():
 	kernel = Kernel(
 		Container(),
 		Router([Route.delete("/", destroy)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(Method.POST, URL("/"), input=Input({"_method": "DELETE"}))
@@ -270,7 +215,7 @@ def test_rejects_unknown_method_override_as_bad_request():
 	kernel = Kernel(
 		Container(),
 		Router([Route.delete("/", destroy)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(Method.POST, URL("/"), input=Input({"_method": "delete"}))
@@ -286,7 +231,7 @@ def test_passes_get_from_another_site():
 	kernel = Kernel(
 		Container(),
 		Router([Route.get("/posts", index)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -306,7 +251,7 @@ def test_passes_same_origin_request():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -326,7 +271,7 @@ def test_rejects_same_site_request():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -346,7 +291,7 @@ def test_rejects_cross_site_request():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -366,7 +311,7 @@ def test_rejects_user_initiated_request():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -386,7 +331,7 @@ def test_rejects_unknown_fetch_site():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -406,7 +351,7 @@ def test_passes_request_without_browser_headers():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -425,7 +370,7 @@ def test_passes_origin_with_same_host():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -445,7 +390,7 @@ def test_ignores_origin_scheme():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -465,7 +410,7 @@ def test_ignores_origin_host_case():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -485,7 +430,7 @@ def test_rejects_origin_with_other_host():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -505,7 +450,7 @@ def test_rejects_origin_with_other_port():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -525,7 +470,7 @@ def test_rejects_null_origin():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -545,7 +490,7 @@ def test_rejects_malformed_origin():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -565,7 +510,7 @@ def test_prefers_fetch_site_over_origin():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -590,7 +535,7 @@ def test_checks_overridden_method():
 	kernel = Kernel(
 		Container(),
 		Router([Route.delete("/posts", destroy)]),
-		[],
+		Middlewares(),
 	)
 	response = kernel.handle(
 		Request(
@@ -617,7 +562,7 @@ def test_rejects_before_middleware():
 	kernel = Kernel(
 		Container(),
 		Router([Route.post("/posts", store)]),
-		[observe],
+		Middlewares([observe]),
 	)
 	response = kernel.handle(
 		Request(

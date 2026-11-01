@@ -1,4 +1,3 @@
-from collections.abc import Callable, Sequence
 import sys
 import traceback
 
@@ -6,7 +5,6 @@ from helios.http import Method, Request, Response
 from helios.http.error import (
 	BadRequestError,
 	ForbiddenError,
-	HTTPError,
 	InternalServerError,
 	UnsupportedMethodError,
 )
@@ -15,25 +13,32 @@ from helios.url import URL
 
 from .container import Container
 from .context import Context
+from .middleware import Middlewares, Next
 
 
 class Kernel:
-	"""Runs each request through a chain of middleware to the router.
+	"""Runs each request through middleware to the router.
 
-	An `HTTPError` renders as a response at the layer that raised it, so the
-	middleware around that layer still receives a response. Any other error
-	becomes a server error at the outermost layer, past every middleware. In
-	both cases, the request's context records the first error as its failure.
+	The kernel's own middleware runs before the application's. An error other
+	than an `HTTPError` becomes a server error at the outermost layer, past
+	every middleware. The request's context records that error as its failure
+	unless it already has one.
 	"""
 
 	def __init__(
 		self,
 		container: Container,
 		router: Router,
-		middlewares: Sequence[Middleware],
+		middlewares: Middlewares,
 	):
+		middlewares.prepend(
+			self.capture_errors,
+			self.adapt_artificial_method,
+			self.prevent_request_forgery,
+		)
+
 		self.container = container
-		self.pipeline = self.build(router, middlewares)
+		self.pipeline = middlewares.build(router)
 
 	def handle(self, request: Request) -> Response:
 		try:
@@ -45,32 +50,15 @@ class Kernel:
 			traceback.print_exception(error, file=sys.stderr)
 			return Response.error(InternalServerError())
 
-	def build(self, router: Router, middlewares: Sequence[Middleware]) -> Next:
-		next: Next = self.render_http_errors(router)
-		for middleware in reversed(middlewares):
-			next = self.render_http_errors(self.bind(middleware, next))
-		next = self.render_http_errors(self.bind(self.prevent_request_forgery, next))
-		next = self.render_http_errors(self.bind(self.adapt_artificial_method, next))
-		return self.bind(self.capture_errors, next)
-
 	@staticmethod
-	def bind(middleware: Middleware, next: Next) -> Next:
-		def call(request: Request, context: Context) -> Response:
-			return middleware(request, context, next)
-
-		return call
-
-	@staticmethod
-	def render_http_errors(next: Next) -> Next:
-		def call(request: Request, context: Context) -> Response:
-			try:
-				return next(request, context)
-			except HTTPError as error:
-				if context.failure is None:
-					context.failure = error
-				return Response.error(error)
-
-		return call
+	def capture_errors(request: Request, context: Context, next: Next) -> Response:
+		try:
+			return next(request, context)
+		except Exception as error:
+			if context.failure is None:
+				context.failure = error
+			traceback.print_exception(error, file=sys.stderr)
+			return Response.error(InternalServerError())
 
 	@staticmethod
 	def adapt_artificial_method(
@@ -127,17 +115,3 @@ class Kernel:
 			if origin.port != request.url.port:
 				raise ForbiddenError("the request came from another port")
 		return next(request, context)
-
-	@staticmethod
-	def capture_errors(request: Request, context: Context, next: Next) -> Response:
-		try:
-			return next(request, context)
-		except Exception as error:
-			if context.failure is None:
-				context.failure = error
-			traceback.print_exception(error, file=sys.stderr)
-			return Response.error(InternalServerError())
-
-
-type Middleware = Callable[[Request, Context, Next], Response]
-type Next = Callable[[Request, Context], Response]

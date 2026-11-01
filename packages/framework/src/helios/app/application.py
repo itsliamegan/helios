@@ -1,5 +1,5 @@
 from abc import ABC
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Self
 
@@ -8,16 +8,18 @@ from helios.routing import Router, URLs
 from helios.url import URL
 
 from .container import Container
-from .kernel import Kernel, Middleware
+from .kernel import Kernel
+from .middleware import Middleware, Middlewares
 
 
 class Application:
 	"""Coordinates services, providers, and middleware.
 
 	Constructing an application registers its providers. Booting an application
-	boots providers and builds the HTTP kernel. Once booted, the application can
-	handle HTTP requests and cannot change its middleware stack. Closing the
-	application releases its services.
+	boots providers and builds the HTTP kernel. Middleware that providers use
+	wraps the middleware the application was constructed with. Once booted, the
+	application can handle HTTP requests and cannot change its middleware stack.
+	Closing the application releases its services.
 	"""
 
 	def __init__(
@@ -31,7 +33,8 @@ class Application:
 
 		self.container = Container()
 		self.providers = list(providers)
-		self.middlewares = Middlewares(middlewares)
+		self.middlewares = Middlewares()
+		self.standalone = list(middlewares)
 		self.kernel: Kernel | None = None
 		try:
 			self.container.instance(Application, self)
@@ -56,10 +59,11 @@ class Application:
 		try:
 			for provider in self.providers:
 				provider.boot(self)
+			self.middlewares.append(*self.standalone)
 			self.kernel = Kernel(
 				self.container,
 				self.container.get(Router),
-				list(self.middlewares),
+				self.middlewares,
 			)
 		except BaseException:
 			self.container.close()
@@ -67,12 +71,12 @@ class Application:
 
 	def use(self, middleware: Middleware):
 		# Providers add middleware to the application while booting, but the
-		# kernel copies the list when it's built. Reject adding middleware that
-		# would be added after this copy is made.
+		# kernel builds its chain from the middleware once. Reject adding
+		# middleware that would be added after the chain is built.
 		if self.kernel is not None:
 			raise RuntimeError("the application is already booted")
 
-		self.middlewares.use(middleware)
+		self.middlewares.append(middleware)
 
 	def handle(self, request: Request) -> Response:
 		if self.container.closed:
@@ -101,25 +105,6 @@ class Provider(ABC):
 	def register(self, container: Container): ...
 
 	def boot(self, application: Application): ...
-
-
-class Middlewares:
-	"""An application's middleware kept in two tiers.
-
-	Those its providers use wrap those it was constructed with. Each tier keeps
-	the order its middleware was added in.
-	"""
-
-	def __init__(self, middlewares: Sequence[Middleware]):
-		self.provided: list[Middleware] = []
-		self.application = list(middlewares)
-
-	def __iter__(self) -> Iterator[Middleware]:
-		yield from self.provided
-		yield from self.application
-
-	def use(self, middleware: Middleware):
-		self.provided.append(middleware)
 
 
 @dataclass
