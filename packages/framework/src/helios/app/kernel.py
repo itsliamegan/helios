@@ -5,11 +5,13 @@ import traceback
 from helios.http import Method, Request, Response
 from helios.http.error import (
 	BadRequestError,
+	ForbiddenError,
 	HTTPError,
 	InternalServerError,
 	UnsupportedMethodError,
 )
 from helios.routing import Router
+from helios.url import URL
 
 from .container import Container
 from .context import Context
@@ -47,6 +49,7 @@ class Kernel:
 		next: Next = self.render_http_errors(router)
 		for middleware in reversed(middlewares):
 			next = self.render_http_errors(self.bind(middleware, next))
+		next = self.render_http_errors(self.bind(self.prevent_request_forgery, next))
 		next = self.render_http_errors(self.bind(self.adapt_artificial_method, next))
 		return self.bind(self.capture_errors, next)
 
@@ -93,6 +96,33 @@ class Kernel:
 		return next(request, context)
 
 	@staticmethod
+	def prevent_request_forgery(
+		request: Request,
+		context: Context,
+		next: Next,
+	) -> Response:
+		"""Reject a state-changing request that a browser sent from another origin.
+
+		A `GET` request always passes. A request with `Sec-Fetch-Site` passes only
+		from the same origin. Otherwise, a request with `Origin` passes only when
+		that origin has the request's host and port. A request with neither header
+		did not come from a current browser, so it passes.
+		"""
+
+		if request.method is Method.GET:
+			return next(request, context)
+
+		if "Sec-Fetch-Site" in request.headers:
+			if str(request.headers["Sec-Fetch-Site"]) != "same-origin":
+				raise ForbiddenError("the request came from another origin")
+		elif "Origin" in request.headers and not has_same_host(
+			str(request.headers["Origin"]),
+			request.url,
+		):
+			raise ForbiddenError("the request came from another host")
+		return next(request, context)
+
+	@staticmethod
 	def capture_errors(request: Request, context: Context, next: Next) -> Response:
 		try:
 			return next(request, context)
@@ -101,6 +131,16 @@ class Kernel:
 				context.failure = error
 			traceback.print_exception(error, file=sys.stderr)
 			return Response.error(InternalServerError())
+
+
+def has_same_host(raw_origin: str, url: URL) -> bool:
+	try:
+		origin = URL.parse(raw_origin)
+	except ValueError:
+		return False
+	if origin.host is None or url.host is None:
+		return False
+	return origin.host.lower() == url.host.lower() and origin.port == url.port
 
 
 type Middleware = Callable[[Request, Context, Next], Response]

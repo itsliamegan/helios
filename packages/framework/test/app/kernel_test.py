@@ -3,7 +3,7 @@ from typing import cast
 from luna.test.assertion import assert_eq, assert_is, assert_is_instance
 
 from helios.app import Container, Kernel
-from helios.http import Input, Method, Request, Response, Status
+from helios.http import Headers, Input, Method, Request, Response, Status
 from helios.http.body import Stream
 from helios.http.error import BadRequestError, ContentTooLargeError, NotFoundError
 from helios.routing import Route, Router
@@ -277,3 +277,355 @@ def test_rejects_unknown_method_override_as_bad_request():
 	)
 
 	assert_eq(response.status, Status.BAD_REQUEST)
+
+
+def test_passes_get_from_another_site():
+	def index(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.get("/posts", index)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.GET,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Sec-Fetch-Site": "cross-site"}),
+		)
+	)
+
+	assert_eq(response.status, Status.OK)
+
+
+def test_passes_same_origin_request():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Sec-Fetch-Site": "same-origin"}),
+		)
+	)
+
+	assert_eq(response.status, Status.OK)
+
+
+def test_rejects_same_site_request():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Sec-Fetch-Site": "same-site"}),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+
+
+def test_rejects_cross_site_request():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Sec-Fetch-Site": "cross-site"}),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+
+
+def test_rejects_user_initiated_request():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Sec-Fetch-Site": "none"}),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+
+
+def test_rejects_unknown_fetch_site():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Sec-Fetch-Site": "same-planet"}),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+
+
+def test_passes_request_without_browser_headers():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+		)
+	)
+
+	assert_eq(response.status, Status.OK)
+
+
+def test_passes_origin_with_same_host():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Origin": "https://blog.example"}),
+		)
+	)
+
+	assert_eq(response.status, Status.OK)
+
+
+def test_ignores_origin_scheme():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Origin": "http://blog.example"}),
+		)
+	)
+
+	assert_eq(response.status, Status.OK)
+
+
+def test_ignores_origin_host_case():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Origin": "https://Blog.Example"}),
+		)
+	)
+
+	assert_eq(response.status, Status.OK)
+
+
+def test_rejects_origin_with_other_host():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Origin": "https://spam.example"}),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+
+
+def test_rejects_origin_with_other_port():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Origin": "https://blog.example:8443"}),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+
+
+def test_rejects_null_origin():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Origin": "null"}),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+
+
+def test_rejects_malformed_origin():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Origin": "https://[blog.example"}),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+
+
+def test_prefers_fetch_site_over_origin():
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers(
+				{
+					"Sec-Fetch-Site": "cross-site",
+					"Origin": "https://blog.example",
+				}
+			),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+
+
+def test_checks_overridden_method():
+	def destroy(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.delete("/posts", destroy)]),
+		[],
+	)
+	response = kernel.handle(
+		Request(
+			Method.GET,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Sec-Fetch-Site": "cross-site"}),
+			input=Input({"_method": "DELETE"}),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+
+
+def test_rejects_before_middleware():
+	seen = []
+
+	def observe(request, context, next):
+		seen.append(request)
+		return next(request, context)
+
+	def store(request, context):
+		return Response.empty(Status.OK)
+
+	kernel = Kernel(
+		Container(),
+		Router([Route.post("/posts", store)]),
+		[observe],
+	)
+	response = kernel.handle(
+		Request(
+			Method.POST,
+			URL.parse("https://blog.example/posts"),
+			headers=Headers({"Sec-Fetch-Site": "cross-site"}),
+		)
+	)
+
+	assert_eq(response.status, Status.FORBIDDEN)
+	assert_eq(seen, [])
