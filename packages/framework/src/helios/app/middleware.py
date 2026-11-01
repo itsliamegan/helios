@@ -30,8 +30,8 @@ class Middlewares:
 		self.provided = []
 		self.application = list(middlewares or [])
 
-	def build(self, destination: Next) -> Next:
-		def with_rendered_http_errors(middleware: Middleware, next: Next) -> Next:
+	def build(self, destination: Handler) -> Handler:
+		def with_rendered_http_errors(middleware: Middleware, next: Handler) -> Handler:
 			def call(request: Request, context: Context) -> Response:
 				try:
 					return middleware(request, context, next)
@@ -62,5 +62,5 @@ class Middlewares:
 		yield from self.application
 
 
-type Middleware = Callable[[Request, Context, Next], Response]
-type Next = Callable[[Request, Context], Response]
+type Middleware = Callable[[Request, Context, Handler], Response]
+type Handler = Callable[[Request, Context], Response]

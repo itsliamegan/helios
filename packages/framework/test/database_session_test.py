@@ -29,10 +29,10 @@ def request(session_id: str | None = None) -> Request:
 	return Request(Method.GET, URL("/"), headers)
 
 
-def application(database_path: Path, session_path: Path, handler):
+def application(database_path: Path, session_path: Path, action):
 	app = helios.app.Application(
 		helios.app.Config(),
-		Router([Route.get("/", handler)]),
+		Router([Route.get("/", action)]),
 		[
 			helios.session.Provider(
 				helios.session.Config(),

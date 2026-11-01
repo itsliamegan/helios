@@ -2,7 +2,7 @@ from collections.abc import Generator
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from helios.app import Application, Container, Context, Next, Provider
+from helios.app import Application, Container, Context, Handler, Provider
 from helios.http import Cookie, Request, Response
 from helios.view import View
 from helios.view.composer import Composers
@@ -83,7 +83,7 @@ class Provider(Provider):
 	def compose(self, view: View, context: Context):
 		view.share("flash", context.get(Flash))
 
-	def middleware(self, request: Request, context: Context, next: Next) -> Response:
+	def middleware(self, request: Request, context: Context, next: Handler) -> Response:
 		response = next(request, context)
 
 		flash = context.resolved(Flash)

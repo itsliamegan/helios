@@ -24,10 +24,10 @@ def context(request: Request) -> Context:
 
 
 def test_dispatches_directly():
-	def handler(req, ctx):
+	def action(req, ctx):
 		return Response.empty(Status.OK)
 
-	router = Router([Route.get("/", handler)])
+	router = Router([Route.get("/", action)])
 	request = Request(Method.GET, URL("/"))
 	res = router(request, context(request))
 
@@ -122,15 +122,15 @@ def test_routes_with_uuid_converter():
 	assert_eq(match, Match(route, {"id": id}))
 
 
-def test_passes_converted_parameters_to_handler_by_name():
+def test_passes_converted_parameters_to_action_by_name():
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
 	called_with = []
 
-	def handler(req, ctx, slug: str, id: UUID):
+	def action(req, ctx, slug: str, id: UUID):
 		called_with.append((slug, id))
 		return Response.empty(Status.OK)
 
-	router = Router([Route.get("/articles/{id:uuid}/{slug}", handler)])
+	router = Router([Route.get("/articles/{id:uuid}/{slug}", action)])
 
 	request = Request(Method.GET, URL(f"/articles/{id}/intro"))
 	router(request, context(request))
@@ -193,7 +193,7 @@ def test_routes_with_param_to_subroute():
 	assert_eq(match, Match(route, {"slug": "intro"}))
 
 
-def test_runs_route_guards_in_order_before_handler():
+def test_runs_route_guards_in_order_before_action():
 	calls = []
 
 	def first(req, ctx):
@@ -202,15 +202,15 @@ def test_runs_route_guards_in_order_before_handler():
 	def second(req, ctx):
 		calls.append("second")
 
-	def handler(req, ctx):
-		calls.append("handler")
+	def action(req, ctx):
+		calls.append("action")
 		return Response.empty(Status.OK)
 
-	router = Router([Route.get("/", handler, guards=[first, second])])
+	router = Router([Route.get("/", action, guards=[first, second])])
 	request = Request(Method.GET, URL("/"))
 	router(request, context(request))
 
-	assert_eq(calls, ["first", "second", "handler"])
+	assert_eq(calls, ["first", "second", "action"])
 
 
 def test_guard_response_stops_dispatch():
@@ -223,11 +223,11 @@ def test_guard_response_stops_dispatch():
 	def later(req, ctx):
 		calls.append("later")
 
-	def handler(req, ctx):
-		calls.append("handler")
+	def action(req, ctx):
+		calls.append("action")
 		return Response.empty(Status.OK)
 
-	router = Router([Route.get("/", handler, guards=[stop, later])])
+	router = Router([Route.get("/", action, guards=[stop, later])])
 	request = Request(Method.GET, URL("/"))
 	res = router(request, context(request))
 
@@ -242,10 +242,10 @@ def test_passes_converted_parameters_to_guards_by_name():
 	def guard(req, ctx, id: UUID):
 		called_with.append(id)
 
-	def handler(req, ctx, id: UUID):
+	def action(req, ctx, id: UUID):
 		return Response.empty(Status.OK)
 
-	router = Router([Route.get("/articles/{id:uuid}", handler, guards=[guard])])
+	router = Router([Route.get("/articles/{id:uuid}", action, guards=[guard])])
 	request = Request(Method.GET, URL(f"/articles/{id}"))
 	router(request, context(request))
 
