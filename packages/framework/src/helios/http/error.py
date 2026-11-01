@@ -15,6 +15,10 @@ class NotFoundError(HTTPError):
 	status = Status.NOT_FOUND
 
 
+class ForbiddenError(HTTPError):
+	status = Status.FORBIDDEN
+
+
 class ContentTooLargeError(HTTPError):
 	status = Status.CONTENT_TOO_LARGE
 

@@ -1,37 +1,44 @@
-from collections.abc import Callable, Sequence
 import sys
 import traceback
 
 from helios.http import Method, Request, Response
 from helios.http.error import (
 	BadRequestError,
-	HTTPError,
+	ForbiddenError,
 	InternalServerError,
 	UnsupportedMethodError,
 )
 from helios.routing import Router
+from helios.url import URL
 
 from .container import Container
 from .context import Context
+from .middleware import Middlewares, Next
 
 
 class Kernel:
-	"""Runs each request through a chain of middleware to the router.
+	"""Runs each request through middleware to the router.
 
-	An `HTTPError` renders as a response at the layer that raised it, so the
-	middleware around that layer still receives a response. Any other error
-	becomes a server error at the outermost layer, past every middleware. In
-	both cases, the request's context records the first error as its failure.
+	The kernel requires its own middleware, so it runs first. An error other
+	than an `HTTPError` becomes a server error at the outermost layer, past
+	every middleware. The request's context records that error as its failure
+	unless it already has one.
 	"""
 
 	def __init__(
 		self,
 		container: Container,
 		router: Router,
-		middlewares: Sequence[Middleware],
+		middlewares: Middlewares,
 	):
+		middlewares.require(
+			self.capture_errors,
+			self.adapt_artificial_method,
+			self.prevent_request_forgery,
+		)
+
 		self.container = container
-		self.pipeline = self.build(router, middlewares)
+		self.pipeline = middlewares.build(router)
 
 	def handle(self, request: Request) -> Response:
 		try:
@@ -43,31 +50,15 @@ class Kernel:
 			traceback.print_exception(error, file=sys.stderr)
 			return Response.error(InternalServerError())
 
-	def build(self, router: Router, middlewares: Sequence[Middleware]) -> Next:
-		next: Next = self.render_http_errors(router)
-		for middleware in reversed(middlewares):
-			next = self.render_http_errors(self.bind(middleware, next))
-		next = self.render_http_errors(self.bind(self.adapt_artificial_method, next))
-		return self.bind(self.capture_errors, next)
-
 	@staticmethod
-	def bind(middleware: Middleware, next: Next) -> Next:
-		def call(request: Request, context: Context) -> Response:
-			return middleware(request, context, next)
-
-		return call
-
-	@staticmethod
-	def render_http_errors(next: Next) -> Next:
-		def call(request: Request, context: Context) -> Response:
-			try:
-				return next(request, context)
-			except HTTPError as error:
-				if context.failure is None:
-					context.failure = error
-				return Response.error(error)
-
-		return call
+	def capture_errors(request: Request, context: Context, next: Next) -> Response:
+		try:
+			return next(request, context)
+		except Exception as error:
+			if context.failure is None:
+				context.failure = error
+			traceback.print_exception(error, file=sys.stderr)
+			return Response.error(InternalServerError())
 
 	@staticmethod
 	def adapt_artificial_method(
@@ -93,15 +84,36 @@ class Kernel:
 		return next(request, context)
 
 	@staticmethod
-	def capture_errors(request: Request, context: Context, next: Next) -> Response:
-		try:
+	def prevent_request_forgery(
+		request: Request,
+		context: Context,
+		next: Next,
+	) -> Response:
+		"""Reject a state-changing request that a browser sent from another origin.
+
+		A `GET` request always passes. A request with `Sec-Fetch-Site` passes only
+		from the same origin. Otherwise, a request with `Origin` passes only when
+		that origin has the request's host and port. A request with neither header
+		did not come from a current browser, so it passes.
+		"""
+
+		if request.method is Method.GET:
 			return next(request, context)
-		except Exception as error:
-			if context.failure is None:
-				context.failure = error
-			traceback.print_exception(error, file=sys.stderr)
-			return Response.error(InternalServerError())
 
-
-type Middleware = Callable[[Request, Context, Next], Response]
-type Next = Callable[[Request, Context], Response]
+		if "Sec-Fetch-Site" in request.headers:
+			if str(request.headers["Sec-Fetch-Site"]) != "same-origin":
+				raise ForbiddenError("the request came from another origin")
+		elif "Origin" in request.headers:
+			try:
+				origin = URL.parse(str(request.headers["Origin"]))
+			except ValueError as error:
+				raise ForbiddenError("the request has a malformed origin") from error
+			if (
+				origin.host is None
+				or request.url.host is None
+				or origin.host.lower() != request.url.host.lower()
+			):
+				raise ForbiddenError("the request came from another host")
+			if origin.port != request.url.port:
+				raise ForbiddenError("the request came from another port")
+		return next(request, context)
