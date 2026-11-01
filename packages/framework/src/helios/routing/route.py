@@ -19,7 +19,7 @@ type Guard[**P] = Callable[Concatenate[Request, Context, P], Response | None]
 
 @dataclass(init=False)
 class Route:
-	"""A response handler matched to a method and path pattern.
+	"""An action paired with a method and a path pattern.
 
 	Calling a route runs its guards in order and then its action unless a
 	guard answers the request first.
