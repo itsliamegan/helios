@@ -9,8 +9,8 @@ from .composer import Composers
 from .config import Config
 from .engine import Engine
 from .file import Driver
-from .form import method
 from .helpers import Helpers
+from .method import method
 from .view import View
 from .views import Views
 
