@@ -19,9 +19,7 @@ class Provider(Provider):
 	"""Provides the template engine and each request's `Views`.
 
 	The engine is built while booting, so a template error stops the
-	application from starting. `method` is always a template global, and
-	`urls` and `assets` become template globals when they are bound. Within a
-	request, `urls` also knows the route the request matched.
+	application from starting.
 	"""
 
 	def __init__(
