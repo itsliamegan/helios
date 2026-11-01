@@ -9,6 +9,7 @@ from .composer import Composers
 from .config import Config
 from .engine import Engine
 from .file import Driver
+from .form import method
 from .helpers import Helpers
 from .view import View
 from .views import Views
@@ -18,9 +19,9 @@ class Provider(Provider):
 	"""Provides the template engine and each request's `Views`.
 
 	The engine is built while booting, so a template error stops the
-	application from starting. `urls` and `assets` become template globals
-	when they are bound. Within a request, `urls` also knows the route the
-	request matched.
+	application from starting. `method` is always a template global, and
+	`urls` and `assets` become template globals when they are bound. Within a
+	request, `urls` also knows the route the request matched.
 	"""
 
 	def __init__(
@@ -48,7 +49,7 @@ class Provider(Provider):
 		view.share("urls", context.get(URLs).matched(context.match))
 
 	def engine(self, container: Container) -> Engine:
-		helpers = Helpers()
+		helpers = Helpers(globals={"method": method})
 		if container.bound(URLs):
 			helpers.globals["urls"] = container.get(URLs)
 		if container.bound(Assets):
