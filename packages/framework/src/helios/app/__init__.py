@@ -3,7 +3,7 @@ from .container import Binding, Container, Instance, Scoped, Singleton
 from .context import Context
 from .error import DependencyError
 from .kernel import Kernel
-from .middleware import Middleware, Middlewares, Next
+from .middleware import Handler, Middleware, Middlewares
 
 __all__ = [
 	"Application",
@@ -12,11 +12,11 @@ __all__ = [
 	"Container",
 	"Context",
 	"DependencyError",
+	"Handler",
 	"Instance",
 	"Kernel",
 	"Middleware",
 	"Middlewares",
-	"Next",
 	"Provider",
 	"Scoped",
 	"Singleton",

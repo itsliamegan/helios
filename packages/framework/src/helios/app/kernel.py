@@ -13,7 +13,7 @@ from helios.url import URL
 
 from .container import Container
 from .context import Context
-from .middleware import Middlewares, Next
+from .middleware import Handler, Middlewares
 
 
 class Kernel:
@@ -51,7 +51,7 @@ class Kernel:
 			return Response.error(InternalServerError())
 
 	@staticmethod
-	def capture_errors(request: Request, context: Context, next: Next) -> Response:
+	def capture_errors(request: Request, context: Context, next: Handler) -> Response:
 		try:
 			return next(request, context)
 		except Exception as error:
@@ -64,7 +64,7 @@ class Kernel:
 	def adapt_artificial_method(
 		request: Request,
 		context: Context,
-		next: Next,
+		next: Handler,
 	) -> Response:
 		"""Take the method from a `_method` form field, if one was sent.
 
@@ -87,7 +87,7 @@ class Kernel:
 	def prevent_request_forgery(
 		request: Request,
 		context: Context,
-		next: Next,
+		next: Handler,
 	) -> Response:
 		"""Reject a state-changing request that a browser sent from another origin.
 

@@ -29,10 +29,10 @@ def request() -> Request:
 	return Request(Method.GET, URL("/"))
 
 
-def application(path: Path, handler, model_types=None) -> Application:
+def application(path: Path, action, model_types=None) -> Application:
 	app = Application(
 		helios.app.Config(),
-		Router([Route.get("/", handler)]),
+		Router([Route.get("/", action)]),
 		[Provider(Config(path), model_types or [Post])],
 	)
 	app.boot()

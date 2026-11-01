@@ -8,11 +8,11 @@ from helios.url import Pattern, URL
 if TYPE_CHECKING:
 	from helios.app import Context
 
-# A handler takes the request, its context, and the route's parameters by name.
-type Handler[**P] = Callable[Concatenate[Request, Context, P], Response]
+# An action takes the request, its context, and the route's parameters by name.
+type Action[**P] = Callable[Concatenate[Request, Context, P], Response]
 
 # A guard takes the request, its context, and the route's parameters by name.
-# Returning a response answers the request in place of the handler, and
+# Returning a response answers the request in place of the action, and
 # returning `None` lets the request through.
 type Guard[**P] = Callable[Concatenate[Request, Context, P], Response | None]
 
@@ -21,13 +21,13 @@ type Guard[**P] = Callable[Concatenate[Request, Context, P], Response | None]
 class Route:
 	"""A response handler matched to a method and path pattern.
 
-	Calling a route runs its guards in order and then its handler unless a
+	Calling a route runs its guards in order and then its action unless a
 	guard answers the request first.
 	"""
 
 	method: Method
 	pattern: Pattern
-	handler: Handler[...]
+	action: Action[...]
 	guards: Sequence[Guard[...]]
 	name: str | None
 
@@ -35,13 +35,13 @@ class Route:
 		self,
 		method: Method,
 		pattern: Pattern,
-		handler: Handler[...],
+		action: Action[...],
 		guards: Sequence[Guard[...]] | None = None,
 		name: str | None = None,
 	):
 		self.method = method
 		self.pattern = pattern
-		self.handler = handler
+		self.action = action
 		self.guards = guards or []
 		self.name = name
 
@@ -49,51 +49,51 @@ class Route:
 	def get(
 		cls,
 		pattern: str,
-		handler: Handler[...],
+		action: Action[...],
 		guards: Sequence[Guard[...]] | None = None,
 		name: str | None = None,
 	) -> Self:
-		return cls(Method.GET, Pattern.parse(pattern), handler, guards, name)
+		return cls(Method.GET, Pattern.parse(pattern), action, guards, name)
 
 	@classmethod
 	def post(
 		cls,
 		pattern: str,
-		handler: Handler[...],
+		action: Action[...],
 		guards: Sequence[Guard[...]] | None = None,
 		name: str | None = None,
 	) -> Self:
-		return cls(Method.POST, Pattern.parse(pattern), handler, guards, name)
+		return cls(Method.POST, Pattern.parse(pattern), action, guards, name)
 
 	@classmethod
 	def put(
 		cls,
 		pattern: str,
-		handler: Handler[...],
+		action: Action[...],
 		guards: Sequence[Guard[...]] | None = None,
 		name: str | None = None,
 	) -> Self:
-		return cls(Method.PUT, Pattern.parse(pattern), handler, guards, name)
+		return cls(Method.PUT, Pattern.parse(pattern), action, guards, name)
 
 	@classmethod
 	def patch(
 		cls,
 		pattern: str,
-		handler: Handler[...],
+		action: Action[...],
 		guards: Sequence[Guard[...]] | None = None,
 		name: str | None = None,
 	) -> Self:
-		return cls(Method.PATCH, Pattern.parse(pattern), handler, guards, name)
+		return cls(Method.PATCH, Pattern.parse(pattern), action, guards, name)
 
 	@classmethod
 	def delete(
 		cls,
 		pattern: str,
-		handler: Handler[...],
+		action: Action[...],
 		guards: Sequence[Guard[...]] | None = None,
 		name: str | None = None,
 	) -> Self:
-		return cls(Method.DELETE, Pattern.parse(pattern), handler, guards, name)
+		return cls(Method.DELETE, Pattern.parse(pattern), action, guards, name)
 
 	def within(self, prefix: Pattern, guards: Sequence[Guard[...]]) -> Route:
 		"""Return this route under a prefix, with `guards` running before its own."""
@@ -104,7 +104,7 @@ class Route:
 		return Route(
 			self.method,
 			pattern,
-			self.handler,
+			self.action,
 			[*guards, *self.guards],
 			self.name,
 		)
@@ -121,7 +121,7 @@ class Route:
 			response = guard(request, context, **parameters)
 			if response is not None:
 				return response
-		return self.handler(request, context, **parameters)
+		return self.action(request, context, **parameters)
 
 
 @dataclass(init=False)

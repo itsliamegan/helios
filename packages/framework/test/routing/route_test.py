@@ -25,22 +25,22 @@ def context(request: Request) -> Context:
 	return Context(Container(), request)
 
 
-def test_calling_route_runs_guards_before_handler():
+def test_calling_route_runs_guards_before_action():
 	calls = []
 
 	def guard(req, ctx, id):
 		calls.append(("guard", id))
 
-	def handler(req, ctx, id):
-		calls.append(("handler", id))
+	def action(req, ctx, id):
+		calls.append(("action", id))
 		return Response.empty(Status.OK)
 
-	route = Route.get("/{id}", handler, [guard])
+	route = Route.get("/{id}", action, [guard])
 	request = Request(Method.GET, URL("/1"))
 	res = route(request, context(request), id="1")
 
 	assert_eq(res.status, Status.OK)
-	assert_eq(calls, [("guard", "1"), ("handler", "1")])
+	assert_eq(calls, [("guard", "1"), ("action", "1")])
 
 
 def test_group_without_prefix_or_guards_preserves_route_configuration():
@@ -51,7 +51,7 @@ def test_group_without_prefix_or_guards_preserves_route_configuration():
 	assert_is(effective, route)
 	assert_eq(effective.method, Method.GET)
 	assert_eq(effective.pattern, Pattern.parse("/articles"))
-	assert_eq(effective.handler, handle)
+	assert_eq(effective.action, handle)
 	assert_eq(effective.guards, [])
 
 
@@ -108,7 +108,7 @@ def test_converts_parameters_in_grouped_patterns():
 	id = UUID("102ddad7-06d1-484f-a3f8-3cf4711e91ba")
 	called_with = []
 
-	def handler(req, ctx, id):
+	def action(req, ctx, id):
 		called_with.append(id)
 		return Response.empty(Status.OK)
 
@@ -117,7 +117,7 @@ def test_converts_parameters_in_grouped_patterns():
 			Group(
 				prefix="/articles",
 				routes=[
-					Route.get("/{id:uuid}", handler),
+					Route.get("/{id:uuid}", action),
 				],
 			)
 		]
@@ -160,8 +160,8 @@ def test_runs_nested_and_route_guards_outermost_first():
 	def route_guard(req, ctx):
 		calls.append("route")
 
-	def handler(req, ctx):
-		calls.append("handler")
+	def action(req, ctx):
+		calls.append("action")
 		return Response.empty(Status.OK)
 
 	router = Router(
@@ -172,7 +172,7 @@ def test_runs_nested_and_route_guards_outermost_first():
 					Group(
 						guards=[inner],
 						routes=[
-							Route.get("/", handler, guards=[route_guard]),
+							Route.get("/", action, guards=[route_guard]),
 						],
 					),
 				],
@@ -182,7 +182,7 @@ def test_runs_nested_and_route_guards_outermost_first():
 	request = Request(Method.GET, URL("/"))
 	router(request, context(request))
 
-	assert_eq(calls, ["outer", "inner", "route", "handler"])
+	assert_eq(calls, ["outer", "inner", "route", "action"])
 
 
 def test_inherited_guard_response_stops_dispatch():
@@ -195,8 +195,8 @@ def test_inherited_guard_response_stops_dispatch():
 	def inner(req, ctx):
 		calls.append("inner")
 
-	def handler(req, ctx):
-		calls.append("handler")
+	def action(req, ctx):
+		calls.append("action")
 		return Response.empty(Status.OK)
 
 	router = Router(
@@ -204,7 +204,7 @@ def test_inherited_guard_response_stops_dispatch():
 			Group(
 				guards=[outer],
 				routes=[
-					Route.get("/", handler, guards=[inner]),
+					Route.get("/", action, guards=[inner]),
 				],
 			)
 		]
@@ -238,9 +238,9 @@ def test_group_flattening_preserves_declaration_and_matching_order():
 		]
 	)
 
-	assert_eq([route.handler for route in router.routes], [first, second, third])
+	assert_eq([route.action for route in router.routes], [first, second, third])
 	match = router.match(Method.GET, URL("/new"))
-	assert_is(assert_not_none(match).route.handler, first)
+	assert_is(assert_not_none(match).route.action, first)
 
 
 def test_reusing_group_configuration_doesnt_mutate_sources():

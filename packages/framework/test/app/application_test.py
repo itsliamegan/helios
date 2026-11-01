@@ -140,7 +140,7 @@ def test_runs_provider_then_standalone_middleware_in_order():
 		return response
 
 	def index(request, context):
-		events.append("handler")
+		events.append("action")
 		return Response.empty(Status.OK)
 
 	app = Application(
@@ -158,7 +158,7 @@ def test_runs_provider_then_standalone_middleware_in_order():
 			"before one",
 			"before two",
 			"before standalone",
-			"handler",
+			"action",
 			"after standalone",
 			"after two",
 			"after one",
