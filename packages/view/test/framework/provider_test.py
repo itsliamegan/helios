@@ -110,6 +110,31 @@ def test_provider_shares_assets_with_templates():
 	)
 
 
+def test_provider_shares_method_with_templates():
+	with TemporaryDirectory() as dir:
+		views_dir = Path(dir)
+		views_dir.joinpath("edit.html").write_text('{{ method("PUT") }}')
+
+		def edit(request, context, id):
+			return context.get(Views).render("edit")
+
+		app = Application(
+			Config(),
+			Router([Route.get("/posts/{id}/edit", edit)]),
+			[helios.view.provider.Provider(helios.view.config.Config(views_dir))],
+		)
+		app.boot()
+		try:
+			response = app.handle(Request(Method.GET, URL("/posts/7/edit")))
+		finally:
+			app.close()
+
+	assert_eq(
+		str(response.body),
+		'<input type="hidden" name="_method" value="PUT">',
+	)
+
+
 def test_provider_registers_components():
 	with TemporaryDirectory() as dir:
 		views_dir = Path(dir)
