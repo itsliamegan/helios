@@ -108,9 +108,11 @@ class Kernel:
 				origin = URL.parse(str(request.headers["Origin"]))
 			except ValueError as error:
 				raise ForbiddenError("the request has a malformed origin") from error
-			if origin.host is None or request.url.host is None:
-				raise ForbiddenError("the request came from another host")
-			if origin.host.lower() != request.url.host.lower():
+			if (
+				origin.host is None
+				or request.url.host is None
+				or origin.host.lower() != request.url.host.lower()
+			):
 				raise ForbiddenError("the request came from another host")
 			if origin.port != request.url.port:
 				raise ForbiddenError("the request came from another port")

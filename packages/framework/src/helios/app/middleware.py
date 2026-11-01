@@ -1,4 +1,5 @@
 from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass
 
 from helios.http import Request, Response
 from helios.http.error import HTTPError
@@ -6,22 +7,27 @@ from helios.http.error import HTTPError
 from .context import Context
 
 
+@dataclass(init=False)
 class Middlewares:
 	"""An application's middleware in the order a request passes through it.
 
-	Required middleware runs first. Middleware that providers use runs next,
-	then the middleware the application was constructed with. Each tier keeps
-	the order its middleware was added in.
+	Required middleware runs first. Middleware that providers use runs next.
+	The middleware the application was constructed with runs last. Each tier
+	keeps the order its middleware was added in.
 
-	Building the middleware chains it to a destination. An `HTTPError` renders
+	A chain of middleware terminates in a destination. An `HTTPError` renders
 	as a response at the layer that raised it, so the middleware around that
 	layer still receives a response. The request's context records the first
 	such error as its failure.
 	"""
 
+	required: list[Middleware]
+	provided: list[Middleware]
+	application: list[Middleware]
+
 	def __init__(self, middlewares: Sequence[Middleware] | None = None):
-		self.required: list[Middleware] = []
-		self.provided: list[Middleware] = []
+		self.required = []
+		self.provided = []
 		self.application = list(middlewares or [])
 
 	def build(self, destination: Next) -> Next:
