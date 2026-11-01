@@ -115,11 +115,17 @@ class Kernel:
 		if "Sec-Fetch-Site" in request.headers:
 			if str(request.headers["Sec-Fetch-Site"]) != "same-origin":
 				raise ForbiddenError("the request came from another origin")
-		elif "Origin" in request.headers and not has_same_host(
-			str(request.headers["Origin"]),
-			request.url,
-		):
-			raise ForbiddenError("the request came from another host")
+		elif "Origin" in request.headers:
+			try:
+				origin = URL.parse(str(request.headers["Origin"]))
+			except ValueError as error:
+				raise ForbiddenError("the request has a malformed origin") from error
+			if origin.host is None or request.url.host is None:
+				raise ForbiddenError("the request came from another host")
+			if origin.host.lower() != request.url.host.lower():
+				raise ForbiddenError("the request came from another host")
+			if origin.port != request.url.port:
+				raise ForbiddenError("the request came from another port")
 		return next(request, context)
 
 	@staticmethod
@@ -131,16 +137,6 @@ class Kernel:
 				context.failure = error
 			traceback.print_exception(error, file=sys.stderr)
 			return Response.error(InternalServerError())
-
-
-def has_same_host(raw_origin: str, url: URL) -> bool:
-	try:
-		origin = URL.parse(raw_origin)
-	except ValueError:
-		return False
-	if origin.host is None or url.host is None:
-		return False
-	return origin.host.lower() == url.host.lower() and origin.port == url.port
 
 
 type Middleware = Callable[[Request, Context, Next], Response]
