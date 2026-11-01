@@ -19,7 +19,7 @@ from .middleware import Middlewares, Next
 class Kernel:
 	"""Runs each request through middleware to the router.
 
-	The kernel's own middleware runs before the application's. An error other
+	The kernel requires its own middleware, so it runs first. An error other
 	than an `HTTPError` becomes a server error at the outermost layer, past
 	every middleware. The request's context records that error as its failure
 	unless it already has one.
@@ -31,7 +31,7 @@ class Kernel:
 		router: Router,
 		middlewares: Middlewares,
 	):
-		middlewares.prepend(
+		middlewares.require(
 			self.capture_errors,
 			self.adapt_artificial_method,
 			self.prevent_request_forgery,

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 
 from helios.http import Request, Response
 from helios.http.error import HTTPError
@@ -7,7 +7,11 @@ from .context import Context
 
 
 class Middlewares:
-	"""Middleware in the order a request passes through it.
+	"""An application's middleware in the order a request passes through it.
+
+	Required middleware runs first. Middleware that providers use runs next,
+	then the middleware the application was constructed with. Each tier keeps
+	the order its middleware was added in.
 
 	Building the middleware chains it to a destination. An `HTTPError` renders
 	as a response at the layer that raised it, so the middleware around that
@@ -16,7 +20,9 @@ class Middlewares:
 	"""
 
 	def __init__(self, middlewares: Sequence[Middleware] | None = None):
-		self.middlewares = list(middlewares or [])
+		self.required: list[Middleware] = []
+		self.provided: list[Middleware] = []
+		self.application = list(middlewares or [])
 
 	def build(self, destination: Next) -> Next:
 		def with_rendered_http_errors(middleware: Middleware, next: Next) -> Next:
@@ -34,15 +40,20 @@ class Middlewares:
 			lambda request, context, next: next(request, context),
 			destination,
 		)
-		for middleware in reversed(self.middlewares):
+		for middleware in reversed(list(self)):
 			next = with_rendered_http_errors(middleware, next)
 		return next
 
-	def prepend(self, *middlewares: Middleware):
-		self.middlewares[0:0] = middlewares
+	def require(self, *middlewares: Middleware):
+		self.required.extend(middlewares)
 
-	def append(self, *middlewares: Middleware):
-		self.middlewares.extend(middlewares)
+	def provide(self, middleware: Middleware):
+		self.provided.append(middleware)
+
+	def __iter__(self) -> Iterator[Middleware]:
+		yield from self.required
+		yield from self.provided
+		yield from self.application
 
 
 type Middleware = Callable[[Request, Context, Next], Response]

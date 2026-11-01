@@ -16,10 +16,9 @@ class Application:
 	"""Coordinates services, providers, and middleware.
 
 	Constructing an application registers its providers. Booting an application
-	boots providers and builds the HTTP kernel. Middleware that providers use
-	wraps the middleware the application was constructed with. Once booted, the
-	application can handle HTTP requests and cannot change its middleware stack.
-	Closing the application releases its services.
+	boots providers and builds the HTTP kernel. Once booted, the application can
+	handle HTTP requests and cannot change its middleware stack. Closing the
+	application releases its services.
 	"""
 
 	def __init__(
@@ -33,8 +32,7 @@ class Application:
 
 		self.container = Container()
 		self.providers = list(providers)
-		self.middlewares = Middlewares()
-		self.standalone = list(middlewares)
+		self.middlewares = Middlewares(middlewares)
 		self.kernel: Kernel | None = None
 		try:
 			self.container.instance(Application, self)
@@ -59,7 +57,6 @@ class Application:
 		try:
 			for provider in self.providers:
 				provider.boot(self)
-			self.middlewares.append(*self.standalone)
 			self.kernel = Kernel(
 				self.container,
 				self.container.get(Router),
@@ -76,7 +73,7 @@ class Application:
 		if self.kernel is not None:
 			raise RuntimeError("the application is already booted")
 
-		self.middlewares.append(middleware)
+		self.middlewares.provide(middleware)
 
 	def handle(self, request: Request) -> Response:
 		if self.container.closed:

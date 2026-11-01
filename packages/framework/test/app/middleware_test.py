@@ -29,60 +29,33 @@ def test_runs_middleware_in_order_to_destination():
 	assert_eq(events, ["first", "second", "index"])
 
 
-def test_prepends_middleware_before_existing_middleware():
+def test_runs_required_then_provided_then_application_middleware():
 	events = []
 
-	def first(request, context, next):
-		events.append("first")
+	def required(request, context, next):
+		events.append("required")
 		return next(request, context)
 
-	def second(request, context, next):
-		events.append("second")
+	def provided(request, context, next):
+		events.append("provided")
 		return next(request, context)
 
-	def third(request, context, next):
-		events.append("third")
+	def application(request, context, next):
+		events.append("application")
 		return next(request, context)
 
 	def index(request, context):
 		return Response.empty(Status.OK)
 
-	middlewares = Middlewares([third])
-	middlewares.prepend(first, second)
+	middlewares = Middlewares([application])
+	middlewares.provide(provided)
+	middlewares.require(required)
 	request = Request(Method.GET, URL("/posts"))
 	next = middlewares.build(index)
 	with Context(Container(), request) as context:
 		next(request, context)
 
-	assert_eq(events, ["first", "second", "third"])
-
-
-def test_appends_middleware_after_existing_middleware():
-	events = []
-
-	def first(request, context, next):
-		events.append("first")
-		return next(request, context)
-
-	def second(request, context, next):
-		events.append("second")
-		return next(request, context)
-
-	def third(request, context, next):
-		events.append("third")
-		return next(request, context)
-
-	def index(request, context):
-		return Response.empty(Status.OK)
-
-	middlewares = Middlewares([first])
-	middlewares.append(second, third)
-	request = Request(Method.GET, URL("/posts"))
-	next = middlewares.build(index)
-	with Context(Container(), request) as context:
-		next(request, context)
-
-	assert_eq(events, ["first", "second", "third"])
+	assert_eq(events, ["required", "provided", "application"])
 
 
 def test_records_destination_error_as_failure_for_middleware():
