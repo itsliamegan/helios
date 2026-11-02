@@ -59,15 +59,34 @@ def test_transaction_rolls_back_when_block_raises():
 		assert_eq(rows, [])
 
 
-def test_transaction_holds_write_lock():
+def test_transaction_without_statements_leaves_write_lock_free():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		database = Database(path, Registry([Post]))
 		other = Connection.open(path, busy_timeout=timedelta(milliseconds=10))
 
 		try:
-			with database.transaction(), assert_raises(DatabaseBusyError):
+			with database.transaction():
 				other.begin()
+				other.rollback()
+		finally:
+			other.close()
+
+
+def test_transaction_holds_write_lock_from_first_read():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		connection = sqlite3.connect(path, autocommit=True)
+		connection.execute(SCHEMA)
+		connection.close()
+		database = Database(path, Registry([Post]))
+		other = Connection.open(path, busy_timeout=timedelta(milliseconds=10))
+
+		try:
+			with database.transaction() as store:
+				store.find_all(Post)
+				with assert_raises(DatabaseBusyError):
+					other.begin()
 		finally:
 			other.close()
 

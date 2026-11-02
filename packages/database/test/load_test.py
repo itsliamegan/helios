@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
+from typing import cast
 from uuid import UUID, uuid4
 
 from luna.test.assertion import (
@@ -149,11 +150,11 @@ def open_store(
 @contextmanager
 def recording(store: Store) -> Generator[list[str]]:
 	statements: list[str] = []
-	store.connection.connection.set_trace_callback(statements.append)
+	cast(Connection, store.connection).connection.set_trace_callback(statements.append)
 	try:
 		yield statements
 	finally:
-		store.connection.connection.set_trace_callback(None)
+		cast(Connection, store.connection).connection.set_trace_callback(None)
 
 
 def selects(statements: list[str], table: str) -> int:
@@ -281,7 +282,9 @@ def test_splits_large_id_sets_into_batches():
 		for position in range(3, 8):
 			fixture.tag(store, store.create(Tag, name=f"Tag {position}"), position)
 		taggings = store.find_all(Tagging)
-		store.connection.connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 2)
+		cast(Connection, store.connection).connection.setlimit(
+			sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 2
+		)
 
 		with recording(store) as statements:
 			store.load(taggings, "tag")

@@ -16,18 +16,19 @@ from .registry import Registry
 from .relationship import BelongsTo
 from .sqlite import Connection
 from .statement import Delete, Insert, Raw, Select, Statement, Update
+from .transaction import Transaction
 
 
 class Store:
-	"""A set of models stored as rows, read and written through one connection.
+	"""A set of models stored as rows, read and written through a transaction.
 
-	The store never begins, commits, or rolls back a transaction itself. Once
-	closed, it refuses every read and write with `RuntimeError`.
+	Over a bare connection, each statement commits as it runs. The store never
+	begins, commits, or rolls back a transaction itself.
 	"""
 
 	def __init__(
 		self,
-		connection: Connection,
+		connection: Connection | Transaction,
 		model_types: Iterable[type[Model]] | Registry,
 	):
 		self.connection = connection
@@ -35,7 +36,6 @@ class Store:
 			model_types if isinstance(model_types, Registry) else Registry(model_types)
 		)
 		self.grammar = Grammar()
-		self.closed = False
 
 	def create[**P, T: Model](
 		self,
@@ -100,9 +100,6 @@ class Store:
 		A path names relationships separated by dots, as in `"taggings.tag"`.
 		"""
 
-		if self.closed:
-			raise RuntimeError("the transaction is closed")
-
 		if not isinstance(models, Sequence):
 			models = [models]
 		if not models:
@@ -152,11 +149,6 @@ class Store:
 		self.registry.get(model_type)
 		return self.models(model_type, Raw(sql, tuple(parameters)))
 
-	def close(self):
-		"""Refuse every later read and write."""
-
-		self.closed = True
-
 	def models[T: Model](self, model_type: type[T], statement: Statement) -> list[T]:
 		column_names, rows = self.read(statement)
 		return [self.hydrate(model_type, column_names, row) for row in rows]
@@ -178,9 +170,6 @@ class Store:
 		self,
 		statement: Statement,
 	) -> tuple[tuple[str, ...], list[tuple[Scalar | None, ...]]]:
-		if self.closed:
-			raise RuntimeError("the transaction is closed")
-
 		compiled = self.grammar.compile(statement)
 		cursor = self.connection.execute(compiled.sql, compiled.parameters)
 		try:
@@ -189,9 +178,6 @@ class Store:
 			cursor.close()
 
 	def write(self, statement: Statement) -> int:
-		if self.closed:
-			raise RuntimeError("the transaction is closed")
-
 		compiled = self.grammar.compile(statement)
 		cursor = self.connection.execute(compiled.sql, compiled.parameters)
 		try:

@@ -6,13 +6,15 @@ from pathlib import Path
 from .registry import Registry
 from .sqlite import Connection
 from .store import Store
+from .transaction import Transaction
 
 
 class Database:
 	"""A handle to a potential SQLite database accessed through transactions.
 
-	Each transaction opens its own connection and holds the database's write
-	lock. It commits when its block ends and rolls back when the block raises.
+	Each transaction opens its own connection and takes the database's write
+	lock on its first statement. It commits when its block ends and rolls back
+	when the block raises.
 	"""
 
 	def __init__(
@@ -26,19 +28,12 @@ class Database:
 		self.busy_timeout = busy_timeout
 
 	@contextmanager
-	def transaction(self) -> Generator[Transaction]:
-		# Closing the connection rolls back a transaction the block left open.
+	def transaction(self) -> Generator[Store]:
 		with Connection.open(self.path, self.busy_timeout) as connection:
-			connection.begin()
-			store = Store(connection, self.registry)
+			transaction = Transaction(connection)
 			try:
-				yield store
-				connection.commit()
+				yield Store(transaction, self.registry)
+				transaction.commit()
 			finally:
-				store.close()
-
-
-# A transaction is a `Store` for now. Callers name it `Transaction`, so their
-# code stays correct once `Transaction` is its own class and `Store` is built
-# over it.
-type Transaction = Store
+				# Rolling back after a commit does nothing.
+				transaction.rollback()
