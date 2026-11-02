@@ -7,6 +7,7 @@ from .model import Model
 from .query import Query
 from .relationship import belongs_to, has_many, has_one
 from .store import Store
+from .transaction import Transaction
 
 __all__ = [
 	"Codec",
@@ -20,6 +21,7 @@ __all__ = [
 	"Query",
 	"Scalar",
 	"Store",
+	"Transaction",
 	"belongs_to",
 	"generated",
 	"has_many",

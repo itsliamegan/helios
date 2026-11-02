@@ -27,9 +27,19 @@ class Connection:
 		path: Path,
 		busy_timeout: timedelta = timedelta(seconds=30),
 		foreign_keys: bool = True,
+		read_only: bool = False,
 	) -> Self:
 		try:
-			connection = cls(sqlite3.connect(path, autocommit=True))
+			if read_only:
+				connection = cls(
+					sqlite3.connect(
+						f"{path.absolute().as_uri()}?mode=ro",
+						autocommit=True,
+						uri=True,
+					)
+				)
+			else:
+				connection = cls(sqlite3.connect(path, autocommit=True))
 		except sqlite3.Error as error:
 			raise translate(error, "connection") from error
 
