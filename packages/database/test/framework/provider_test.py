@@ -1,12 +1,14 @@
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
+from uuid import uuid4
 
 from luna.test.assertion import assert_eq, assert_is, assert_is_instance, assert_that
 
 import helios.app
 from helios.app import Application
-from helios.database import Config, Database, Model, Provider, Store
+from helios.database import Config, Database, Model, Store
+from helios.database.provider import Provider
 from helios.http import Method, Request, Response, Status
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
@@ -103,6 +105,27 @@ def test_raised_http_error_rolls_back():
 			raise NotFoundError()
 
 		app = application(path, missing)
+		try:
+			response = app.handle(request())
+		finally:
+			app.close()
+
+		assert_eq(response.status, Status.NOT_FOUND)
+		assert_eq(titles(path), [])
+
+
+def test_missing_row_renders_not_found_and_rolls_back():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_schema(path)
+
+		def show(request, context):
+			store = context.get(Store)
+			store.create(Post, title="Rolled back")
+			store.find_one(Post, uuid4())
+			return Response.empty(Status.OK)
+
+		app = application(path, show)
 		try:
 			response = app.handle(request())
 		finally:

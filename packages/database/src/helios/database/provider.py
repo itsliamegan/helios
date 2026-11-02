@@ -1,9 +1,11 @@
 from collections.abc import Generator, Iterable
 
-from helios.app import Container, Context, Provider
+from helios.app import Application, Container, Context, Provider
+from helios.http import Status
 
 from .config import Config
 from .database import Database
+from .error import NotFoundError
 from .migration import Migrations, Migrator
 from .model import Model
 from .registry import Registry
@@ -30,6 +32,9 @@ class Provider(Provider):
 		container.instance(Database, self.database)
 		container.singleton(Migrator, self.migrator)
 		container.scoped(Store, self.store)
+
+	def boot(self, application: Application):
+		application.rescue(NotFoundError, Status.NOT_FOUND)
 
 	def migrator(self, container: Container) -> Migrator:
 		return Migrator(

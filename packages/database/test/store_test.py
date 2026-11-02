@@ -20,10 +20,10 @@ from helios.database import (
 	Model,
 	ModelError,
 	NotFoundError,
-	Provider,
 	Scalar,
 	Store,
 )
+from helios.database.provider import Provider
 from helios.database.sqlite import Connection
 from helios.url import URL
 

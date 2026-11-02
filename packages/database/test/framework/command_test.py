@@ -9,7 +9,8 @@ from luna.test.assertion import assert_eq, assert_not, assert_raises
 import helios.app
 from helios.app import Application
 from helios.console import Program
-from helios.database import Config, Provider
+from helios.database import Config
+from helios.database.provider import Provider
 from helios.routing import Router
 
 

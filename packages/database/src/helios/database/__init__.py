@@ -4,7 +4,6 @@ from .config import Config
 from .database import Database
 from .error import DatabaseBusyError, DatabaseError, ModelError, NotFoundError
 from .model import Model
-from .provider import Provider
 from .query import Query
 from .relationship import belongs_to, has_many, has_one
 from .store import Store
@@ -18,7 +17,6 @@ __all__ = [
 	"Model",
 	"ModelError",
 	"NotFoundError",
-	"Provider",
 	"Query",
 	"Scalar",
 	"Store",
