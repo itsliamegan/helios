@@ -1,18 +1,29 @@
 from collections.abc import Generator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import timedelta
 from pathlib import Path
 
 from .registry import Registry
 from .sqlite import Connection
 from .store import Store
+from .transaction import Transaction
+
+# Each thread under WSGI, and each task under ASGI, has its own context, so
+# concurrent requests do not refuse each other.
+TRANSACTIONS: ContextVar[frozenset[Database]] = ContextVar(
+	"transactions",
+	default=frozenset(),
+)
 
 
 class Database:
-	"""A handle to a potential SQLite database accessed through transactions.
+	"""A handle to a potential SQLite database opened through connections.
 
-	Each transaction opens its own connection and holds the database's write
-	lock. It commits when its block ends and rolls back when the block raises.
+	A transaction takes the database's write lock on its first statement. While
+	one is open in the current context, opening another connection to the same
+	database raises `RuntimeError`, because that connection would wait on the
+	transaction's lock until the busy timeout.
 	"""
 
 	def __init__(
@@ -26,19 +37,42 @@ class Database:
 		self.busy_timeout = busy_timeout
 
 	@contextmanager
+	def connection(self, read_only: bool = False) -> Generator[Connection]:
+		"""Open a connection that commits each statement as it runs."""
+
+		if self in TRANSACTIONS.get():
+			raise RuntimeError("the database has a transaction open in this context")
+
+		with Connection.open(
+			self.path,
+			self.busy_timeout,
+			read_only=read_only,
+		) as connection:
+			yield connection
+
+	@contextmanager
 	def transaction(self) -> Generator[Transaction]:
-		# Closing the connection rolls back a transaction the block left open.
-		with Connection.open(self.path, self.busy_timeout) as connection:
-			connection.begin()
-			store = Store(connection, self.registry)
+		"""Open a transaction that commits when the block ends.
+
+		The transaction rolls back when the block raises.
+		"""
+
+		with self.connection() as connection:
+			transaction = Transaction(connection)
+			token = TRANSACTIONS.set(TRANSACTIONS.get() | {self})
 			try:
-				yield store
-				connection.commit()
+				yield transaction
+			except BaseException:
+				transaction.rollback()
+				raise
+			else:
+				transaction.commit()
 			finally:
-				store.close()
+				TRANSACTIONS.reset(token)
 
+	@contextmanager
+	def store(self) -> Generator[Store]:
+		"""Open a store over a transaction that commits when the block ends."""
 
-# A transaction is a `Store` for now. Callers name it `Transaction`, so their
-# code stays correct once `Transaction` is its own class and `Store` is built
-# over it.
-type Transaction = Store
+		with self.transaction() as transaction:
+			yield Store(transaction, self.registry)

@@ -15,8 +15,9 @@ from .store import Store
 class Provider(Provider):
 	"""Provides the database and a `Store` for each request.
 
-	A request's store is one transaction, which commits when the request
-	succeeds and rolls back when it fails.
+	A request's store is one transaction, which takes the database's write lock
+	on its first statement, commits when the request succeeds, and rolls back
+	when it fails.
 	"""
 
 	def __init__(self, config: Config, model_types: Iterable[type[Model]]):
@@ -44,5 +45,5 @@ class Provider(Provider):
 		)
 
 	def store(self, context: Context) -> Generator[Store]:
-		with context.get(Database).transaction() as transaction:
-			yield transaction
+		with context.get(Database).store() as store:
+			yield store

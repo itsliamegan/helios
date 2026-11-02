@@ -25,6 +25,7 @@ from helios.database import (
 )
 from helios.database.provider import Provider
 from helios.database.sqlite import Connection
+from helios.database.transaction import Transaction
 from helios.url import URL
 
 
@@ -626,15 +627,15 @@ def open_post_store(directory: str):
 		"CREATE TABLE posts (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, title TEXT NOT NULL)",
 	)
 	connection = Connection.open(path)
-	connection.begin()
-	return connection, Store(connection, [Post])
+	transaction = Transaction(connection)
+	return connection, transaction, Store(transaction, [Post])
 
 
-def test_closed_store_refuses_writes():
+def test_store_over_ended_transaction_refuses_writes():
 	with TemporaryDirectory() as directory:
-		connection, store = open_post_store(directory)
+		connection, transaction, store = open_post_store(directory)
 		try:
-			store.close()
+			transaction.commit()
 
 			with assert_raises(RuntimeError) as raised:
 				store.create(Post, title="Intro")
@@ -643,28 +644,14 @@ def test_closed_store_refuses_writes():
 			connection.close()
 
 
-def test_closed_store_refuses_reads():
+def test_store_over_ended_transaction_refuses_reads():
 	with TemporaryDirectory() as directory:
-		connection, store = open_post_store(directory)
+		connection, transaction, store = open_post_store(directory)
 		try:
-			store.close()
+			transaction.commit()
 
 			with assert_raises(RuntimeError) as raised:
 				store.find_all(Post)
-			assert_is(type(raised.exception), RuntimeError)
-		finally:
-			connection.close()
-
-
-def test_closed_store_refuses_loads():
-	with TemporaryDirectory() as directory:
-		connection, store = open_post_store(directory)
-		try:
-			post = store.create(Post, title="Intro")
-			store.close()
-
-			with assert_raises(RuntimeError) as raised:
-				store.load(post)
 			assert_is(type(raised.exception), RuntimeError)
 		finally:
 			connection.close()

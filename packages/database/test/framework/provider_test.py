@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -9,6 +10,7 @@ import helios.app
 from helios.app import Application
 from helios.database import Config, Database, Model, Store
 from helios.database.provider import Provider
+from helios.database.sqlite import Connection
 from helios.http import Method, Request, Response, Status
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
@@ -204,6 +206,30 @@ def test_request_shares_transaction():
 
 		assert_eq(response.status, Status.OK)
 		assert_eq(titles(path), ["Revised"])
+
+
+def test_store_without_queries_leaves_write_lock_free():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_schema(path)
+
+		def resolve(request, context):
+			context.get(Store)
+			other = Connection.open(path, busy_timeout=timedelta(milliseconds=10))
+			try:
+				other.begin()
+				other.rollback()
+			finally:
+				other.close()
+			return Response.empty(Status.OK)
+
+		app = application(path, resolve)
+		try:
+			response = app.handle(request())
+		finally:
+			app.close()
+
+		assert_eq(response.status, Status.OK)
 
 
 def test_commits_after_middleware_returns():

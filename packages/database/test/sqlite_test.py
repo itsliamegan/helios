@@ -209,3 +209,36 @@ def test_reports_foreign_key_violations_with_foreign_keys_off():
 			connection.close()
 
 	assert_eq(violations, [("comments", 1, "posts", 0)])
+
+
+def test_read_only_connection_reads_rows():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(
+			path,
+			"CREATE TABLE posts (title TEXT NOT NULL);"
+			"INSERT INTO posts (title) VALUES ('Intro');",
+		)
+		connection = Connection.open(path, read_only=True)
+		try:
+			cursor = connection.execute("SELECT title FROM posts")
+			try:
+				rows = cursor.fetch_all()
+			finally:
+				cursor.close()
+		finally:
+			connection.close()
+
+	assert_eq(rows, [("Intro",)])
+
+
+def test_read_only_connection_refuses_writes():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
+		connection = Connection.open(path, read_only=True)
+		try:
+			with assert_raises(DatabaseError):
+				connection.execute("INSERT INTO posts (title) VALUES ('Intro')")
+		finally:
+			connection.close()
