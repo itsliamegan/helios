@@ -16,10 +16,6 @@ class Transaction:
 		self.begun = False
 		self.ended = False
 
-	@property
-	def parameter_limit(self) -> int:
-		return self.connection.parameter_limit
-
 	def execute(
 		self,
 		sql: str,
@@ -37,7 +33,8 @@ class Transaction:
 		if self.ended:
 			return
 
-		# A failed commit rolls back, so the transaction ends either way.
+		# A commit that fails rolls back and raises, so mark the transaction ended
+		# before committing.
 		self.ended = True
 		if self.begun:
 			self.connection.commit()
@@ -49,3 +46,7 @@ class Transaction:
 		self.ended = True
 		if self.begun:
 			self.connection.rollback()
+
+	@property
+	def parameter_limit(self) -> int:
+		return self.connection.parameter_limit
