@@ -80,7 +80,7 @@ class Application:
 
 	def rescue(self, error_type: type[Exception], status: Status):
 		# The kernel renders errors through the rescues it was built with, so
-		# reject registering one after boot, as with middleware.
+		# reject registering one after boot.
 		if self.kernel is not None:
 			raise RuntimeError("the application is already booted")
 
