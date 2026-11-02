@@ -1,14 +1,14 @@
-from collections.abc import Generator
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
 
 from helios.app import Application, Container, Context, Handler, Provider
+from helios.database import Database, Store
 from helios.http import Cookie, Request, Response
 from helios.view import View
 from helios.view.composer import Composers
 
+from . import database, memory
 from .config import Config
-from .file import Driver
+from .driver import Driver
 from .flash import Flash
 from .session import Session
 from .sessions import Sessions
@@ -19,58 +19,59 @@ EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 class Provider(Provider):
 	"""Provides each request's sessions, its visitor's session, and its flash.
 
-	A request's sessions are loaded under the driver's lock, which is held until
-	the request ends. They are saved only when the request succeeds and changed
-	them. The visitor's session comes from the `session_id` cookie, and it is
-	stored once it holds items. Each response renews the cookie, and a session
-	emptied of items is removed along with its cookie.
+	The visitor's session comes from the `session_id` cookie, or is a fresh
+	session when the cookie names no live session. Finding a session touches it.
+	When the request succeeds, a session with items is saved and its cookie
+	renewed, and an emptied session is destroyed along with its cookie. A
+	request that used its sessions also purges the expired ones. A failed
+	request saves nothing.
+
+	The memory driver keeps its sessions for the life of the application. The
+	database driver writes through the request's store, so session changes
+	commit or roll back with the request's other writes.
 
 	The flash is read from the session and written back to it only when the
-	request succeeds. Once a response passes the session middleware, the flash
-	and session are closed, so outer middleware and streamed bodies cannot
-	change them.
+	request succeeds. Once a response passes the session middleware, the flash,
+	session, and sessions are closed, so outer middleware and streamed bodies
+	cannot change them.
 	"""
 
-	def __init__(self, config: Config, driver: Driver):
+	def __init__(self, config: Config):
 		self.config = config
-		self.driver = driver
 
 	def register(self, container: Container):
 		container.instance(Config, self.config)
+		match self.config.driver:
+			case database.Config():
+				container.scoped(Driver, self.database_driver)
+			case memory.Config():
+				container.instance(Driver, memory.Driver())
 		container.scoped(Sessions, self.sessions)
 		container.scoped(Session, self.session)
 		container.scoped(Flash, self.flash)
 
 	def boot(self, application: Application):
+		if isinstance(self.config.driver, database.Config):
+			application.container.get(Database).registry.get(database.Record)
 		application.use(self.middleware)
 		if application.container.bound(Composers):
 			application.container.get(Composers).add(self.compose)
 
-	def sessions(self, context: Context) -> Generator[Sessions]:
-		with self.driver.open() as sessions:
-			sessions.purge(self.config.maximum_age)
-			try:
-				yield sessions
-				if sessions.is_dirty():
-					self.driver.save(sessions)
-			finally:
-				sessions.close()
+	def database_driver(self, context: Context) -> Driver:
+		return database.Driver(context.get(Store))
+
+	def sessions(self, context: Context) -> Sessions:
+		return Sessions(context.get(Driver), self.config.maximum_age)
 
 	def session(self, context: Context) -> Session:
 		request = context.get(Request)
-		sessions = context.get(Sessions)
 		if "session_id" in request.cookies:
-			try:
-				id = UUID(request.cookies["session_id"].value)
-			except ValueError:
-				id = None
-			if id is not None and id in sessions:
-				session = sessions.get(id)
-				if not session.is_expired(self.config.maximum_age):
-					session.touch()
-					return session
-				sessions.remove(id)
-		return Session(uuid4())
+			token = request.cookies["session_id"].value
+			session = context.get(Sessions).find(token)
+			if session is not None:
+				session.touch()
+				return session
+		return Session(Session.generate_token())
 
 	def flash(self, context: Context) -> Flash:
 		session = context.get(Session)
@@ -93,24 +94,36 @@ class Provider(Provider):
 			flash.close()
 
 		session = context.resolved(Session)
-		if session is None:
-			return response
-		if context.failure is not None:
+		if session is not None:
+			if context.failure is None:
+				self.persist(session, request, response, context)
 			session.close()
-			return response
 
-		sessions = context.get(Sessions)
-		if session.items:
-			if session.id not in sessions:
-				session.touch()
-				sessions.put(session)
-			expires = datetime.now(UTC) + self.config.maximum_age
-			response.cookies["session_id"] = self.cookie(str(session.id), expires)
-		elif session.id in sessions:
-			sessions.remove(session.id)
-			response.cookies["session_id"] = self.cookie("", EPOCH)
-		session.close()
+		sessions = context.resolved(Sessions)
+		if sessions is not None:
+			if context.failure is None:
+				sessions.purge()
+			sessions.close()
 		return response
+
+	def persist(
+		self,
+		session: Session,
+		request: Request,
+		response: Response,
+		context: Context,
+	):
+		if session.items:
+			context.get(Sessions).save(session)
+			expires = datetime.now(UTC) + self.config.maximum_age
+			response.cookies["session_id"] = self.cookie(session.token, expires)
+		else:
+			if session.stored:
+				context.get(Sessions).destroy(session)
+			# The cookie can name a session that was rotated away, has expired,
+			# or never existed, so the visitor's browser drops it.
+			if "session_id" in request.cookies:
+				response.cookies["session_id"] = self.cookie("", EPOCH)
 
 	def cookie(self, value: str, expires: datetime) -> Cookie:
 		return Cookie(

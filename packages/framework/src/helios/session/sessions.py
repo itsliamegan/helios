@@ -1,53 +1,47 @@
-from collections.abc import Mapping
-from dataclasses import dataclass
-from datetime import timedelta
-from uuid import UUID, uuid4
+from datetime import UTC, datetime, timedelta
 
+from .driver import Driver
 from .session import Session
 
 
-@dataclass(init=False)
 class Sessions:
-	"""A set of sessions keyed by their IDs.
+	"""A request's access to the stored sessions.
 
-	Adding, removing, or rotating a stored session marks the set as dirty. The
-	set is also dirty when any of its sessions are dirty. Purging removes every
-	session that has expired. Once closed, the set and its sessions refuse
-	changes with `RuntimeError`, but they can still be read.
+	A session inactive for longer than the maximum age has expired, and `find`
+	treats it as absent. Once closed, it refuses changes with `RuntimeError`.
 	"""
 
-	items: dict[UUID, Session]
-	dirty: bool
-
-	def __init__(self, items: Mapping[UUID, Session] | None = None):
-		self.items = dict(items or {})
-		self.dirty = False
+	def __init__(self, driver: Driver, maximum_age: timedelta):
+		self.driver = driver
+		self.maximum_age = maximum_age
 		self.closed = False
 
-	def get(self, id: UUID) -> Session:
-		return self.items[id]
+	def find(self, token: str) -> Session | None:
+		session = self.driver.read(token)
+		if session is None or session.is_expired(self.maximum_age):
+			return None
+		else:
+			return session
 
-	def put(self, session: Session):
+	def save(self, session: Session):
 		if self.closed:
 			raise RuntimeError("the sessions are closed")
 
-		self.items[session.id] = session
-		self.dirty = True
+		self.driver.write(session)
+		session.stored = True
 
-	def remove(self, id: UUID):
+	def destroy(self, session: Session):
 		if self.closed:
 			raise RuntimeError("the sessions are closed")
 
-		if self.items.pop(id, None) is not None:
-			self.dirty = True
-
-	def purge(self, maximum_age: timedelta):
-		for id, session in list(self.items.items()):
-			if session.is_expired(maximum_age):
-				self.remove(id)
+		self.driver.destroy(session.token)
+		session.stored = False
 
 	def rotate(self, session: Session):
-		"""Give a session a new ID, so its old ID stops identifying it."""
+		"""Give a session a new token, so its old token stops identifying it.
+
+		The session is stored again under its new token only when it is saved.
+		"""
 
 		if self.closed:
 			raise RuntimeError("the sessions are closed")
@@ -55,27 +49,17 @@ class Sessions:
 		if session.closed:
 			raise RuntimeError("the session is closed")
 
-		stored = self.items.get(session.id)
-		if stored is not None and stored is not session:
-			raise RuntimeError("another session is stored under this ID")
-
-		id = uuid4()
-		while id in self.items:
-			id = uuid4()
-		if stored is not None:
-			del self.items[session.id]
-			self.items[id] = session
-			self.dirty = True
-		session.id = id
+		if session.stored:
+			self.driver.destroy(session.token)
+		session.token = Session.generate_token()
+		session.stored = False
 		session.dirty = True
 
-	def is_dirty(self) -> bool:
-		return self.dirty or any(session.dirty for session in self.items.values())
+	def purge(self):
+		if self.closed:
+			raise RuntimeError("the sessions are closed")
 
-	def __contains__(self, id: object) -> bool:
-		return id in self.items
+		self.driver.purge(datetime.now(UTC) - self.maximum_age)
 
 	def close(self):
 		self.closed = True
-		for session in self.items.values():
-			session.close()

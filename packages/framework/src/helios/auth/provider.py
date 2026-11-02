@@ -1,7 +1,6 @@
 from helios.app import Application, Container, Context, Provider
 from helios.database import Model, Store
-from helios.session.session import Session
-from helios.session.sessions import Sessions
+from helios.session import Session, Sessions
 from helios.view import View
 from helios.view.composer import Composers
 

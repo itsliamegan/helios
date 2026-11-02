@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -18,8 +19,7 @@ from helios.database import Model, Store
 from helios.database.sqlite import Connection
 from helios.http import Method, Request, Response
 from helios.routing import Route, Router
-from helios.session.session import Session
-from helios.session.sessions import Sessions
+from helios.session import Session, Sessions, memory
 from helios.url import URL
 from helios.view import Component
 import helios.view.config
@@ -49,7 +49,7 @@ class Values(Provider):
 		container.scoped(Session, lambda context: self.session)
 		container.scoped(
 			Sessions,
-			lambda context: Sessions({self.session.id: self.session}),
+			lambda context: Sessions(memory.Driver(), timedelta(days=30)),
 		)
 
 
@@ -94,7 +94,7 @@ def test_finds_no_user():
 	with TemporaryDirectory() as directory:
 		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
-			provided = resolve(store, Session(uuid4()))
+			provided = resolve(store, Session("visitor-token"))
 		finally:
 			connection.close()
 
@@ -106,7 +106,7 @@ def test_finds_user_from_session():
 		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
 			user = store.create(User, name="Alice")
-			session = Session(uuid4())
+			session = Session("visitor-token")
 			session["_user_id"] = str(user.id)
 
 			provided = resolve(store, session)
@@ -121,7 +121,7 @@ def test_removes_stale_user_id():
 	with TemporaryDirectory() as directory:
 		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
-			session = Session(uuid4())
+			session = Session("visitor-token")
 			session["_user_id"] = str(uuid4())
 			provided = resolve(store, session)
 		finally:
@@ -135,7 +135,7 @@ def test_removes_malformed_user_id():
 	with TemporaryDirectory() as directory:
 		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
-			session = Session(uuid4())
+			session = Session("visitor-token")
 			session["_user_id"] = "not-a-uuid"
 			provided = resolve(store, session)
 		finally:
@@ -177,7 +177,7 @@ def test_shares_signed_in_authenticator_with_views():
 		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
 			user = store.create(User, name="Alice")
-			session = Session(uuid4())
+			session = Session("visitor-token")
 			session["_user_id"] = str(user.id)
 
 			html = render_signed_in_user(store, session)
@@ -191,7 +191,7 @@ def test_shares_signed_out_authenticator_with_views():
 	with TemporaryDirectory() as directory:
 		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
-			html = render_signed_in_user(store, Session(uuid4()))
+			html = render_signed_in_user(store, Session("visitor-token"))
 		finally:
 			connection.close()
 
@@ -203,7 +203,7 @@ def test_shares_authenticator_with_components():
 		connection, store = create_store(Path(directory, "app.sqlite"))
 		try:
 			user = store.create(User, name="Alice")
-			session = Session(uuid4())
+			session = Session("visitor-token")
 			session["_user_id"] = str(user.id)
 			views_dir = Path(directory, "views")
 			views_dir.mkdir()

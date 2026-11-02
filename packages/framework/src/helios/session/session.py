@@ -1,35 +1,43 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+import secrets
 from typing import Any
-from uuid import UUID
 
 
 @dataclass(init=False)
 class Session:
 	"""A set of items kept for one visitor between requests.
 
-	A session is identified by an ID. Changing a session's items or its activity
-	date marks it as dirty. Once closed, it refuses changes with `RuntimeError`,
-	but its items can still be read.
+	A session is identified by the token its visitor's cookie carries, and it
+	starts active at the time it is built. Changing a session's items or its
+	activity time marks it as dirty. Once closed, it refuses changes with
+	`RuntimeError`, but its items can still be read.
 	"""
 
-	id: UUID
+	token: str
 	items: dict[str, Any]
-	last_active_at: datetime | None
+	last_active_at: datetime
+	stored: bool
 	dirty: bool
 
 	def __init__(
 		self,
-		id: UUID,
+		token: str,
 		items: Mapping[str, Any] | None = None,
 		last_active_at: datetime | None = None,
+		stored: bool = False,
 	):
-		self.id = id
+		self.token = token
 		self.items = dict(items or {})
-		self.last_active_at = last_active_at
+		self.last_active_at = last_active_at or datetime.now(UTC)
+		self.stored = stored
 		self.dirty = False
 		self.closed = False
+
+	@staticmethod
+	def generate_token() -> str:
+		return secrets.token_urlsafe(32)
 
 	def __getitem__(self, key: str) -> Any:
 		return self.items[key]
@@ -66,10 +74,7 @@ class Session:
 		self.dirty = True
 
 	def is_expired(self, maximum_age: timedelta) -> bool:
-		return (
-			self.last_active_at is not None
-			and self.last_active_at + maximum_age < datetime.now(UTC)
-		)
+		return self.last_active_at + maximum_age < datetime.now(UTC)
 
 	def close(self):
 		self.closed = True

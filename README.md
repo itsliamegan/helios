@@ -21,6 +21,6 @@ The available components are:
 - [Database modeling backed by SQLite](packages/database/src/helios/database/)
 - [View rendering](packages/view/src/helios/view/)
 - [Form validation](packages/framework/src/helios/form/)
-- [File-backed sessions](packages/framework/src/helios/session/)
+- [Database-backed sessions](packages/framework/src/helios/session/)
 - [Authentication](packages/framework/src/helios/auth/)
 - [Rate limiting](packages/framework/src/helios/limit/)
