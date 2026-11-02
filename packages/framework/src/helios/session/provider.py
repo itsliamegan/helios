@@ -23,8 +23,8 @@ class Provider(Provider):
 	session when the cookie names no live session. Finding a session touches it.
 	When the request succeeds, a session with items is saved and its cookie
 	renewed, and an emptied session is destroyed along with its cookie. A
-	request that used its sessions also purges the expired ones. A failed
-	request saves nothing.
+	request that saves or destroys a session also purges the expired ones. A
+	failed request saves nothing.
 
 	The memory driver keeps its sessions for the life of the application. The
 	database driver writes through the request's store, so session changes
@@ -101,8 +101,6 @@ class Provider(Provider):
 
 		sessions = context.resolved(Sessions)
 		if sessions is not None:
-			if context.failure is None:
-				sessions.purge()
 			sessions.close()
 		return response
 
@@ -113,17 +111,23 @@ class Provider(Provider):
 		response: Response,
 		context: Context,
 	):
+		# Purging runs only beside a write, so a request that writes no session
+		# takes no database lock for it.
 		if session.items:
-			context.get(Sessions).save(session)
+			sessions = context.get(Sessions)
+			sessions.save(session)
+			sessions.purge()
 			expires = datetime.now(UTC) + self.config.maximum_age
 			response.cookies["session_id"] = self.cookie(session.token, expires)
-		else:
-			if session.stored:
-				context.get(Sessions).destroy(session)
-			# The cookie can name a session that was rotated away, has expired,
-			# or never existed, so the visitor's browser drops it.
-			if "session_id" in request.cookies:
-				response.cookies["session_id"] = self.cookie("", EPOCH)
+		elif session.stored:
+			sessions = context.get(Sessions)
+			sessions.destroy(session)
+			sessions.purge()
+			response.cookies["session_id"] = self.cookie("", EPOCH)
+		elif "session_id" in request.cookies:
+			# The cookie names a session that was rotated away, has expired, or
+			# never existed, so the visitor's browser drops it.
+			response.cookies["session_id"] = self.cookie("", EPOCH)
 
 	def cookie(self, value: str, expires: datetime) -> Cookie:
 		return Cookie(

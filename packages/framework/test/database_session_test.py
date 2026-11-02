@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
@@ -148,6 +149,39 @@ def test_failed_request_rolls_back_a_rotation():
 
 		session = assert_not_none(read_session(path, "visitor-token"))
 		assert_eq(session["message"], "Hello")
+
+
+def test_request_without_a_cookie_takes_no_write_lock():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path)
+
+		def index(request, context):
+			context.get(helios.auth.Authenticator)
+			return Response.empty(Status.OK)
+
+		app = helios.app.Application(
+			helios.app.Config(),
+			Router([Route.get("/", index)]),
+			[
+				helios.session.Provider(helios.session.Config()),
+				helios.database.provider.Provider(
+					helios.database.Config(path, busy_timeout=timedelta(0)),
+					[User, database.Record],
+				),
+				helios.auth.Provider(User),
+			],
+		)
+		app.boot()
+		lock = sqlite3.connect(path, autocommit=True)
+		try:
+			lock.execute("BEGIN IMMEDIATE")
+			response = app.handle(request())
+		finally:
+			lock.close()
+			app.close()
+
+		assert_eq(response.status, Status.OK)
 
 
 def test_boot_refuses_an_unregistered_session_model():

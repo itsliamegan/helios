@@ -103,7 +103,7 @@ def test_unused_and_empty_sessions_do_not_write():
 	assert_eq(empty_driver.sessions, {})
 
 
-def test_request_without_a_cookie_does_not_purge():
+def test_request_that_writes_no_session_does_not_purge():
 	now = datetime(2026, 10, 12, tzinfo=UTC)
 	expired = Session(
 		"expired-token",
@@ -111,7 +111,11 @@ def test_request_without_a_cookie_does_not_purge():
 	)
 
 	with time_machine.travel(now, tick=False):
-		_, _, driver = exercise(request(), stored=[expired])
+		_, _, driver = exercise(
+			request(),
+			lambda session, sessions: None,
+			stored=[expired],
+		)
 
 	assert_not_none(driver.read("expired-token"))
 
