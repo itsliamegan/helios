@@ -10,7 +10,8 @@ from helios.http import Headers, Method, Request, Response, Status
 import helios.limit
 from helios.limit.config import Config
 from helios.routing import Route, Router
-from helios.session import Session, Sessions, memory
+from helios.session import Session, Sessions
+from helios.session.driver import memory
 from helios.url import URL
 
 

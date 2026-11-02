@@ -2,8 +2,8 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 
+from ..session import Session
 from .driver import Driver
-from .session import Session
 
 
 class Driver(Driver):

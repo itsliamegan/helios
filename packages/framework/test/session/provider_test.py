@@ -22,8 +22,8 @@ from helios.http.body import Stream
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
 import helios.session
-from helios.session import Flash, memory
-from helios.session.driver import Driver
+from helios.session import Flash
+from helios.session.driver import Driver, memory
 from helios.session.session import Session
 from helios.session.sessions import Sessions
 from helios.url import URL

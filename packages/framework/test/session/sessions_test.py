@@ -11,7 +11,7 @@ from luna.test.assertion import (
 )
 import time_machine
 
-from helios.session import memory
+from helios.session.driver import memory
 from helios.session.session import Session
 from helios.session.sessions import Sessions
 

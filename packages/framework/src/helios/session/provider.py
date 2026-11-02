@@ -6,9 +6,8 @@ from helios.http import Cookie, Request, Response
 from helios.view import View
 from helios.view.composer import Composers
 
-from . import database, memory
 from .config import Config
-from .driver import Driver
+from .driver import Driver, database, memory
 from .flash import Flash
 from .session import Session
 from .sessions import Sessions

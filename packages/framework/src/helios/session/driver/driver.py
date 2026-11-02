@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from .session import Session
+from ..session import Session
 
 
 class Driver(ABC):

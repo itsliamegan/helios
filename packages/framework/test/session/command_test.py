@@ -13,7 +13,7 @@ from helios.database import Config
 from helios.database.migration import Migrations, Migrator
 from helios.database.provider import Provider
 from helios.routing import Router
-from helios.session.database import SCHEMA
+from helios.session.command import SKELETON_FILE
 
 
 def test_writes_the_migration_at_the_next_number():
@@ -36,7 +36,7 @@ def test_writes_the_migration_at_the_next_number():
 		written = Path(migrations, "0002_create_sessions.sql").read_text()
 
 	assert_eq(names, ["0001_create_posts.sql", "0002_create_sessions.sql"])
-	assert_eq(written, SCHEMA)
+	assert_eq(written, SKELETON_FILE.read_text())
 
 
 def test_written_migration_applies():

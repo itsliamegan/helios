@@ -15,7 +15,8 @@ from helios.database.registry import Registry
 from helios.http import Response
 from helios.routing import Route, Router
 import helios.session
-from helios.session import database
+from helios.session.command import SKELETON_FILE
+from helios.session.driver import database
 from helios.wsgi import Application
 from helios.wsgi.test import TestClient
 
@@ -39,7 +40,7 @@ def test_signs_a_user_in_for_the_next_request():
 					name TEXT NOT NULL
 				);
 				"""
-				+ database.SCHEMA
+				+ SKELETON_FILE.read_text()
 			)
 		finally:
 			connection.close()

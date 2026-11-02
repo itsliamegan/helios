@@ -14,7 +14,9 @@ from helios.database.registry import Registry
 from helios.http import Headers, Method, Request, Response, Status
 from helios.routing import Route, Router
 import helios.session
-from helios.session import Session, Sessions, database
+from helios.session import Session, Sessions
+from helios.session.command import SKELETON_FILE
+from helios.session.driver import database
 from helios.url import URL
 
 
@@ -31,7 +33,7 @@ CREATE TABLE users (
 	name TEXT NOT NULL
 );
 
-{database.SCHEMA}
+{SKELETON_FILE.read_text()}
 """
 
 

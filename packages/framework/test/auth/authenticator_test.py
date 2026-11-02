@@ -12,7 +12,8 @@ from luna.test.assertion import (
 
 from helios.auth import AuthenticationError, Authenticator
 from helios.database import Model
-from helios.session import Session, Sessions, memory
+from helios.session import Session, Sessions
+from helios.session.driver import memory
 
 MAXIMUM_AGE = timedelta(days=30)
 

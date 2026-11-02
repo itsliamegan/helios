@@ -17,7 +17,8 @@ from helios.http import (
 from helios.http.error import BadRequestError, ContentTooLargeError
 from helios.routing import Route, Router
 import helios.session
-from helios.session import Session, memory
+from helios.session import Session
+from helios.session.driver import memory
 from helios.url import URL
 from helios.wsgi import Application
 from helios.wsgi.adapt import RequestAdapter, ResponseAdapter

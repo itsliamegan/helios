@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 from luna.test.assertion import assert_eq, assert_is, assert_not_none, assert_that
 
-from helios.session import memory
+from helios.session.driver import memory
 from helios.session.session import Session
 
 

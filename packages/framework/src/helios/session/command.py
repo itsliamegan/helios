@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 from typing import Any
 
 from luna.cli import Command
@@ -7,7 +8,7 @@ from helios.app import Application
 import helios.database
 from helios.database.migration import MigrationError, Migrations
 
-from .database import SCHEMA
+SKELETON_FILE = Path(Path(__file__).parent, "skeleton", "create_sessions.sql")
 
 
 class MakeMigration(Command):
@@ -37,5 +38,5 @@ class MakeMigration(Command):
 			config.migrations,
 			f"{migrations.latest + 1:04d}_create_sessions.sql",
 		)
-		path.write_text(SCHEMA)
+		shutil.copyfile(SKELETON_FILE, path)
 		self.logger.info(f"create  {path}")

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import timedelta
 
-from . import database, memory
+from .driver import database, memory
 
 
 @dataclass(init=False)
