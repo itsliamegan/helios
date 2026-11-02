@@ -9,6 +9,7 @@ import helios.app
 import helios.auth
 import helios.database
 from helios.database import Model, Store
+import helios.database.provider
 from helios.http import Headers, Method, Request, Response, Status
 from helios.routing import Route, Router
 import helios.session
@@ -38,7 +39,7 @@ def application(database_path: Path, session_path: Path, action):
 				helios.session.Config(),
 				Driver(session_path, session_path.with_suffix(".lock")),
 			),
-			helios.database.Provider(
+			helios.database.provider.Provider(
 				helios.database.Config(database_path),
 				[User],
 			),

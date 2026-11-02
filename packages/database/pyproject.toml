@@ -1,0 +1,25 @@
+[project]
+name = "helios-database"
+version = "0.1"
+requires-python = ">=3.15"
+dependencies = [
+	"helios-url",
+	"luna",
+]
+
+[dependency-groups]
+dev = [
+	"helios",
+]
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+helios = { workspace = true }
+helios-url = { workspace = true }
+luna = { git = "https://github.com/itsliamegan/luna", branch = "main" }
+
+[tool.uv.build-backend]
+module-name = "helios.database"

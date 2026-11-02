@@ -7,7 +7,6 @@ from helios.url import URL
 from . import sse
 from .body import Body, Buffered, Stream
 from .cookie import Cookies
-from .error import HTTPError
 from .header import Headers
 from .status import Status
 
@@ -44,10 +43,6 @@ class Response:
 	@classmethod
 	def html(cls, html: str, status: Status = Status.OK) -> Self:
 		return cls(status, Headers({"Content-Type": "text/html"}), body=Buffered(html))
-
-	@classmethod
-	def error(cls, error: HTTPError) -> Self:
-		return cls.text(f"{error.status}", error.status)
 
 	@classmethod
 	def file(cls, content: bytes, filename: str, content_type: str) -> Self:

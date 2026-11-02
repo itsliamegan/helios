@@ -4,6 +4,7 @@ from .context import Context
 from .error import DependencyError
 from .kernel import Kernel
 from .middleware import Handler, Middleware, Middlewares
+from .rescues import Rescues
 
 __all__ = [
 	"Application",
@@ -18,6 +19,7 @@ __all__ = [
 	"Middleware",
 	"Middlewares",
 	"Provider",
+	"Rescues",
 	"Scoped",
 	"Singleton",
 ]

@@ -2,9 +2,9 @@ from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 
 from helios.http import Request, Response
-from helios.http.error import HTTPError
 
 from .context import Context
+from .rescues import Rescues
 
 
 @dataclass(init=False)
@@ -15,7 +15,7 @@ class Middlewares:
 	The middleware the application was constructed with runs last. Each tier
 	keeps the order its middleware was added in.
 
-	A chain of middleware terminates in a destination. An `HTTPError` renders
+	A chain of middleware terminates in a destination. A rescued error renders
 	as a response at the layer that raised it, so the middleware around that
 	layer still receives a response. The request's context records the first
 	such error as its failure.
@@ -30,24 +30,27 @@ class Middlewares:
 		self.provided = []
 		self.application = list(middlewares or [])
 
-	def build(self, destination: Handler) -> Handler:
-		def with_rendered_http_errors(middleware: Middleware, next: Handler) -> Handler:
+	def build(self, destination: Handler, rescues: Rescues) -> Handler:
+		def with_rendered_errors(middleware: Middleware, next: Handler) -> Handler:
 			def call(request: Request, context: Context) -> Response:
 				try:
 					return middleware(request, context, next)
-				except HTTPError as error:
+				except Exception as error:
+					if not rescues.is_rescued(error):
+						raise
+
 					if context.failure is None:
 						context.failure = error
-					return Response.error(error)
+					return rescues.render(error)
 
 			return call
 
-		next = with_rendered_http_errors(
+		next = with_rendered_errors(
 			lambda request, context, next: next(request, context),
 			destination,
 		)
 		for middleware in reversed(list(self)):
-			next = with_rendered_http_errors(middleware, next)
+			next = with_rendered_errors(middleware, next)
 		return next
 
 	def require(self, *middlewares: Middleware):

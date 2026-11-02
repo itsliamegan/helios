@@ -1,8 +1,6 @@
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from helios.http.error import NotFoundError as BaseNotFoundError
-
 if TYPE_CHECKING:
 	from .model import Model
 
@@ -23,8 +21,8 @@ class ScriptError(DatabaseError):
 	pass
 
 
-class NotFoundError(BaseNotFoundError):
-	"""Raised when no row has a model's ID. Left uncaught, it renders as a 404."""
+class NotFoundError(LookupError):
+	"""Raised when no row has a model's ID."""
 
 	def __init__(self, model_type: type[Model], id: UUID):
 		self.model_type = model_type

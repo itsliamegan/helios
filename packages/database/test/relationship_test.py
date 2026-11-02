@@ -19,12 +19,12 @@ from helios.database import (
 	Config,
 	Model,
 	ModelError,
-	Provider,
 	Store,
 	belongs_to,
 	has_many,
 	has_one,
 )
+from helios.database.provider import Provider
 from helios.database.sqlite import Connection
 
 

@@ -3,13 +3,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Self
 
-from helios.http import Request, Response
+from helios.http import Request, Response, Status
 from helios.routing import Router, URLs
 from helios.url import URL
 
 from .container import Container
 from .kernel import Kernel
 from .middleware import Middleware, Middlewares
+from .rescues import Rescues
 
 
 class Application:
@@ -33,6 +34,7 @@ class Application:
 		self.container = Container()
 		self.providers = list(providers)
 		self.middlewares = Middlewares(middlewares)
+		self.rescues = Rescues()
 		self.kernel: Kernel | None = None
 		try:
 			self.container.instance(Application, self)
@@ -61,6 +63,7 @@ class Application:
 				self.container,
 				self.container.get(Router),
 				self.middlewares,
+				self.rescues,
 			)
 		except BaseException:
 			self.container.close()
@@ -74,6 +77,14 @@ class Application:
 			raise RuntimeError("the application is already booted")
 
 		self.middlewares.provide(middleware)
+
+	def rescue(self, error_type: type[Exception], status: Status):
+		# The kernel renders errors through the rescues it was built with, so
+		# reject registering one after boot.
+		if self.kernel is not None:
+			raise RuntimeError("the application is already booted")
+
+		self.rescues.rescue(error_type, status)
 
 	def handle(self, request: Request) -> Response:
 		if self.container.closed:

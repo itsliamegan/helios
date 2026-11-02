@@ -274,6 +274,14 @@ def test_rejects_middleware_after_boot():
 		app.use(middleware)
 
 
+def test_rejects_rescue_after_boot():
+	app = Application(Config(), Router([]), [])
+	app.boot()
+
+	with assert_raises(RuntimeError):
+		app.rescue(ValueError, Status.BAD_REQUEST)
+
+
 def test_closes_when_its_block_ends():
 	events = []
 
