@@ -128,6 +128,28 @@ def test_keeps_first_failure_when_outer_middleware_raises():
 	assert_is_instance(seen[0], ContentTooLargeError)
 
 
+def test_records_rescued_error_as_failure():
+	seen = []
+
+	def observe(request, context, next):
+		response = next(request, context)
+		seen.append(context.failure)
+		return response
+
+	def index(request, context):
+		raise ValueError("failed")
+
+	rescues = Rescues()
+	rescues.rescue(ValueError, Status.BAD_REQUEST)
+	request = Request(Method.GET, URL("/posts"))
+	next = Middlewares([observe]).build(index, rescues)
+	with Context(Container(), request) as context:
+		response = next(request, context)
+
+	assert_eq(response.status, Status.BAD_REQUEST)
+	assert_is_instance(seen[0], ValueError)
+
+
 def test_raises_errors_other_than_http_errors():
 	def index(request, context):
 		raise ValueError("failed")

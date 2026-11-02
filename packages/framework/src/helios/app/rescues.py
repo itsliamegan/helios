@@ -19,6 +19,9 @@ class Rescues:
 	def __init__(self):
 		self.statuses = {}
 
+	def rescue(self, error_type: type[Exception], status: Status):
+		self.statuses[error_type] = status
+
 	def is_rescued(self, error: Exception) -> bool:
 		return self.status_of(error) is not None
 
