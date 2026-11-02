@@ -16,6 +16,8 @@ from helios.http import (
 )
 from helios.http.error import BadRequestError, ContentTooLargeError
 from helios.routing import Route, Router
+import helios.session
+from helios.session import Session, memory
 from helios.url import URL
 from helios.wsgi import Application
 from helios.wsgi.adapt import RequestAdapter, ResponseAdapter
@@ -442,3 +444,22 @@ def make_client(routes):
 	app = Application(helios.app.Config(), Router(routes), [])
 	app.boot()
 	return TestClient(app)
+
+
+def test_client_prepares_a_session_for_the_next_request():
+	def index(req, ctx):
+		return Response.text(ctx.get(Session)["message"])
+
+	app = Application(
+		helios.app.Config(),
+		Router([Route.get("/", index)]),
+		[helios.session.Provider(helios.session.Config(driver=memory.Config()))],
+	)
+	app.boot()
+	client = TestClient(app)
+
+	with client.session() as session:
+		session["message"] = "Hello"
+	res = client.get("/")
+
+	assert_eq(res.text, "Hello")
