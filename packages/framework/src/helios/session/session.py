@@ -10,8 +10,7 @@ class Session:
 	"""A set of items kept for one visitor between requests.
 
 	A session is identified by the token its visitor's cookie carries, and it
-	starts active at the time it is built. Changing a session's items or its
-	activity time marks it as dirty. Once closed, it refuses changes with
+	starts active at the time it is built. Once closed, it refuses changes with
 	`RuntimeError`, but its items can still be read.
 	"""
 
@@ -19,7 +18,6 @@ class Session:
 	items: dict[str, Any]
 	last_active_at: datetime
 	stored: bool
-	dirty: bool
 
 	def __init__(
 		self,
@@ -32,7 +30,6 @@ class Session:
 		self.items = dict(items or {})
 		self.last_active_at = last_active_at or datetime.now(UTC)
 		self.stored = stored
-		self.dirty = False
 		self.closed = False
 
 	@staticmethod
@@ -47,21 +44,18 @@ class Session:
 			raise RuntimeError("the session is closed")
 
 		self.items[key] = value
-		self.dirty = True
 
 	def __delitem__(self, key: str):
 		if self.closed:
 			raise RuntimeError("the session is closed")
 
 		del self.items[key]
-		self.dirty = True
 
 	def clear(self):
 		if self.closed:
 			raise RuntimeError("the session is closed")
 
 		self.items = {}
-		self.dirty = True
 
 	def __contains__(self, key: object) -> bool:
 		return key in self.items
@@ -71,7 +65,6 @@ class Session:
 			raise RuntimeError("the session is closed")
 
 		self.last_active_at = datetime.now(UTC)
-		self.dirty = True
 
 	def is_expired(self, maximum_age: timedelta) -> bool:
 		return self.last_active_at + maximum_age < datetime.now(UTC)

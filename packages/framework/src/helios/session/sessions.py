@@ -53,7 +53,6 @@ class Sessions:
 			self.driver.destroy(session.token)
 		session.token = Session.generate_token()
 		session.stored = False
-		session.dirty = True
 
 	def purge(self):
 		if self.closed:

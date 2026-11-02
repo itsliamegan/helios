@@ -91,7 +91,6 @@ def test_rotates_a_stored_session():
 	assert_is(sessions.find(session.token), None)
 	assert_eq(session["message"], "Hello")
 	assert_not(session.stored)
-	assert_that(session.dirty)
 
 
 def test_rotated_session_is_stored_under_its_new_token_once_saved():

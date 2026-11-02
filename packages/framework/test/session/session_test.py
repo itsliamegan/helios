@@ -2,7 +2,6 @@ from luna.test.assertion import (
 	assert_eq,
 	assert_in,
 	assert_is,
-	assert_not,
 	assert_not_in,
 	assert_raises,
 )
@@ -64,4 +63,3 @@ def test_closed_session_still_reads():
 
 	assert_eq(session["message"], "Hello")
 	assert_in("message", session)
-	assert_not(session.dirty)
