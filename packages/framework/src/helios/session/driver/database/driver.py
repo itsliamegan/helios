@@ -10,7 +10,7 @@ from .token import Token
 
 
 class Driver(Driver):
-	"""Stores each session as a row through a request's store.
+	"""Stores each session as a row in the database.
 
 	Every change runs in the store's transaction, so it commits or rolls back
 	with the other writes of the same request.
@@ -53,7 +53,6 @@ class Driver(Driver):
 			self.store.delete(record)
 
 	def purge(self, cutoff: datetime):
-		# The store has no bulk delete, so each expired row is deleted alone.
 		expired = self.store.query(Record).where({"last_active_at <": cutoff}).all()
 		for record in expired:
 			self.store.delete(record)

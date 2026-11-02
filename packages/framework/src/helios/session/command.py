@@ -8,7 +8,7 @@ from helios.app import Application
 import helios.database
 from helios.database.migration import MigrationError, Migrations
 
-SKELETON_FILE = Path(Path(__file__).parent, "skeleton", "create_sessions.sql")
+MIGRATION_FILE = Path(Path(__file__).parent, "skeleton", "create_sessions.sql")
 
 
 class MakeMigration(Command):
@@ -38,5 +38,5 @@ class MakeMigration(Command):
 			config.migrations,
 			f"{migrations.latest + 1:04d}_create_sessions.sql",
 		)
-		shutil.copyfile(SKELETON_FILE, path)
+		shutil.copyfile(MIGRATION_FILE, path)
 		self.logger.info(f"create  {path}")

@@ -13,7 +13,7 @@ from luna.test.assertion import (
 
 from helios.database import Database
 from helios.database.registry import Registry
-from helios.session.command import SKELETON_FILE
+from helios.session.command import MIGRATION_FILE
 from helios.session.driver.database import Driver, Record
 from helios.session.driver.database.items import Items
 from helios.session.driver.database.token import Token
@@ -23,7 +23,7 @@ from helios.session.session import Session
 def create_database(path: Path) -> Database:
 	connection = sqlite3.connect(path, autocommit=True)
 	try:
-		connection.executescript(SKELETON_FILE.read_text())
+		connection.executescript(MIGRATION_FILE.read_text())
 	finally:
 		connection.close()
 	return Database(path, Registry([Record]))
