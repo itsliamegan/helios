@@ -5,7 +5,7 @@ from .session import Session
 
 
 class Sessions:
-	"""A request's access to the stored sessions.
+	"""A handle to the stored sessions.
 
 	A session inactive for longer than the maximum age has expired, and `find`
 	treats it as absent. Once closed, it refuses changes with `RuntimeError`.

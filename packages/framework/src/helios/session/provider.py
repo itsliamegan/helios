@@ -26,10 +26,6 @@ class Provider(Provider):
 	request that saves or destroys a session also purges the expired ones. A
 	failed request saves nothing.
 
-	The memory driver keeps its sessions for the life of the application. The
-	database driver writes through the request's store, so session changes
-	commit or roll back with the request's other writes.
-
 	The flash is read from the session and written back to it only when the
 	request succeeds. Once a response passes the session middleware, the flash,
 	session, and sessions are closed, so outer middleware and streamed bodies

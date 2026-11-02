@@ -94,11 +94,7 @@ class Record(Model):
 
 @dataclass
 class Token:
-	"""A session token stored only as its SHA-256 digest.
-
-	The digest has no salt, so the same token always has the same digest, and a
-	row can be found by it.
-	"""
+	"""A session token stored only as its SHA-256 digest."""
 
 	digest: str
 
