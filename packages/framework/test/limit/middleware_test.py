@@ -1,5 +1,4 @@
 from datetime import timedelta
-from uuid import uuid4
 
 from luna.test.assertion import assert_eq
 
@@ -11,8 +10,8 @@ from helios.http import Headers, Method, Request, Response, Status
 import helios.limit
 from helios.limit.config import Config
 from helios.routing import Route, Router
-from helios.session.session import Session
-from helios.session.sessions import Sessions
+from helios.session import Session, Sessions
+from helios.session.driver import memory
 from helios.url import URL
 
 
@@ -30,10 +29,11 @@ class Authentication(Provider):
 		container.scoped(Authenticator, self.authenticator)
 
 	def authenticator(self, context):
-		session = Session(uuid4())
+		session = Session("visitor-token")
+		sessions = Sessions(memory.Driver(), timedelta(days=30))
 		if self.signed_in:
-			return Authenticator(session, Sessions(), User(name="Alice"))
-		return Authenticator(session, Sessions())
+			return Authenticator(session, sessions, User(name="Alice"))
+		return Authenticator(session, sessions)
 
 
 HEADER = "X-Forwarded-For"

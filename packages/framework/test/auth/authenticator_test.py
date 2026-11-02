@@ -1,8 +1,9 @@
-from uuid import uuid4
+from datetime import timedelta
 
 from luna.test.assertion import (
 	assert_eq,
 	assert_in,
+	assert_is,
 	assert_not,
 	assert_not_eq,
 	assert_not_in,
@@ -11,8 +12,10 @@ from luna.test.assertion import (
 
 from helios.auth import AuthenticationError, Authenticator
 from helios.database import Model
-from helios.session.session import Session
-from helios.session.sessions import Sessions
+from helios.session import Session, Sessions
+from helios.session.driver import memory
+
+MAXIMUM_AGE = timedelta(days=30)
 
 
 class User(Model):
@@ -23,49 +26,48 @@ class User(Model):
 
 def test_signs_in():
 	user = User(name="Alice")
-	session = Session(uuid4())
-	sessions = Sessions({session.id: session})
-	old_id = session.id
+	session = Session("visitor-token")
+	sessions = Sessions(memory.Driver(), MAXIMUM_AGE)
+	sessions.save(session)
 	auth = Authenticator(session, sessions)
 
 	auth.sign_in(user)
 
-	assert_not_eq(session.id, old_id)
-	assert_not_in(old_id, sessions)
+	assert_not_eq(session.token, "visitor-token")
+	assert_is(sessions.find("visitor-token"), None)
 	assert_eq(auth.user, user)
 	assert_eq(session["_user_id"], str(user.id))
 
 
 def test_signs_out():
 	user = User(name="Alice")
-	session = Session(uuid4())
-	sessions = Sessions({session.id: session})
-	old_id = session.id
+	session = Session("visitor-token")
+	sessions = Sessions(memory.Driver(), MAXIMUM_AGE)
+	sessions.save(session)
 	auth = Authenticator(session, sessions, user)
 
 	auth.sign_out()
 
-	assert_not_eq(session.id, old_id)
-	assert_not_in(old_id, sessions)
+	assert_not_eq(session.token, "visitor-token")
+	assert_is(sessions.find("visitor-token"), None)
 	assert_not(auth.is_signed_in())
 	assert_not_in("_user_id", session)
 
 
 def test_signs_out_when_already_signed_out():
-	session = Session(uuid4())
-	old_id = session.id
-	auth = Authenticator(session, Sessions())
+	session = Session("visitor-token")
+	auth = Authenticator(session, Sessions(memory.Driver(), MAXIMUM_AGE))
 
 	auth.sign_out()
 
-	assert_not_eq(session.id, old_id)
+	assert_not_eq(session.token, "visitor-token")
 	assert_not(auth.is_signed_in())
 
 
 def test_keeps_other_session_values_on_sign_out():
-	session = Session(uuid4())
+	session = Session("visitor-token")
 	session["_flash"] = {"message": "Signed out."}
-	auth = Authenticator(session, Sessions())
+	auth = Authenticator(session, Sessions(memory.Driver(), MAXIMUM_AGE))
 
 	auth.sign_out()
 
@@ -74,13 +76,20 @@ def test_keeps_other_session_values_on_sign_out():
 
 def test_returns_user_when_signed_in():
 	user = User(name="Alice")
-	auth = Authenticator(Session(uuid4()), Sessions(), user)
+	auth = Authenticator(
+		Session("visitor-token"),
+		Sessions(memory.Driver(), MAXIMUM_AGE),
+		user,
+	)
 
 	assert_eq(auth.user, user)
 
 
 def test_rejects_user_when_signed_out():
-	auth = Authenticator(Session(uuid4()), Sessions())
+	auth = Authenticator(
+		Session("visitor-token"),
+		Sessions(memory.Driver(), MAXIMUM_AGE),
+	)
 
 	with assert_raises(AuthenticationError) as raised:
 		_ = auth.user

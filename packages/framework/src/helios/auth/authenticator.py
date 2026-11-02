@@ -2,8 +2,7 @@ from typing import Self
 from uuid import UUID
 
 from helios.database import Model, NotFoundError, Store
-from helios.session.session import Session
-from helios.session.sessions import Sessions
+from helios.session import Session, Sessions
 
 from .error import AuthenticationError
 
@@ -13,8 +12,8 @@ SESSION_KEY = "_user_id"
 class Authenticator[U: Model]:
 	"""Provides access to the signed-in user for the request from the session.
 
-	Signing in or out gives the session a new ID. Signing out keeps the session's
-	other items.
+	Signing in or out gives the session a new token. Signing out keeps the
+	session's other items.
 	"""
 
 	def __init__(self, session: Session, sessions: Sessions, user: U | None = None):

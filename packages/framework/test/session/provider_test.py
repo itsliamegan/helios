@@ -1,11 +1,7 @@
 from datetime import UTC, datetime, timedelta
-import json
-import multiprocessing
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import time
 from typing import cast
-from uuid import uuid4
 
 from luna.test.assertion import (
 	assert_eq,
@@ -19,15 +15,16 @@ from luna.test.assertion import (
 )
 import time_machine
 
-from helios.app import Application, Provider
+import helios.app
 from helios.app import Config as AppConfig
+from helios.app import Provider
 from helios.http import Headers, Method, Request, Response, Status
 from helios.http.body import Stream
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
 import helios.session
 from helios.session import Flash
-from helios.session.file import Driver
+from helios.session.driver import memory
 from helios.session.session import Session
 from helios.session.sessions import Sessions
 from helios.url import URL
@@ -35,8 +32,11 @@ from helios.view import Component
 import helios.view.config
 import helios.view.provider
 from helios.view.views import Views
+import helios.wsgi
+from helios.wsgi.test import TestClient
 
 MAXIMUM_AGE = timedelta(days=30)
+EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 class Notice(Component):
@@ -45,28 +45,51 @@ class Notice(Component):
 	label: str
 
 
-def request(session_id: str | None = None) -> Request:
+def request(token: str | None = None) -> Request:
 	headers = Headers()
-	if session_id is not None:
-		headers["Cookie"] = f"session_id={session_id}"
+	if token is not None:
+		headers["Cookie"] = f"session_id={token}"
 	return Request(Method.GET, URL("/"), headers)
 
 
-def write_sessions(path: Path, sessions: dict | None = None):
-	path.write_text(json.dumps(sessions or {}))
+def provider(secure: bool = False) -> helios.session.Provider:
+	return helios.session.Provider(
+		helios.session.Config(
+			memory.Config(),
+			secure=secure,
+			maximum_age=MAXIMUM_AGE,
+		)
+	)
 
 
-def read_sessions(path: Path):
-	return json.loads(path.read_text())
+def application(
+	routes: list[Route],
+	providers: list[Provider] | None = None,
+	middlewares=None,
+) -> helios.wsgi.Application:
+	app = helios.wsgi.Application(
+		AppConfig(),
+		Router(routes),
+		[provider(), *(providers or [])],
+		middlewares,
+	)
+	app.boot()
+	return app
+
+
+def show_message(request, context) -> Response:
+	session = context.get(Session)
+	if "message" in session:
+		return Response.text(session["message"])
+	else:
+		return Response.text("")
 
 
 def exercise(
-	path: Path,
 	request: Request,
 	change=None,
 	secure: bool = False,
 	resolve: bool = True,
-	maximum_age: timedelta = MAXIMUM_AGE,
 ):
 	seen = []
 
@@ -75,18 +98,14 @@ def exercise(
 			session = context.get(Session)
 			seen.append(session)
 			if change is not None:
-				change(session, context.get(Sessions))
+				sessions = context.get(Sessions)
+				change(session, sessions)
 		return Response.empty()
 
-	app = Application(
+	app = helios.app.Application(
 		AppConfig(),
 		Router([Route.get("/", index)]),
-		[
-			helios.session.Provider(
-				helios.session.Config(secure=secure, maximum_age=maximum_age),
-				Driver(path, path.with_suffix(".lock")),
-			)
-		],
+		[provider(secure)],
 	)
 	app.boot()
 	try:
@@ -96,476 +115,384 @@ def exercise(
 	return (seen[0] if seen else None), response
 
 
-def session_data(
-	items: dict | None = None,
-	last_active_at: datetime | None = None,
-):
-	return {
-		"items": items or {},
-		"last_active_at": (
-			last_active_at.isoformat() if last_active_at is not None else None
-		),
-	}
+def test_unused_and_empty_sessions_set_no_cookie():
+	_, unused_response = exercise(request(), resolve=False)
+	empty, empty_response = exercise(request())
+
+	assert_not_in("session_id", unused_response.cookies)
+	assert_not_in("session_id", empty_response.cookies)
+	assert_not_none(empty)
 
 
-def test_unused_and_empty_sessions_do_not_write():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		write_sessions(path)
-		before = path.stat().st_mtime_ns
-
-		_, unused_response = exercise(path, request(), resolve=False)
-		empty, empty_response = exercise(path, request())
-
-		assert_not_in("session_id", unused_response.cookies)
-		assert_not_in("session_id", empty_response.cookies)
-		assert_not_none(empty)
-		assert_eq(path.stat().st_mtime_ns, before)
-		assert_eq(read_sessions(path), {})
-
-
-def test_stores_data_and_sets_cookie_policy():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		write_sessions(path)
-		now = datetime(2026, 10, 12, tzinfo=UTC)
-		with time_machine.travel(now, tick=False):
-			session, response = exercise(
-				path,
-				request(),
-				lambda session, sessions: session.__setitem__("message", "Hello"),
-				secure=True,
-			)
-
-		stored = read_sessions(path)
-		cookie = response.cookies["session_id"]
-		assert_eq(stored[str(session.id)]["items"], {"message": "Hello"})
-		assert_eq(cookie.value, str(session.id))
-		assert_that(cookie.http_only)
-		assert_that(cookie.secure)
-		assert_eq(cookie.same_site, "Lax")
-		assert_eq(cookie.expires, now + MAXIMUM_AGE)
-
-
-def test_reuses_touches_and_rotates_known_session():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		old_id = uuid4()
-		write_sessions(path, {str(old_id): session_data({"message": "Hello"})})
-		now = datetime(2026, 10, 12, tzinfo=UTC)
-		with time_machine.travel(now, tick=False):
-			session, response = exercise(
-				path,
-				request(str(old_id)),
-				lambda session, sessions: sessions.rotate(session),
-			)
-
-		stored = read_sessions(path)
-		assert_not_eq(session.id, old_id)
-		assert_not_in(str(old_id), stored)
-		assert_eq(stored[str(session.id)]["items"], {"message": "Hello"})
-		assert_eq(stored[str(session.id)]["last_active_at"], now.isoformat())
-		assert_eq(response.cookies["session_id"].value, str(session.id))
-
-
-def test_replaces_malformed_and_unknown_cookies():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		write_sessions(path)
-		malformed, _ = exercise(path, request("not-a-uuid"))
-		unknown_id = uuid4()
-		unknown, _ = exercise(path, request(str(unknown_id)))
-
-		assert_not_eq(malformed.id, unknown_id)
-		assert_not_eq(unknown.id, unknown_id)
-		assert_eq(read_sessions(path), {})
-
-
-def test_purges_expired_sessions_and_renews_boundary():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		now = datetime(2026, 10, 12, tzinfo=UTC)
-		active_id = uuid4()
-		expired_id = uuid4()
-		write_sessions(
-			path,
-			{
-				str(active_id): session_data({"message": "Hello"}, now - MAXIMUM_AGE),
-				str(expired_id): session_data(
-					last_active_at=now - MAXIMUM_AGE - timedelta(microseconds=1)
-				),
-			},
-		)
-		with time_machine.travel(now, tick=False):
-			session, _ = exercise(path, request(str(active_id)))
-
-		stored = read_sessions(path)
-		assert_eq(session.id, active_id)
-		assert_eq(stored[str(active_id)]["last_active_at"], now.isoformat())
-		assert_not_in(str(expired_id), stored)
-
-
-def test_clear_removes_persisted_session():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		id = uuid4()
-		write_sessions(path, {str(id): session_data({"message": "Hello"})})
-		_, response = exercise(
-			path, request(str(id)), lambda session, sessions: session.clear()
+def test_sets_the_cookie_policy():
+	now = datetime(2026, 10, 12, tzinfo=UTC)
+	with time_machine.travel(now, tick=False):
+		session, response = exercise(
+			request(),
+			lambda session, sessions: session.__setitem__("message", "Hello"),
+			secure=True,
 		)
 
-		assert_eq(read_sessions(path), {})
-		assert_eq(response.cookies["session_id"].value, "")
-		assert_eq(
-			response.cookies["session_id"].expires, datetime(1970, 1, 1, tzinfo=UTC)
-		)
+	cookie = response.cookies["session_id"]
+	assert_eq(cookie.value, session.token)
+	assert_that(cookie.http_only)
+	assert_that(cookie.secure)
+	assert_eq(cookie.same_site, "Lax")
+	assert_eq(cookie.expires, now + MAXIMUM_AGE)
 
 
-def test_unexpected_exception_does_not_save_and_releases_lock():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		id = uuid4()
-		initial = {str(id): session_data({"message": "Before"})}
-		write_sessions(path, initial)
+def test_saves_a_session_with_items():
+	def create(request, context):
+		session = context.get(Session)
+		session["message"] = "Hello"
+		return Response.empty()
 
-		def fail(request, context):
-			context.get(Session)["message"] = "After"
-			raise RuntimeError("failure")
+	client = TestClient(
+		application([Route.post("/", create), Route.get("/", show_message)])
+	)
 
-		driver = Driver(path, path.with_suffix(".lock"))
-		app = Application(
-			AppConfig(),
-			Router([Route.get("/", fail)]),
-			[helios.session.Provider(helios.session.Config(), driver)],
-		)
-		app.boot()
-		try:
-			response = app.handle(request(str(id)))
-		finally:
-			app.close()
+	client.post("/")
+	response = client.get("/")
 
-		assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
-		assert_eq(read_sessions(path), initial)
-		with driver.open() as store:
-			assert_eq(store.get(id)["message"], "Before")
+	assert_eq(response.text, "Hello")
+
+
+def test_touches_a_found_session():
+	seen = []
+
+	def index(request, context):
+		session = context.get(Session)
+		seen.append(session.last_active_at)
+		return Response.empty()
+
+	client = TestClient(application([Route.get("/", index)]))
+	created = datetime(2026, 10, 12, tzinfo=UTC)
+	with time_machine.travel(created, tick=False), client.session() as session:
+		session["message"] = "Hello"
+
+	visited = created + timedelta(days=1)
+	with time_machine.travel(visited, tick=False):
+		client.get("/")
+
+	assert_eq(seen, [visited])
+
+
+def test_rotates_a_session_to_a_new_token():
+	def rotate(request, context):
+		session = context.get(Session)
+		sessions = context.get(Sessions)
+		sessions.rotate(session)
+		return Response.empty()
+
+	app = application([Route.post("/", rotate), Route.get("/", show_message)])
+	client = TestClient(app)
+	with client.session() as session:
+		session["message"] = "Hello"
+	old_token = assert_not_none(client.get_cookie("session_id")).value
+
+	client.post("/")
+	stale = TestClient(app)
+	stale.set_cookie("session_id", old_token)
+
+	assert_not_eq(assert_not_none(client.get_cookie("session_id")).value, old_token)
+	assert_eq(client.get("/").text, "Hello")
+	assert_eq(stale.get("/").text, "")
+
+
+def test_replaces_and_clears_an_unknown_cookie():
+	session, response = exercise(request("unknown-token"))
+
+	assert_not_eq(session.token, "unknown-token")
+	assert_eq(response.cookies["session_id"].value, "")
+	assert_eq(response.cookies["session_id"].expires, EPOCH)
+
+
+def test_finds_a_session_active_at_the_maximum_age():
+	client = TestClient(application([Route.get("/", show_message)]))
+	created = datetime(2026, 10, 12, tzinfo=UTC)
+	with time_machine.travel(created, tick=False), client.session() as session:
+		session["message"] = "Hello"
+
+	with time_machine.travel(created + MAXIMUM_AGE, tick=False):
+		response = client.get("/")
+
+	assert_eq(response.text, "Hello")
+
+
+def test_purges_expired_sessions_when_a_request_saves_a_session():
+	def create(request, context):
+		session = context.get(Session)
+		session["message"] = "Other"
+		return Response.empty()
+
+	app = application([Route.post("/", create), Route.get("/", show_message)])
+	expired = TestClient(app)
+	other = TestClient(app)
+	created = datetime(2026, 10, 12, tzinfo=UTC)
+	with time_machine.travel(created, tick=False), expired.session() as session:
+		session["message"] = "Hello"
+
+	with time_machine.travel(
+		created + MAXIMUM_AGE + timedelta(microseconds=1),
+		tick=False,
+	):
+		other.post("/")
+
+	# Back within the maximum age, only a purged session is missing.
+	with time_machine.travel(created, tick=False):
+		response = expired.get("/")
+
+	assert_eq(response.text, "")
+
+
+def test_request_that_writes_no_session_does_not_purge():
+	def resolve(request, context):
+		context.get(Sessions)
+		return Response.empty()
+
+	app = application([Route.post("/", resolve), Route.get("/", show_message)])
+	kept = TestClient(app)
+	other = TestClient(app)
+	created = datetime(2026, 10, 12, tzinfo=UTC)
+	with time_machine.travel(created, tick=False), kept.session() as session:
+		session["message"] = "Hello"
+
+	with time_machine.travel(
+		created + MAXIMUM_AGE + timedelta(microseconds=1),
+		tick=False,
+	):
+		other.post("/")
+
+	# Back within the maximum age, a session that was not purged is found.
+	with time_machine.travel(created, tick=False):
+		response = kept.get("/")
+
+	assert_eq(response.text, "Hello")
+
+
+def test_clearing_a_session_destroys_it_and_its_cookie():
+	def clear(request, context):
+		session = context.get(Session)
+		session.clear()
+		return Response.empty()
+
+	app = application([Route.post("/", clear), Route.get("/", show_message)])
+	client = TestClient(app)
+	with client.session() as session:
+		session["message"] = "Hello"
+	token = assert_not_none(client.get_cookie("session_id")).value
+
+	client.post("/")
+	stale = TestClient(app)
+	stale.set_cookie("session_id", token)
+
+	assert_is(client.get_cookie("session_id"), None)
+	assert_eq(stale.get("/").text, "")
+
+
+def test_unexpected_exception_does_not_save():
+	def fail(request, context):
+		session = context.get(Session)
+		session["message"] = "After"
+		raise RuntimeError("failure")
+
+	client = TestClient(
+		application([Route.post("/", fail), Route.get("/", show_message)])
+	)
+	with client.session() as session:
+		session["message"] = "Before"
+
+	failed = client.post("/")
+	response = client.get("/")
+
+	assert_eq(failed.status_code, Status.INTERNAL_SERVER_ERROR.code)
+	assert_eq(response.text, "Before")
 
 
 def test_raised_http_error_discards_mutation():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		id = uuid4()
-		initial = {str(id): session_data({"message": "Before"})}
-		write_sessions(path, initial)
+	def missing(request, context):
+		session = context.get(Session)
+		session["message"] = "After"
+		raise NotFoundError()
 
-		def missing(request, context):
-			context.get(Session)["message"] = "After"
+	client = TestClient(
+		application([Route.post("/", missing), Route.get("/", show_message)])
+	)
+	with client.session() as session:
+		session["message"] = "Before"
+
+	failed = client.post("/")
+	response = client.get("/")
+
+	assert_eq(failed.status_code, Status.NOT_FOUND.code)
+	assert_is(failed.headers.get("Set-Cookie"), None)
+	assert_eq(response.text, "Before")
+
+
+def test_failure_after_the_session_middleware_discards_mutation():
+	def refuse(request, context, next):
+		response = next(request, context)
+		if request.method is Method.POST:
 			raise NotFoundError()
+		return response
 
-		app = Application(
-			AppConfig(),
-			Router([Route.get("/", missing)]),
-			[
-				helios.session.Provider(
-					helios.session.Config(),
-					Driver(path, path.with_suffix(".lock")),
-				)
-			],
+	def change(request, context):
+		session = context.get(Session)
+		session["message"] = "After"
+		return Response.empty()
+
+	client = TestClient(
+		application(
+			[Route.post("/", change), Route.get("/", show_message)],
+			middlewares=[refuse],
 		)
-		app.boot()
-		try:
-			response = app.handle(request(str(id)))
-		finally:
-			app.close()
+	)
+	with client.session() as session:
+		session["message"] = "Before"
 
-		assert_eq(response.status, Status.NOT_FOUND)
-		assert_eq(read_sessions(path), initial)
-		assert_not_in("session_id", response.cookies)
+	failed = client.post("/")
+	response = client.get("/")
 
-
-def test_releases_lock_when_request_fails_after_resolving_session():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		id = uuid4()
-		initial = {str(id): session_data({"message": "Before"})}
-		write_sessions(path, initial)
-
-		def refuse(request, context, next):
-			next(request, context)
-			raise NotFoundError()
-
-		def change(request, context):
-			context.get(Session)["message"] = "After"
-			return Response.empty()
-
-		driver = Driver(path, path.with_suffix(".lock"))
-		app = Application(
-			AppConfig(),
-			Router([Route.get("/", change)]),
-			[helios.session.Provider(helios.session.Config(), driver)],
-			[refuse],
-		)
-		app.boot()
-		try:
-			response = app.handle(request(str(id)))
-		finally:
-			app.close()
-
-		assert_eq(response.status, Status.NOT_FOUND)
-		assert_eq(read_sessions(path), initial)
-		with driver.open() as store:
-			assert_eq(store.get(id)["message"], "Before")
+	assert_eq(failed.status_code, Status.NOT_FOUND.code)
+	assert_eq(response.text, "Before")
 
 
 def test_returned_error_response_saves_mutation():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		write_sessions(path)
+	def failed(request, context):
+		session = context.get(Session)
+		session["message"] = "Saved"
+		return Response.text("failed", Status.INTERNAL_SERVER_ERROR)
 
-		def failed(request, context):
-			context.get(Session)["message"] = "Saved"
-			return Response.text("failed", Status.INTERNAL_SERVER_ERROR)
+	client = TestClient(
+		application([Route.post("/", failed), Route.get("/", show_message)])
+	)
 
-		app = Application(
-			AppConfig(),
-			Router([Route.get("/", failed)]),
-			[
-				helios.session.Provider(
-					helios.session.Config(),
-					Driver(path, path.with_suffix(".lock")),
-				)
-			],
-		)
-		app.boot()
-		try:
-			response = app.handle(request())
-		finally:
-			app.close()
+	client.post("/")
+	response = client.get("/")
 
-		assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
-		assert_eq(
-			next(iter(read_sessions(path).values()))["items"], {"message": "Saved"}
-		)
+	assert_eq(response.text, "Saved")
 
 
 def test_flash_reaches_next_request_only():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		write_sessions(path)
-		notices = []
+	notices = []
 
-		def create(request, context):
-			context.get(Flash)["notice"] = "Saved"
-			return Response.empty()
+	def create(request, context):
+		flash = context.get(Flash)
+		flash["notice"] = "Saved"
+		return Response.empty()
 
-		def index(request, context):
-			notices.append(context.get(Flash).get("notice"))
-			return Response.empty()
+	def index(request, context):
+		flash = context.get(Flash)
+		notices.append(flash.get("notice"))
+		return Response.empty()
 
-		app = Application(
-			AppConfig(),
-			Router([Route.post("/", create), Route.get("/", index)]),
-			[
-				helios.session.Provider(
-					helios.session.Config(),
-					Driver(path, path.with_suffix(".lock")),
-				)
-			],
-		)
-		app.boot()
-		try:
-			response = app.handle(Request(Method.POST, URL("/")))
-			id = response.cookies["session_id"].value
-			app.handle(request(id))
-			app.handle(request(id))
-		finally:
-			app.close()
+	client = TestClient(application([Route.post("/", create), Route.get("/", index)]))
 
-		assert_eq(notices, ["Saved", None])
+	client.post("/")
+	client.get("/")
+	client.get("/")
+
+	assert_eq(notices, ["Saved", None])
 
 
 def test_failed_request_keeps_unread_flash():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		id = uuid4()
-		write_sessions(path, {str(id): session_data({"_flash": {"notice": "Saved"}})})
-		notices = []
+	notices = []
 
-		def missing(request, context):
-			notices.append(context.get(Flash).get("notice"))
-			raise NotFoundError()
+	def create(request, context):
+		flash = context.get(Flash)
+		flash["notice"] = "Saved"
+		return Response.empty()
 
-		app = Application(
-			AppConfig(),
-			Router([Route.get("/", missing)]),
-			[
-				helios.session.Provider(
-					helios.session.Config(),
-					Driver(path, path.with_suffix(".lock")),
-				)
-			],
-		)
-		app.boot()
-		try:
-			app.handle(request(str(id)))
-			app.handle(request(str(id)))
-		finally:
-			app.close()
+	def missing(request, context):
+		flash = context.get(Flash)
+		notices.append(flash.get("notice"))
+		raise NotFoundError()
 
-		assert_eq(notices, ["Saved", "Saved"])
+	client = TestClient(application([Route.post("/", create), Route.get("/", missing)]))
+
+	client.post("/")
+	client.get("/")
+	client.get("/")
+
+	assert_eq(notices, ["Saved", "Saved"])
 
 
 def test_shares_flash_with_views():
+	def create(request, context):
+		flash = context.get(Flash)
+		flash["notice"] = "Saved"
+		return Response.empty()
+
+	def index(request, context):
+		views = context.get(Views)
+		return views.render("index")
+
 	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		id = uuid4()
-		write_sessions(path, {str(id): session_data({"_flash": {"notice": "Saved"}})})
-		views_directory = Path(directory, "views")
-		views_directory.mkdir()
+		views_directory = Path(directory)
 		views_directory.joinpath("index.html").write_text('{{ flash.get("notice") }}')
-
-		def index(request, context):
-			return context.get(Views).render("index")
-
-		app = Application(
-			AppConfig(),
-			Router([Route.get("/", index)]),
-			[
-				helios.session.Provider(
-					helios.session.Config(),
-					Driver(path, path.with_suffix(".lock")),
-				),
-				helios.view.provider.Provider(
-					helios.view.config.Config(views_directory)
-				),
-			],
+		client = TestClient(
+			application(
+				[Route.post("/", create), Route.get("/", index)],
+				[
+					helios.view.provider.Provider(
+						helios.view.config.Config(views_directory)
+					),
+				],
+			)
 		)
-		app.boot()
-		try:
-			response = app.handle(request(str(id)))
-		finally:
-			app.close()
 
-	assert_eq(str(response.body), "Saved")
+		client.post("/")
+		response = client.get("/")
+
+	assert_eq(response.text, "Saved")
 
 
 def test_shares_flash_with_components():
+	def create(request, context):
+		flash = context.get(Flash)
+		flash["notice"] = "Saved"
+		return Response.empty()
+
+	def index(request, context):
+		views = context.get(Views)
+		return views.render("index")
+
 	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		id = uuid4()
-		write_sessions(path, {str(id): session_data({"_flash": {"notice": "Saved"}})})
-		views_directory = Path(directory, "views")
-		views_directory.mkdir()
+		views_directory = Path(directory)
 		views_directory.joinpath("index.html").write_text(
 			'{{ Notice(label="Notice") }}'
 		)
 		views_directory.joinpath("notice.html").write_text(
 			'{{ label }}: {{ flash.get("notice") }}'
 		)
-
-		def index(request, context):
-			return context.get(Views).render("index")
-
-		app = Application(
-			AppConfig(),
-			Router([Route.get("/", index)]),
-			[
-				helios.session.Provider(
-					helios.session.Config(),
-					Driver(path, path.with_suffix(".lock")),
-				),
-				helios.view.provider.Provider(
-					helios.view.config.Config(views_directory),
-					components=[Notice],
-				),
-			],
+		client = TestClient(
+			application(
+				[Route.post("/", create), Route.get("/", index)],
+				[
+					helios.view.provider.Provider(
+						helios.view.config.Config(views_directory),
+						components=[Notice],
+					),
+				],
+			)
 		)
-		app.boot()
-		try:
-			response = app.handle(request(str(id)))
-		finally:
-			app.close()
 
-	assert_eq(str(response.body), "Notice: Saved")
+		client.post("/")
+		response = client.get("/")
 
-
-def test_boots_without_views():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		id = uuid4()
-		write_sessions(path, {str(id): session_data({"_flash": {"notice": "Saved"}})})
-		notices = []
-
-		def index(request, context):
-			notices.append(context.get(Flash).get("notice"))
-			return Response.empty()
-
-		app = Application(
-			AppConfig(),
-			Router([Route.get("/", index)]),
-			[
-				helios.session.Provider(
-					helios.session.Config(),
-					Driver(path, path.with_suffix(".lock")),
-				)
-			],
-		)
-		app.boot()
-		try:
-			app.handle(request(str(id)))
-		finally:
-			app.close()
-
-	assert_eq(notices, ["Saved"])
-
-
-def lock_worker(path: str, lock_path: str, queue):
-	driver = Driver(Path(path), Path(lock_path))
-	with driver.open():
-		queue.put(("entered", time.monotonic()))
-		time.sleep(0.15)
-		queue.put(("leaving", time.monotonic()))
-
-
-def test_file_driver_serializes_processes():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		lock_path = path.with_suffix(".lock")
-		write_sessions(path)
-		context = multiprocessing.get_context("fork")
-		queue = context.Queue()
-		first = context.Process(
-			target=lock_worker, args=(str(path), str(lock_path), queue)
-		)
-		second = context.Process(
-			target=lock_worker, args=(str(path), str(lock_path), queue)
-		)
-		first.start()
-		first_event = queue.get(timeout=5)
-		second.start()
-		events = [first_event, *(queue.get(timeout=5) for _ in range(3))]
-		first.join(timeout=5)
-		second.join(timeout=5)
-
-		assert_eq(first.exitcode, 0)
-		assert_eq(second.exitcode, 0)
-		assert_eq(
-			[event[0] for event in events], ["entered", "leaving", "entered", "leaving"]
-		)
-		assert_that(events[2][1] >= events[1][1])
+	assert_eq(response.text, "Notice: Saved")
 
 
 def test_provider_registers_config_before_boot():
-	with TemporaryDirectory() as dir:
-		path = Path(dir, "sessions.json")
-		config = helios.session.Config()
+	config = helios.session.Config(memory.Config())
 
-		app = Application(
-			AppConfig(),
-			Router([]),
-			[helios.session.Provider(config, Driver(path, path.with_suffix(".lock")))],
-		)
+	app = helios.app.Application(
+		AppConfig(),
+		Router([]),
+		[helios.session.Provider(config)],
+	)
 
-		assert_is(app.container.get(helios.session.Config), config)
+	assert_is(app.container.get(helios.session.Config), config)
 
 
 class Outer(Provider):
@@ -574,22 +501,16 @@ class Outer(Provider):
 	def __init__(self, middleware):
 		self.middleware = middleware
 
-	def boot(self, application: Application):
+	def boot(self, application: helios.app.Application):
 		application.use(self.middleware)
 
 
-def handle(path: Path, route, outer=None) -> Response:
+def handle(route, outer=None) -> Response:
 	providers = [Outer(outer)] if outer is not None else []
-	app = Application(
+	app = helios.app.Application(
 		AppConfig(),
 		Router([Route.get("/", route)]),
-		[
-			*providers,
-			helios.session.Provider(
-				helios.session.Config(),
-				Driver(path, path.with_suffix(".lock")),
-			),
-		],
+		[*providers, provider()],
 	)
 	app.boot()
 	try:
@@ -599,119 +520,110 @@ def handle(path: Path, route, outer=None) -> Response:
 
 
 def test_streamed_body_cannot_write_to_the_session():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		write_sessions(path)
-		errors = []
+	errors = []
 
-		def stream(request, context):
-			session = context.get(Session)
-			session["message"] = "Hello"
+	def stream(request, context):
+		session = context.get(Session)
+		session["message"] = "Hello"
 
-			def chunks():
-				try:
-					session["late"] = "Too late"
-				except RuntimeError as error:
-					errors.append(error)
-				yield b""
+		def chunks():
+			try:
+				session["late"] = "Too late"
+			except RuntimeError as error:
+				errors.append(error)
+			yield b""
 
-			return Response.stream(chunks(), "text/plain")
+		return Response.stream(chunks(), "text/plain")
 
-		response = handle(path, stream)
-		assert_is_instance(response.body, Stream)
-		list(cast(Stream, response.body).chunks)
+	response = handle(stream)
+	assert_is_instance(response.body, Stream)
+	list(cast(Stream, response.body).chunks)
 
-		assert_eq([type(error) for error in errors], [RuntimeError])
+	assert_eq([type(error) for error in errors], [RuntimeError])
 
 
 def test_streamed_body_cannot_write_to_the_flash():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		write_sessions(path)
-		errors = []
+	errors = []
 
-		def stream(request, context):
-			flash = context.get(Flash)
+	def stream(request, context):
+		flash = context.get(Flash)
 
-			def chunks():
-				try:
-					flash["notice"] = "Too late"
-				except RuntimeError as error:
-					errors.append(error)
-				yield b""
+		def chunks():
+			try:
+				flash["notice"] = "Too late"
+			except RuntimeError as error:
+				errors.append(error)
+			yield b""
 
-			return Response.stream(chunks(), "text/plain")
+		return Response.stream(chunks(), "text/plain")
 
-		response = handle(path, stream)
-		assert_is_instance(response.body, Stream)
-		list(cast(Stream, response.body).chunks)
+	response = handle(stream)
+	assert_is_instance(response.body, Stream)
+	list(cast(Stream, response.body).chunks)
 
-		assert_eq([type(error) for error in errors], [RuntimeError])
+	assert_eq([type(error) for error in errors], [RuntimeError])
 
 
 def test_failed_request_closes_its_sessions():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		write_sessions(path)
-		captured = []
+	captured = []
 
-		def fail(request, context):
-			captured.append(context.get(Sessions))
-			captured.append(context.get(Session))
-			raise NotFoundError()
+	def fail(request, context):
+		sessions = context.get(Sessions)
+		session = context.get(Session)
+		captured.append(sessions)
+		captured.append(session)
+		raise NotFoundError()
 
-		handle(path, fail)
+	handle(fail)
 
-		sessions, session = captured
-		with assert_raises(RuntimeError) as put:
-			sessions.put(Session(uuid4()))
-		with assert_raises(RuntimeError) as write:
-			session["message"] = "Hello"
-		assert_is(type(put.exception), RuntimeError)
-		assert_is(type(write.exception), RuntimeError)
+	sessions, session = captured
+	with assert_raises(RuntimeError) as save:
+		sessions.save(Session("other-token"))
+	with assert_raises(RuntimeError) as write:
+		session["message"] = "Hello"
+	assert_is(type(save.exception), RuntimeError)
+	assert_is(type(write.exception), RuntimeError)
 
 
 def test_outer_middleware_cannot_write_to_the_flash():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		write_sessions(path)
-		errors = []
+	errors = []
 
-		def outer(request, context, next):
-			response = next(request, context)
-			try:
-				context.get(Flash)["notice"] = "Too late"
-			except RuntimeError as error:
-				errors.append(error)
-			return response
+	def outer(request, context, next):
+		response = next(request, context)
+		try:
+			flash = context.get(Flash)
+			flash["notice"] = "Too late"
+		except RuntimeError as error:
+			errors.append(error)
+		return response
 
-		def index(request, context):
-			context.get(Flash)
-			return Response.empty()
+	def index(request, context):
+		context.get(Flash)
+		return Response.empty()
 
-		handle(path, index, outer)
+	handle(index, outer)
 
-		assert_eq([type(error) for error in errors], [RuntimeError])
+	assert_eq([type(error) for error in errors], [RuntimeError])
 
 
 def test_outer_middleware_cannot_rotate_the_session():
-	with TemporaryDirectory() as directory:
-		path = Path(directory, "sessions.json")
-		write_sessions(path)
-		errors = []
+	errors = []
 
-		def outer(request, context, next):
-			response = next(request, context)
-			try:
-				context.get(Sessions).rotate(context.get(Session))
-			except RuntimeError as error:
-				errors.append(error)
-			return response
+	def outer(request, context, next):
+		response = next(request, context)
+		try:
+			sessions = context.get(Sessions)
+			session = context.get(Session)
+			sessions.rotate(session)
+		except RuntimeError as error:
+			errors.append(error)
+		return response
 
-		def index(request, context):
-			context.get(Session)["message"] = "Hello"
-			return Response.empty()
+	def index(request, context):
+		session = context.get(Session)
+		session["message"] = "Hello"
+		return Response.empty()
 
-		handle(path, index, outer)
+	handle(index, outer)
 
-		assert_eq([type(error) for error in errors], [RuntimeError])
+	assert_eq([type(error) for error in errors], [RuntimeError])
