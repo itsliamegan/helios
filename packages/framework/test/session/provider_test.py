@@ -15,15 +15,16 @@ from luna.test.assertion import (
 )
 import time_machine
 
-from helios.app import Application, Provider
+import helios.app
 from helios.app import Config as AppConfig
+from helios.app import Provider
 from helios.http import Headers, Method, Request, Response, Status
 from helios.http.body import Stream
 from helios.http.error import NotFoundError
 from helios.routing import Route, Router
 import helios.session
 from helios.session import Flash
-from helios.session.driver import Driver, memory
+from helios.session.driver import memory
 from helios.session.session import Session
 from helios.session.sessions import Sessions
 from helios.url import URL
@@ -31,6 +32,8 @@ from helios.view import Component
 import helios.view.config
 import helios.view.provider
 from helios.view.views import Views
+import helios.wsgi
+from helios.wsgi.test import TestClient
 
 MAXIMUM_AGE = timedelta(days=30)
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -59,10 +62,32 @@ def provider(secure: bool = False) -> helios.session.Provider:
 	)
 
 
+def application(
+	routes: list[Route],
+	providers: list[Provider] | None = None,
+	middlewares=None,
+) -> helios.wsgi.Application:
+	app = helios.wsgi.Application(
+		AppConfig(),
+		Router(routes),
+		[provider(), *(providers or [])],
+		middlewares,
+	)
+	app.boot()
+	return app
+
+
+def show_message(request, context) -> Response:
+	session = context.get(Session)
+	if "message" in session:
+		return Response.text(session["message"])
+	else:
+		return Response.text("")
+
+
 def exercise(
 	request: Request,
 	change=None,
-	stored: list[Session] | None = None,
 	secure: bool = False,
 	resolve: bool = True,
 ):
@@ -73,66 +98,42 @@ def exercise(
 			session = context.get(Session)
 			seen.append(session)
 			if change is not None:
-				change(session, context.get(Sessions))
+				sessions = context.get(Sessions)
+				change(session, sessions)
 		return Response.empty()
 
-	app = Application(
+	app = helios.app.Application(
 		AppConfig(),
 		Router([Route.get("/", index)]),
 		[provider(secure)],
 	)
-	driver = app.container.get(Driver)
-	for session in stored or []:
-		driver.write(session)
 	app.boot()
 	try:
 		response = app.handle(request)
 	finally:
 		app.close()
-	return (seen[0] if seen else None), response, cast(memory.Driver, driver)
+	return (seen[0] if seen else None), response
 
 
-def test_unused_and_empty_sessions_do_not_write():
-	_, unused_response, unused_driver = exercise(request(), resolve=False)
-	empty, empty_response, empty_driver = exercise(request())
+def test_unused_and_empty_sessions_set_no_cookie():
+	_, unused_response = exercise(request(), resolve=False)
+	empty, empty_response = exercise(request())
 
 	assert_not_in("session_id", unused_response.cookies)
 	assert_not_in("session_id", empty_response.cookies)
 	assert_not_none(empty)
-	assert_eq(unused_driver.sessions, {})
-	assert_eq(empty_driver.sessions, {})
 
 
-def test_request_that_writes_no_session_does_not_purge():
-	now = datetime(2026, 10, 12, tzinfo=UTC)
-	expired = Session(
-		"expired-token",
-		last_active_at=now - MAXIMUM_AGE - timedelta(microseconds=1),
-	)
-
-	with time_machine.travel(now, tick=False):
-		_, _, driver = exercise(
-			request(),
-			lambda session, sessions: None,
-			stored=[expired],
-		)
-
-	assert_not_none(driver.read("expired-token"))
-
-
-def test_stores_data_and_sets_cookie_policy():
+def test_sets_the_cookie_policy():
 	now = datetime(2026, 10, 12, tzinfo=UTC)
 	with time_machine.travel(now, tick=False):
-		session, response, driver = exercise(
+		session, response = exercise(
 			request(),
 			lambda session, sessions: session.__setitem__("message", "Hello"),
 			secure=True,
 		)
 
-	stored = assert_not_none(driver.read(session.token))
 	cookie = response.cookies["session_id"]
-	assert_eq(stored.items, {"message": "Hello"})
-	assert_eq(stored.last_active_at, now)
 	assert_eq(cookie.value, session.token)
 	assert_that(cookie.http_only)
 	assert_that(cookie.secure)
@@ -140,178 +141,256 @@ def test_stores_data_and_sets_cookie_policy():
 	assert_eq(cookie.expires, now + MAXIMUM_AGE)
 
 
-def test_reuses_touches_and_rotates_known_session():
-	now = datetime(2026, 10, 12, tzinfo=UTC)
-	known = Session(
-		"visitor-token",
-		{"message": "Hello"},
-		last_active_at=now - timedelta(days=1),
-	)
-	with time_machine.travel(now, tick=False):
-		session, response, driver = exercise(
-			request("visitor-token"),
-			lambda session, sessions: sessions.rotate(session),
-			stored=[known],
-		)
+def test_saves_a_session_with_items():
+	def create(request, context):
+		session = context.get(Session)
+		session["message"] = "Hello"
+		return Response.empty()
 
-	stored = assert_not_none(driver.read(session.token))
-	assert_not_eq(session.token, "visitor-token")
-	assert_is(driver.read("visitor-token"), None)
-	assert_eq(stored.items, {"message": "Hello"})
-	assert_eq(stored.last_active_at, now)
-	assert_eq(response.cookies["session_id"].value, session.token)
+	client = TestClient(
+		application([Route.post("/", create), Route.get("/", show_message)])
+	)
+
+	client.post("/")
+	response = client.get("/")
+
+	assert_eq(response.text, "Hello")
+
+
+def test_touches_a_found_session():
+	seen = []
+
+	def index(request, context):
+		session = context.get(Session)
+		seen.append(session.last_active_at)
+		return Response.empty()
+
+	client = TestClient(application([Route.get("/", index)]))
+	created = datetime(2026, 10, 12, tzinfo=UTC)
+	with time_machine.travel(created, tick=False), client.session() as session:
+		session["message"] = "Hello"
+
+	visited = created + timedelta(days=1)
+	with time_machine.travel(visited, tick=False):
+		client.get("/")
+
+	assert_eq(seen, [visited])
+
+
+def test_rotates_a_session_to_a_new_token():
+	def rotate(request, context):
+		session = context.get(Session)
+		sessions = context.get(Sessions)
+		sessions.rotate(session)
+		return Response.empty()
+
+	app = application([Route.post("/", rotate), Route.get("/", show_message)])
+	client = TestClient(app)
+	with client.session() as session:
+		session["message"] = "Hello"
+	old_token = assert_not_none(client.get_cookie("session_id")).value
+
+	client.post("/")
+	stale = TestClient(app)
+	stale.set_cookie("session_id", old_token)
+
+	assert_not_eq(assert_not_none(client.get_cookie("session_id")).value, old_token)
+	assert_eq(client.get("/").text, "Hello")
+	assert_eq(stale.get("/").text, "")
 
 
 def test_replaces_and_clears_an_unknown_cookie():
-	session, response, driver = exercise(request("unknown-token"))
+	session, response = exercise(request("unknown-token"))
 
 	assert_not_eq(session.token, "unknown-token")
-	assert_eq(driver.sessions, {})
 	assert_eq(response.cookies["session_id"].value, "")
 	assert_eq(response.cookies["session_id"].expires, EPOCH)
 
 
-def test_purges_expired_sessions_and_renews_boundary():
-	now = datetime(2026, 10, 12, tzinfo=UTC)
-	active = Session(
-		"active-token",
-		{"message": "Hello"},
-		last_active_at=now - MAXIMUM_AGE,
-	)
-	expired = Session(
-		"expired-token",
-		last_active_at=now - MAXIMUM_AGE - timedelta(microseconds=1),
-	)
-	with time_machine.travel(now, tick=False):
-		session, _, driver = exercise(
-			request("active-token"),
-			stored=[active, expired],
-		)
+def test_finds_a_session_active_at_the_maximum_age():
+	client = TestClient(application([Route.get("/", show_message)]))
+	created = datetime(2026, 10, 12, tzinfo=UTC)
+	with time_machine.travel(created, tick=False), client.session() as session:
+		session["message"] = "Hello"
 
-	assert_eq(session.token, "active-token")
-	assert_eq(assert_not_none(driver.read("active-token")).last_active_at, now)
-	assert_is(driver.read("expired-token"), None)
+	with time_machine.travel(created + MAXIMUM_AGE, tick=False):
+		response = client.get("/")
+
+	assert_eq(response.text, "Hello")
 
 
-def test_clear_removes_persisted_session():
-	known = Session("visitor-token", {"message": "Hello"})
-	_, response, driver = exercise(
-		request("visitor-token"),
-		lambda session, sessions: session.clear(),
-		stored=[known],
-	)
+def test_purges_expired_sessions_when_a_request_saves_a_session():
+	def create(request, context):
+		session = context.get(Session)
+		session["message"] = "Other"
+		return Response.empty()
 
-	assert_eq(driver.sessions, {})
-	assert_eq(response.cookies["session_id"].value, "")
-	assert_eq(response.cookies["session_id"].expires, EPOCH)
+	app = application([Route.post("/", create), Route.get("/", show_message)])
+	expired = TestClient(app)
+	other = TestClient(app)
+	created = datetime(2026, 10, 12, tzinfo=UTC)
+	with time_machine.travel(created, tick=False), expired.session() as session:
+		session["message"] = "Hello"
+
+	with time_machine.travel(
+		created + MAXIMUM_AGE + timedelta(microseconds=1),
+		tick=False,
+	):
+		other.post("/")
+
+	# Back within the maximum age, only a purged session is missing.
+	with time_machine.travel(created, tick=False):
+		response = expired.get("/")
+
+	assert_eq(response.text, "")
+
+
+def test_request_that_writes_no_session_does_not_purge():
+	def resolve(request, context):
+		_sessions = context.get(Sessions)
+		return Response.empty()
+
+	app = application([Route.post("/", resolve), Route.get("/", show_message)])
+	kept = TestClient(app)
+	other = TestClient(app)
+	created = datetime(2026, 10, 12, tzinfo=UTC)
+	with time_machine.travel(created, tick=False), kept.session() as session:
+		session["message"] = "Hello"
+
+	with time_machine.travel(
+		created + MAXIMUM_AGE + timedelta(microseconds=1),
+		tick=False,
+	):
+		other.post("/")
+
+	# Back within the maximum age, a session that was not purged is found.
+	with time_machine.travel(created, tick=False):
+		response = kept.get("/")
+
+	assert_eq(response.text, "Hello")
+
+
+def test_clearing_a_session_destroys_it_and_its_cookie():
+	def clear(request, context):
+		session = context.get(Session)
+		session.clear()
+		return Response.empty()
+
+	app = application([Route.post("/", clear), Route.get("/", show_message)])
+	client = TestClient(app)
+	with client.session() as session:
+		session["message"] = "Hello"
+	token = assert_not_none(client.get_cookie("session_id")).value
+
+	client.post("/")
+	stale = TestClient(app)
+	stale.set_cookie("session_id", token)
+
+	assert_is(client.get_cookie("session_id"), None)
+	assert_eq(stale.get("/").text, "")
 
 
 def test_unexpected_exception_does_not_save():
 	def fail(request, context):
-		context.get(Session)["message"] = "After"
+		session = context.get(Session)
+		session["message"] = "After"
 		raise RuntimeError("failure")
 
-	app = Application(AppConfig(), Router([Route.get("/", fail)]), [provider()])
-	driver = app.container.get(Driver)
-	driver.write(Session("visitor-token", {"message": "Before"}))
-	app.boot()
-	try:
-		response = app.handle(request("visitor-token"))
-	finally:
-		app.close()
+	client = TestClient(
+		application([Route.post("/", fail), Route.get("/", show_message)])
+	)
+	with client.session() as session:
+		session["message"] = "Before"
 
-	assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
-	assert_eq(assert_not_none(driver.read("visitor-token"))["message"], "Before")
+	failed = client.post("/")
+	response = client.get("/")
+
+	assert_eq(failed.status_code, Status.INTERNAL_SERVER_ERROR.code)
+	assert_eq(response.text, "Before")
 
 
 def test_raised_http_error_discards_mutation():
 	def missing(request, context):
-		context.get(Session)["message"] = "After"
+		session = context.get(Session)
+		session["message"] = "After"
 		raise NotFoundError()
 
-	app = Application(AppConfig(), Router([Route.get("/", missing)]), [provider()])
-	driver = app.container.get(Driver)
-	driver.write(Session("visitor-token", {"message": "Before"}))
-	app.boot()
-	try:
-		response = app.handle(request("visitor-token"))
-	finally:
-		app.close()
+	client = TestClient(
+		application([Route.post("/", missing), Route.get("/", show_message)])
+	)
+	with client.session() as session:
+		session["message"] = "Before"
 
-	assert_eq(response.status, Status.NOT_FOUND)
-	assert_eq(assert_not_none(driver.read("visitor-token"))["message"], "Before")
-	assert_not_in("session_id", response.cookies)
+	failed = client.post("/")
+	response = client.get("/")
+
+	assert_eq(failed.status_code, Status.NOT_FOUND.code)
+	assert_is(failed.headers.get("Set-Cookie"), None)
+	assert_eq(response.text, "Before")
 
 
 def test_failure_after_the_session_middleware_discards_mutation():
 	def refuse(request, context, next):
-		next(request, context)
-		raise NotFoundError()
+		response = next(request, context)
+		if request.method is Method.POST:
+			raise NotFoundError()
+		return response
 
 	def change(request, context):
-		context.get(Session)["message"] = "After"
+		session = context.get(Session)
+		session["message"] = "After"
 		return Response.empty()
 
-	app = Application(
-		AppConfig(),
-		Router([Route.get("/", change)]),
-		[provider()],
-		[refuse],
+	client = TestClient(
+		application(
+			[Route.post("/", change), Route.get("/", show_message)],
+			middlewares=[refuse],
+		)
 	)
-	driver = app.container.get(Driver)
-	driver.write(Session("visitor-token", {"message": "Before"}))
-	app.boot()
-	try:
-		response = app.handle(request("visitor-token"))
-	finally:
-		app.close()
+	with client.session() as session:
+		session["message"] = "Before"
 
-	assert_eq(response.status, Status.NOT_FOUND)
-	assert_eq(assert_not_none(driver.read("visitor-token"))["message"], "Before")
+	failed = client.post("/")
+	response = client.get("/")
+
+	assert_eq(failed.status_code, Status.NOT_FOUND.code)
+	assert_eq(response.text, "Before")
 
 
 def test_returned_error_response_saves_mutation():
 	def failed(request, context):
-		context.get(Session)["message"] = "Saved"
+		session = context.get(Session)
+		session["message"] = "Saved"
 		return Response.text("failed", Status.INTERNAL_SERVER_ERROR)
 
-	app = Application(AppConfig(), Router([Route.get("/", failed)]), [provider()])
-	driver = cast(memory.Driver, app.container.get(Driver))
-	app.boot()
-	try:
-		response = app.handle(request())
-	finally:
-		app.close()
+	client = TestClient(
+		application([Route.post("/", failed), Route.get("/", show_message)])
+	)
 
-	token = response.cookies["session_id"].value
-	assert_eq(response.status, Status.INTERNAL_SERVER_ERROR)
-	assert_eq(assert_not_none(driver.read(token))["message"], "Saved")
+	client.post("/")
+	response = client.get("/")
+
+	assert_eq(response.text, "Saved")
 
 
 def test_flash_reaches_next_request_only():
 	notices = []
 
 	def create(request, context):
-		context.get(Flash)["notice"] = "Saved"
+		flash = context.get(Flash)
+		flash["notice"] = "Saved"
 		return Response.empty()
 
 	def index(request, context):
-		notices.append(context.get(Flash).get("notice"))
+		flash = context.get(Flash)
+		notices.append(flash.get("notice"))
 		return Response.empty()
 
-	app = Application(
-		AppConfig(),
-		Router([Route.post("/", create), Route.get("/", index)]),
-		[provider()],
-	)
-	app.boot()
-	try:
-		response = app.handle(Request(Method.POST, URL("/")))
-		token = response.cookies["session_id"].value
-		app.handle(request(token))
-		app.handle(request(token))
-	finally:
-		app.close()
+	client = TestClient(application([Route.post("/", create), Route.get("/", index)]))
+
+	client.post("/")
+	client.get("/")
+	client.get("/")
 
 	assert_eq(notices, ["Saved", None])
 
@@ -319,55 +398,65 @@ def test_flash_reaches_next_request_only():
 def test_failed_request_keeps_unread_flash():
 	notices = []
 
+	def create(request, context):
+		flash = context.get(Flash)
+		flash["notice"] = "Saved"
+		return Response.empty()
+
 	def missing(request, context):
-		notices.append(context.get(Flash).get("notice"))
+		flash = context.get(Flash)
+		notices.append(flash.get("notice"))
 		raise NotFoundError()
 
-	app = Application(AppConfig(), Router([Route.get("/", missing)]), [provider()])
-	app.container.get(Driver).write(
-		Session("visitor-token", {"_flash": {"notice": "Saved"}})
-	)
-	app.boot()
-	try:
-		app.handle(request("visitor-token"))
-		app.handle(request("visitor-token"))
-	finally:
-		app.close()
+	client = TestClient(application([Route.post("/", create), Route.get("/", missing)]))
+
+	client.post("/")
+	client.get("/")
+	client.get("/")
 
 	assert_eq(notices, ["Saved", "Saved"])
 
 
 def test_shares_flash_with_views():
+	def create(request, context):
+		flash = context.get(Flash)
+		flash["notice"] = "Saved"
+		return Response.empty()
+
+	def index(request, context):
+		views = context.get(Views)
+		return views.render("index")
+
 	with TemporaryDirectory() as directory:
 		views_directory = Path(directory)
 		views_directory.joinpath("index.html").write_text('{{ flash.get("notice") }}')
-
-		def index(request, context):
-			return context.get(Views).render("index")
-
-		app = Application(
-			AppConfig(),
-			Router([Route.get("/", index)]),
-			[
-				provider(),
-				helios.view.provider.Provider(
-					helios.view.config.Config(views_directory)
-				),
-			],
+		client = TestClient(
+			application(
+				[Route.post("/", create), Route.get("/", index)],
+				[
+					helios.view.provider.Provider(
+						helios.view.config.Config(views_directory)
+					),
+				],
+			)
 		)
-		app.container.get(Driver).write(
-			Session("visitor-token", {"_flash": {"notice": "Saved"}})
-		)
-		app.boot()
-		try:
-			response = app.handle(request("visitor-token"))
-		finally:
-			app.close()
 
-	assert_eq(str(response.body), "Saved")
+		client.post("/")
+		response = client.get("/")
+
+	assert_eq(response.text, "Saved")
 
 
 def test_shares_flash_with_components():
+	def create(request, context):
+		flash = context.get(Flash)
+		flash["notice"] = "Saved"
+		return Response.empty()
+
+	def index(request, context):
+		views = context.get(Views)
+		return views.render("index")
+
 	with TemporaryDirectory() as directory:
 		views_directory = Path(directory)
 		views_directory.joinpath("index.html").write_text(
@@ -376,57 +465,32 @@ def test_shares_flash_with_components():
 		views_directory.joinpath("notice.html").write_text(
 			'{{ label }}: {{ flash.get("notice") }}'
 		)
-
-		def index(request, context):
-			return context.get(Views).render("index")
-
-		app = Application(
-			AppConfig(),
-			Router([Route.get("/", index)]),
-			[
-				provider(),
-				helios.view.provider.Provider(
-					helios.view.config.Config(views_directory),
-					components=[Notice],
-				),
-			],
+		client = TestClient(
+			application(
+				[Route.post("/", create), Route.get("/", index)],
+				[
+					helios.view.provider.Provider(
+						helios.view.config.Config(views_directory),
+						components=[Notice],
+					),
+				],
+			)
 		)
-		app.container.get(Driver).write(
-			Session("visitor-token", {"_flash": {"notice": "Saved"}})
-		)
-		app.boot()
-		try:
-			response = app.handle(request("visitor-token"))
-		finally:
-			app.close()
 
-	assert_eq(str(response.body), "Notice: Saved")
+		client.post("/")
+		response = client.get("/")
 
-
-def test_boots_without_views():
-	notices = []
-
-	def index(request, context):
-		notices.append(context.get(Flash).get("notice"))
-		return Response.empty()
-
-	app = Application(AppConfig(), Router([Route.get("/", index)]), [provider()])
-	app.container.get(Driver).write(
-		Session("visitor-token", {"_flash": {"notice": "Saved"}})
-	)
-	app.boot()
-	try:
-		app.handle(request("visitor-token"))
-	finally:
-		app.close()
-
-	assert_eq(notices, ["Saved"])
+	assert_eq(response.text, "Notice: Saved")
 
 
 def test_provider_registers_config_before_boot():
 	config = helios.session.Config(memory.Config())
 
-	app = Application(AppConfig(), Router([]), [helios.session.Provider(config)])
+	app = helios.app.Application(
+		AppConfig(),
+		Router([]),
+		[helios.session.Provider(config)],
+	)
 
 	assert_is(app.container.get(helios.session.Config), config)
 
@@ -437,13 +501,13 @@ class Outer(Provider):
 	def __init__(self, middleware):
 		self.middleware = middleware
 
-	def boot(self, application: Application):
+	def boot(self, application: helios.app.Application):
 		application.use(self.middleware)
 
 
 def handle(route, outer=None) -> Response:
 	providers = [Outer(outer)] if outer is not None else []
-	app = Application(
+	app = helios.app.Application(
 		AppConfig(),
 		Router([Route.get("/", route)]),
 		[*providers, provider()],
@@ -504,8 +568,10 @@ def test_failed_request_closes_its_sessions():
 	captured = []
 
 	def fail(request, context):
-		captured.append(context.get(Sessions))
-		captured.append(context.get(Session))
+		sessions = context.get(Sessions)
+		session = context.get(Session)
+		captured.append(sessions)
+		captured.append(session)
 		raise NotFoundError()
 
 	handle(fail)
@@ -525,13 +591,14 @@ def test_outer_middleware_cannot_write_to_the_flash():
 	def outer(request, context, next):
 		response = next(request, context)
 		try:
-			context.get(Flash)["notice"] = "Too late"
+			flash = context.get(Flash)
+			flash["notice"] = "Too late"
 		except RuntimeError as error:
 			errors.append(error)
 		return response
 
 	def index(request, context):
-		context.get(Flash)
+		_flash = context.get(Flash)
 		return Response.empty()
 
 	handle(index, outer)
@@ -545,13 +612,16 @@ def test_outer_middleware_cannot_rotate_the_session():
 	def outer(request, context, next):
 		response = next(request, context)
 		try:
-			context.get(Sessions).rotate(context.get(Session))
+			sessions = context.get(Sessions)
+			session = context.get(Session)
+			sessions.rotate(session)
 		except RuntimeError as error:
 			errors.append(error)
 		return response
 
 	def index(request, context):
-		context.get(Session)["message"] = "Hello"
+		session = context.get(Session)
+		session["message"] = "Hello"
 		return Response.empty()
 
 	handle(index, outer)

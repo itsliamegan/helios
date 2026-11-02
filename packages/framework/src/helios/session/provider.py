@@ -33,36 +33,44 @@ class Provider(Provider):
 
 	def __init__(self, config: Config):
 		self.config = config
+		self.memory_driver: memory.Driver | None = None
 
 	def register(self, container: Container):
 		container.instance(Config, self.config)
-		match self.config.driver:
-			case database.Config():
-				container.scoped(Driver, self.database_driver)
-			case memory.Config():
-				container.instance(Driver, memory.Driver())
 		container.scoped(Sessions, self.sessions)
 		container.scoped(Session, self.session)
 		container.scoped(Flash, self.flash)
 
 	def boot(self, application: Application):
 		if isinstance(self.config.driver, database.Config):
-			application.container.get(Database).registry.get(database.Record)
+			database_ = application.container.get(Database)
+			database_.registry.get(database.Record)
 		application.use(self.middleware)
 		if application.container.bound(Composers):
-			application.container.get(Composers).add(self.compose)
-
-	def database_driver(self, context: Context) -> Driver:
-		return database.Driver(context.get(Store))
+			composers = application.container.get(Composers)
+			composers.add(self.compose)
 
 	def sessions(self, context: Context) -> Sessions:
-		return Sessions(context.get(Driver), self.config.maximum_age)
+		return Sessions(self.driver(context), self.config.maximum_age)
+
+	def driver(self, context: Context) -> Driver:
+		match self.config.driver:
+			case database.Config():
+				store = context.get(Store)
+				return database.Driver(store)
+			case memory.Config():
+				# One memory driver serves every request, so its sessions outlive
+				# the request that saved them.
+				if self.memory_driver is None:
+					self.memory_driver = memory.Driver()
+				return self.memory_driver
 
 	def session(self, context: Context) -> Session:
 		request = context.get(Request)
 		if "session_id" in request.cookies:
 			token = request.cookies["session_id"].value
-			session = context.get(Sessions).find(token)
+			sessions = context.get(Sessions)
+			session = sessions.find(token)
 			if session is not None:
 				session.touch()
 				return session
@@ -77,7 +85,8 @@ class Provider(Provider):
 		return Flash()
 
 	def compose(self, view: View, context: Context):
-		view.share("flash", context.get(Flash))
+		flash = context.get(Flash)
+		view.share("flash", flash)
 
 	def middleware(self, request: Request, context: Context, next: Handler) -> Response:
 		response = next(request, context)
@@ -85,7 +94,8 @@ class Provider(Provider):
 		flash = context.resolved(Flash)
 		if flash is not None:
 			if context.failure is None and flash.is_dirty():
-				context.get(Session)["_flash"] = flash.dirty()
+				session = context.get(Session)
+				session["_flash"] = flash.dirty()
 			flash.close()
 
 		session = context.resolved(Session)
