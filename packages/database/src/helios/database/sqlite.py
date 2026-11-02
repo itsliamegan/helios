@@ -13,8 +13,10 @@ class Connection:
 
 	A statement outside a transaction commits immediately. Beginning a
 	transaction takes the database's write lock, and closing the connection
-	rolls back a transaction left open. SQLite's errors are raised as
-	DatabaseError or as DatabaseBusyError when a lock is not acquired in time.
+	rolls back a transaction left open. Opening a connection that can write puts
+	the database in WAL mode, so readers and the writer do not wait for each
+	other. SQLite's errors are raised as DatabaseError or as DatabaseBusyError
+	when a lock is not acquired in time.
 	"""
 
 	def __init__(self, connection: sqlite3.Connection):
@@ -52,6 +54,10 @@ class Connection:
 				f"PRAGMA busy_timeout = {busy_timeout.total_seconds() * 1000}",
 				"configuration",
 			)
+			if not read_only:
+				# Leaving the rollback journal waits for other connections to
+				# release their locks, so it runs after the busy timeout is set.
+				connection.control("PRAGMA journal_mode = WAL", "configuration")
 		except Exception:
 			try:
 				connection.close()

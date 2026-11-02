@@ -11,6 +11,7 @@ import helios.database
 from helios.database import Database, Model, ModelError, Store
 import helios.database.provider
 from helios.database.registry import Registry
+from helios.database.sqlite import Connection
 from helios.http import Headers, Method, Request, Response, Status
 from helios.routing import Route, Router
 import helios.session
@@ -181,9 +182,9 @@ def test_request_without_a_cookie_takes_no_write_lock():
 			],
 		)
 		app.boot()
-		lock = sqlite3.connect(path, autocommit=True)
+		lock = Connection.open(path)
 		try:
-			lock.execute("BEGIN IMMEDIATE")
+			lock.begin()
 			response = app.handle(request())
 		finally:
 			lock.close()

@@ -67,6 +67,44 @@ def test_rolls_back_transaction():
 			observer.close()
 
 
+def test_puts_database_in_wal_mode():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		Connection.open(path).close()
+
+		observer = sqlite3.connect(path)
+		try:
+			assert_eq(observer.execute("PRAGMA journal_mode").fetchone(), ("wal",))
+		finally:
+			observer.close()
+
+
+def test_commits_while_another_connection_reads():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path, "CREATE TABLE posts (title TEXT NOT NULL)")
+		writer = Connection.open(path, busy_timeout=timedelta(milliseconds=10))
+		reader = sqlite3.connect(path, autocommit=True)
+		try:
+			reader.execute("BEGIN")
+			reader.execute("SELECT title FROM posts").fetchall()
+
+			writer.begin()
+			writer.execute("INSERT INTO posts (title) VALUES (?)", ("Intro",)).close()
+			writer.commit()
+		finally:
+			reader.close()
+			writer.close()
+
+		observer = sqlite3.connect(path)
+		try:
+			assert_eq(
+				observer.execute("SELECT title FROM posts").fetchone(), ("Intro",)
+			)
+		finally:
+			observer.close()
+
+
 def test_enforces_foreign_keys():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
