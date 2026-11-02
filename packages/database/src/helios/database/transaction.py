@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from enum import Enum, auto
 from typing import Any
 
 from .sqlite import Connection, Cursor
@@ -8,45 +9,60 @@ class Transaction:
 	"""A unit of work on one connection that commits or rolls back as a whole.
 
 	The transaction takes the database's write lock on its first statement. Once
-	it commits or rolls back, it refuses every statement with `RuntimeError`.
+	it commits or rolls back, it refuses every statement, commit, and rollback
+	with `RuntimeError`.
 	"""
 
 	def __init__(self, connection: Connection):
 		self.connection = connection
-		self.begun = False
-		self.ended = False
+		self.state = State.PENDING
 
 	def execute(
 		self,
 		sql: str,
 		parameters: Iterable[Any] = (),
 	) -> Cursor:
-		if self.ended:
+		if self.state is State.ENDED:
 			raise RuntimeError("the transaction has ended")
 
-		if not self.begun:
+		if self.state is State.PENDING:
 			self.connection.begin()
-			self.begun = True
+			self.state = State.BEGUN
 		return self.connection.execute(sql, parameters)
 
 	def commit(self):
-		if self.ended:
-			return
+		if self.state is State.ENDED:
+			raise RuntimeError("the transaction has ended")
 
-		# A commit that fails rolls back and raises, so mark the transaction ended
-		# before committing.
-		self.ended = True
-		if self.begun:
-			self.connection.commit()
+		if self.state is State.BEGUN:
+			try:
+				self.connection.commit()
+			finally:
+				self.state = State.ENDED
+		else:
+			self.state = State.ENDED
 
 	def rollback(self):
-		if self.ended:
-			return
+		if self.state is State.ENDED:
+			raise RuntimeError("the transaction has ended")
 
-		self.ended = True
-		if self.begun:
-			self.connection.rollback()
+		if self.state is State.BEGUN:
+			try:
+				self.connection.rollback()
+			finally:
+				self.state = State.ENDED
+		else:
+			self.state = State.ENDED
 
 	@property
 	def parameter_limit(self) -> int:
 		return self.connection.parameter_limit
+
+
+class State(Enum):
+	# No statement has run, so the transaction holds no lock.
+	PENDING = auto()
+	# The transaction holds the write lock.
+	BEGUN = auto()
+	# The transaction committed or rolled back.
+	ENDED = auto()

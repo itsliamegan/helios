@@ -127,3 +127,35 @@ def test_execute_after_rollback_raises():
 			assert_is(type(raised.exception), RuntimeError)
 		finally:
 			connection.close()
+
+
+def test_commit_after_rollback_raises():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path)
+		connection = Connection.open(path)
+		try:
+			transaction = Transaction(connection)
+			transaction.rollback()
+
+			with assert_raises(RuntimeError) as raised:
+				transaction.commit()
+			assert_is(type(raised.exception), RuntimeError)
+		finally:
+			connection.close()
+
+
+def test_rollback_after_commit_raises():
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path)
+		connection = Connection.open(path)
+		try:
+			transaction = Transaction(connection)
+			transaction.commit()
+
+			with assert_raises(RuntimeError) as raised:
+				transaction.rollback()
+			assert_is(type(raised.exception), RuntimeError)
+		finally:
+			connection.close()

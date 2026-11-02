@@ -62,12 +62,13 @@ class Database:
 			token = TRANSACTIONS.set(TRANSACTIONS.get() | {self})
 			try:
 				yield transaction
+			except BaseException:
+				transaction.rollback()
+				raise
+			else:
 				transaction.commit()
 			finally:
-				# A failed rollback still ends the transaction in this context.
 				TRANSACTIONS.reset(token)
-				# Rolling back after a commit does nothing.
-				transaction.rollback()
 
 	@contextmanager
 	def store(self) -> Generator[Store]:
