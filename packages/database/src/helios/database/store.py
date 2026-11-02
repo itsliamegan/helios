@@ -20,8 +20,7 @@ from .transaction import Transaction
 
 
 class Store:
-	"""A set of models stored as rows, read and written through an open
-	connection or transaction.
+	"""Reads and writes models as rows through an open connection or transaction.
 
 	Over a bare connection, each statement commits as it runs. The store never
 	begins, commits, or rolls back a transaction itself.
