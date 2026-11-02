@@ -453,7 +453,7 @@ def test_client_prepares_a_session_for_the_next_request():
 	app = Application(
 		helios.app.Config(),
 		Router([Route.get("/", index)]),
-		[helios.session.Provider(helios.session.Config(driver=memory.Config()))],
+		[helios.session.Provider(helios.session.Config(memory.Config()))],
 	)
 	app.boot()
 	client = TestClient(app)

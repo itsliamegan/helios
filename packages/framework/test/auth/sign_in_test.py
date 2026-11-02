@@ -53,7 +53,7 @@ def test_signs_a_user_in_for_the_next_request():
 			helios.app.Config(),
 			Router([Route.get("/", index)]),
 			[
-				helios.session.Provider(helios.session.Config()),
+				helios.session.Provider(helios.session.Config(database.Config())),
 				helios.database.provider.Provider(
 					helios.database.Config(path),
 					[User, database.Record],

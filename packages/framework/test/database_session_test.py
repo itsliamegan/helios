@@ -47,7 +47,7 @@ def application(path: Path, action) -> helios.app.Application:
 		helios.app.Config(),
 		Router([Route.get("/", action)]),
 		[
-			helios.session.Provider(helios.session.Config()),
+			helios.session.Provider(helios.session.Config(database.Config())),
 			helios.database.provider.Provider(
 				helios.database.Config(path),
 				[User, database.Record],
@@ -164,7 +164,7 @@ def test_request_without_a_cookie_takes_no_write_lock():
 			helios.app.Config(),
 			Router([Route.get("/", index)]),
 			[
-				helios.session.Provider(helios.session.Config()),
+				helios.session.Provider(helios.session.Config(database.Config())),
 				helios.database.provider.Provider(
 					helios.database.Config(path, busy_timeout=timedelta(0)),
 					[User, database.Record],
@@ -190,7 +190,7 @@ def test_boot_refuses_an_unregistered_session_model():
 			helios.app.Config(),
 			Router([]),
 			[
-				helios.session.Provider(helios.session.Config()),
+				helios.session.Provider(helios.session.Config(database.Config())),
 				helios.database.provider.Provider(
 					helios.database.Config(Path(directory, "app.sqlite")),
 					[User],

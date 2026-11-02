@@ -52,9 +52,9 @@ def request(token: str | None = None) -> Request:
 def provider(secure: bool = False) -> helios.session.Provider:
 	return helios.session.Provider(
 		helios.session.Config(
+			memory.Config(),
 			secure=secure,
 			maximum_age=MAXIMUM_AGE,
-			driver=memory.Config(),
 		)
 	)
 
@@ -424,7 +424,7 @@ def test_boots_without_views():
 
 
 def test_provider_registers_config_before_boot():
-	config = helios.session.Config(driver=memory.Config())
+	config = helios.session.Config(memory.Config())
 
 	app = Application(AppConfig(), Router([]), [helios.session.Provider(config)])
 
