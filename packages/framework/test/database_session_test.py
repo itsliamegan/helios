@@ -95,8 +95,10 @@ def test_session_and_domain_writes_commit_together():
 		create_database(path)
 
 		def sign_in(request, context):
-			user = context.get(Store).create(User, name="Alice")
-			context.get(helios.auth.Authenticator).sign_in(user)
+			store = context.get(Store)
+			authenticator = context.get(helios.auth.Authenticator)
+			user = store.create(User, name="Alice")
+			authenticator.sign_in(user)
 			return Response.empty(Status.OK)
 
 		app = application(path, sign_in)
@@ -117,8 +119,10 @@ def test_session_and_domain_writes_roll_back_together():
 		store_session(path, Session("visitor-token", {"message": "Before"}))
 
 		def fail(request, context):
-			context.get(Store).create(User, name="Rolled back")
-			context.get(Session)["message"] = "After"
+			store = context.get(Store)
+			session = context.get(Session)
+			store.create(User, name="Rolled back")
+			session["message"] = "After"
 			raise RuntimeError("failure")
 
 		app = application(path, fail)
@@ -140,7 +144,9 @@ def test_failed_request_rolls_back_a_rotation():
 		store_session(path, Session("visitor-token", {"message": "Hello"}))
 
 		def fail(request, context):
-			context.get(Sessions).rotate(context.get(Session))
+			sessions = context.get(Sessions)
+			session = context.get(Session)
+			sessions.rotate(session)
 			raise RuntimeError("failure")
 
 		app = application(path, fail)
@@ -159,7 +165,7 @@ def test_request_without_a_cookie_takes_no_write_lock():
 		create_database(path)
 
 		def index(request, context):
-			context.get(helios.auth.Authenticator)
+			_authenticator = context.get(helios.auth.Authenticator)
 			return Response.empty(Status.OK)
 
 		app = helios.app.Application(

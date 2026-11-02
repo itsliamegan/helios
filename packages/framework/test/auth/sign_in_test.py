@@ -48,7 +48,8 @@ def test_signs_a_user_in_for_the_next_request():
 			user = store.create(User, name="Alice")
 
 		def index(request, context):
-			return Response.text(context.get(Authenticator[User]).user.name)
+			authenticator = context.get(Authenticator[User])
+			return Response.text(authenticator.user.name)
 
 		app = Application(
 			helios.app.Config(),

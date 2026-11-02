@@ -44,10 +44,12 @@ class TestClient:
 			yield session
 
 			if session.items:
-				context.get(Sessions).save(session)
+				sessions = context.get(Sessions)
+				sessions.save(session)
 				self.set_cookie("session_id", session.token)
 			elif session.stored:
-				context.get(Sessions).destroy(session)
+				sessions = context.get(Sessions)
+				sessions.destroy(session)
 				self.delete_cookie("session_id")
 
 	def request(

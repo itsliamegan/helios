@@ -106,7 +106,8 @@ def test_rotated_session_is_stored_under_its_new_token_once_saved():
 
 
 def test_purges_expired_sessions():
-	sessions = Sessions(memory.Driver(), MAXIMUM_AGE)
+	driver = memory.Driver()
+	sessions = Sessions(driver, MAXIMUM_AGE)
 	sessions.save(
 		Session(
 			"expired-token",
@@ -118,8 +119,8 @@ def test_purges_expired_sessions():
 	with time_machine.travel(NOW, tick=False):
 		sessions.purge()
 
-	assert_is(sessions.driver.read("expired-token"), None)
-	assert_not_none(sessions.driver.read("active-token"))
+	assert_is(driver.read("expired-token"), None)
+	assert_not_none(driver.read("active-token"))
 
 
 def test_closed_sessions_refuse_saving():

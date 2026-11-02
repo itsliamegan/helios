@@ -449,7 +449,8 @@ def make_client(routes):
 
 def test_client_prepares_a_session_for_the_next_request():
 	def index(req, ctx):
-		return Response.text(ctx.get(Session)["message"])
+		session = ctx.get(Session)
+		return Response.text(session["message"])
 
 	app = Application(
 		helios.app.Config(),
