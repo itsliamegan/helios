@@ -165,7 +165,7 @@ def test_request_without_a_cookie_takes_no_write_lock():
 		create_database(path)
 
 		def index(request, context):
-			_authenticator = context.get(helios.auth.Authenticator)
+			context.get(helios.auth.Authenticator)
 			return Response.empty(Status.OK)
 
 		app = helios.app.Application(

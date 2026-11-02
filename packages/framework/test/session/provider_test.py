@@ -247,7 +247,7 @@ def test_purges_expired_sessions_when_a_request_saves_a_session():
 
 def test_request_that_writes_no_session_does_not_purge():
 	def resolve(request, context):
-		_sessions = context.get(Sessions)
+		context.get(Sessions)
 		return Response.empty()
 
 	app = application([Route.post("/", resolve), Route.get("/", show_message)])
@@ -598,7 +598,7 @@ def test_outer_middleware_cannot_write_to_the_flash():
 		return response
 
 	def index(request, context):
-		_flash = context.get(Flash)
+		context.get(Flash)
 		return Response.empty()
 
 	handle(index, outer)
