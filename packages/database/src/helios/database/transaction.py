@@ -22,37 +22,40 @@ class Transaction:
 		sql: str,
 		parameters: Iterable[Any] = (),
 	) -> Cursor:
-		if self.state is State.ENDED:
-			raise RuntimeError("the transaction has ended")
+		match self.state:
+			case State.PENDING:
+				self.connection.begin()
+				self.state = State.BEGUN
+			case State.BEGUN:
+				pass
+			case State.ENDED:
+				raise RuntimeError("the transaction has ended")
 
-		if self.state is State.PENDING:
-			self.connection.begin()
-			self.state = State.BEGUN
 		return self.connection.execute(sql, parameters)
 
 	def commit(self):
-		if self.state is State.ENDED:
-			raise RuntimeError("the transaction has ended")
-
-		if self.state is State.BEGUN:
-			try:
-				self.connection.commit()
-			finally:
+		match self.state:
+			case State.PENDING:
 				self.state = State.ENDED
-		else:
-			self.state = State.ENDED
+			case State.BEGUN:
+				try:
+					self.connection.commit()
+				finally:
+					self.state = State.ENDED
+			case State.ENDED:
+				raise RuntimeError("the transaction has ended")
 
 	def rollback(self):
-		if self.state is State.ENDED:
-			raise RuntimeError("the transaction has ended")
-
-		if self.state is State.BEGUN:
-			try:
-				self.connection.rollback()
-			finally:
+		match self.state:
+			case State.PENDING:
 				self.state = State.ENDED
-		else:
-			self.state = State.ENDED
+			case State.BEGUN:
+				try:
+					self.connection.rollback()
+				finally:
+					self.state = State.ENDED
+			case State.ENDED:
+				raise RuntimeError("the transaction has ended")
 
 	@property
 	def parameter_limit(self) -> int:
