@@ -10,7 +10,7 @@ from helios.database.migration import MigrationError, Migrations
 from .database import SCHEMA
 
 
-class WriteMigration(Command):
+class MakeMigration(Command):
 	"""Write the migration that creates the session table.
 
 	The migration takes the next number in the migrations directory, and the

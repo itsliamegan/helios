@@ -1,11 +1,17 @@
 from luna.cli import Program
 
-from helios.assets.command import Compile
-from helios.database.migration.command import Migrate, Status
-from helios.session.command import WriteMigration
-from helios.wsgi.command import Serve
+import helios.assets.command
+import helios.database.migration.command
+import helios.session.command
+import helios.wsgi.command
 
 
 class Program(Program):
 	name = "helios"
-	commands = (Serve, Compile, Migrate, Status, WriteMigration)
+	commands = (
+		helios.wsgi.command.Serve,
+		helios.assets.command.Compile,
+		helios.database.migration.command.Migrate,
+		helios.database.migration.command.Status,
+		helios.session.command.MakeMigration,
+	)
