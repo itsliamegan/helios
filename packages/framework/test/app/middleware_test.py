@@ -1,6 +1,6 @@
 from luna.test.assertion import assert_eq, assert_is_instance, assert_raises
 
-from helios.app import Container, Context, Middlewares
+from helios.app import Container, Context, Middlewares, Rescues
 from helios.http import Method, Request, Response, Status
 from helios.http.error import BadRequestError, ContentTooLargeError, NotFoundError
 from helios.url import URL
@@ -22,7 +22,7 @@ def test_runs_middleware_in_order_to_destination():
 		return Response.empty(Status.OK)
 
 	request = Request(Method.GET, URL("/posts"))
-	next = Middlewares([first, second]).build(index)
+	next = Middlewares([first, second]).build(index, Rescues())
 	with Context(Container(), request) as context:
 		next(request, context)
 
@@ -51,7 +51,7 @@ def test_runs_required_then_provided_then_application_middleware():
 	middlewares.provide(provided)
 	middlewares.require(required)
 	request = Request(Method.GET, URL("/posts"))
-	next = middlewares.build(index)
+	next = middlewares.build(index, Rescues())
 	with Context(Container(), request) as context:
 		next(request, context)
 
@@ -70,7 +70,7 @@ def test_records_destination_error_as_failure_for_middleware():
 		raise NotFoundError()
 
 	request = Request(Method.GET, URL("/posts"))
-	next = Middlewares([observe]).build(index)
+	next = Middlewares([observe]).build(index, Rescues())
 	with Context(Container(), request) as context:
 		response = next(request, context)
 
@@ -93,7 +93,7 @@ def test_records_error_raised_by_inner_middleware_as_failure():
 		return Response.empty(Status.OK)
 
 	request = Request(Method.GET, URL("/posts"))
-	next = Middlewares([observe, refuse]).build(index)
+	next = Middlewares([observe, refuse]).build(index, Rescues())
 	with Context(Container(), request) as context:
 		response = next(request, context)
 
@@ -120,7 +120,7 @@ def test_keeps_first_failure_when_outer_middleware_raises():
 		return Response.empty(Status.OK)
 
 	request = Request(Method.GET, URL("/posts"))
-	next = Middlewares([observe, reject, refuse]).build(index)
+	next = Middlewares([observe, reject, refuse]).build(index, Rescues())
 	with Context(Container(), request) as context:
 		response = next(request, context)
 
@@ -133,6 +133,6 @@ def test_raises_errors_other_than_http_errors():
 		raise ValueError("failed")
 
 	request = Request(Method.GET, URL("/posts"))
-	next = Middlewares().build(index)
+	next = Middlewares().build(index, Rescues())
 	with assert_raises(ValueError), Context(Container(), request) as context:
 		next(request, context)

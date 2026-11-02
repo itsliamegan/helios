@@ -10,6 +10,7 @@ from helios.url import URL
 from .container import Container
 from .kernel import Kernel
 from .middleware import Middleware, Middlewares
+from .rescues import Rescues
 
 
 class Application:
@@ -33,6 +34,7 @@ class Application:
 		self.container = Container()
 		self.providers = list(providers)
 		self.middlewares = Middlewares(middlewares)
+		self.rescues = Rescues()
 		self.kernel: Kernel | None = None
 		try:
 			self.container.instance(Application, self)
@@ -61,6 +63,7 @@ class Application:
 				self.container,
 				self.container.get(Router),
 				self.middlewares,
+				self.rescues,
 			)
 		except BaseException:
 			self.container.close()

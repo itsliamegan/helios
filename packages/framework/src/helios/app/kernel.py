@@ -5,7 +5,6 @@ from helios.http import Method, Request, Response
 from helios.http.error import (
 	BadRequestError,
 	ForbiddenError,
-	InternalServerError,
 	UnsupportedMethodError,
 )
 from helios.routing import Router
@@ -14,14 +13,15 @@ from helios.url import URL
 from .container import Container
 from .context import Context
 from .middleware import Handler, Middlewares
+from .rescues import Rescues
 
 
 class Kernel:
 	"""Runs each request through middleware to the router.
 
-	The kernel requires its own middleware, so it runs first. An error other
-	than an `HTTPError` becomes a server error at the outermost layer, past
-	every middleware. The request's context records that error as its failure
+	The kernel requires its own middleware, so it runs first. An error that
+	is not rescued becomes a server error at the outermost layer, past every
+	middleware. The request's context records that error as its failure
 	unless it already has one.
 	"""
 
@@ -30,6 +30,7 @@ class Kernel:
 		container: Container,
 		router: Router,
 		middlewares: Middlewares,
+		rescues: Rescues,
 	):
 		middlewares.require(
 			self.capture_errors,
@@ -38,7 +39,8 @@ class Kernel:
 		)
 
 		self.container = container
-		self.pipeline = middlewares.build(router)
+		self.rescues = rescues
+		self.pipeline = middlewares.build(router, rescues)
 
 	def handle(self, request: Request) -> Response:
 		try:
@@ -48,17 +50,18 @@ class Kernel:
 			# To reach this, the cleanup of a request-scoped service must have
 			# raised. The kernel captures all other errors inside the pipeline.
 			traceback.print_exception(error, file=sys.stderr)
-			return Response.error(InternalServerError())
+			return self.rescues.render(error)
 
-	@staticmethod
-	def capture_errors(request: Request, context: Context, next: Handler) -> Response:
+	def capture_errors(
+		self, request: Request, context: Context, next: Handler
+	) -> Response:
 		try:
 			return next(request, context)
 		except Exception as error:
 			if context.failure is None:
 				context.failure = error
 			traceback.print_exception(error, file=sys.stderr)
-			return Response.error(InternalServerError())
+			return self.rescues.render(error)
 
 	@staticmethod
 	def adapt_artificial_method(
