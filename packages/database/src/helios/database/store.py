@@ -10,9 +10,10 @@ from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .load import Load
 from .model import Model
+from .namespace import Namespace
 from .parser import ConditionParser
 from .query import Query
-from .registry import Namespace, Registry
+from .registry import Registry
 from .relationship import BelongsTo
 from .sqlite import Connection
 from .statement import Delete, Insert, Raw, Select, Statement, Update

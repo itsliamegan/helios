@@ -7,7 +7,7 @@ from .error import ModelError
 
 if TYPE_CHECKING:
 	from .model import Model
-	from .registry import Namespace
+	from .namespace import Namespace
 
 
 def generated(init: bool = False) -> Any:
