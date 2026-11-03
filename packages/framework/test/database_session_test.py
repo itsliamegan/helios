@@ -18,6 +18,8 @@ import helios.session
 from helios.session import Session, Sessions
 from helios.session.command import MIGRATION_FILE
 from helios.session.driver import database
+import helios.session.driver.database.items
+import helios.session.driver.database.token
 from helios.url import URL
 
 
@@ -46,15 +48,15 @@ def request(token: str | None = None) -> Request:
 
 
 def application(path: Path, action) -> helios.app.Application:
+	registry = Registry()
+	registry.model(User)
+	registry.model(database.Record)
 	app = helios.app.Application(
 		helios.app.Config(),
 		Router([Route.get("/", action)]),
 		[
 			helios.session.Provider(helios.session.Config(database.Config())),
-			helios.database.provider.Provider(
-				helios.database.Config(path),
-				[User, database.Record],
-			),
+			helios.database.provider.Provider(helios.database.Config(path), registry),
 			helios.auth.Provider(User),
 		],
 	)
@@ -71,12 +73,20 @@ def create_database(path: Path):
 
 
 def store_session(path: Path, session: Session):
-	with Database(path, Registry([database.Record])).store() as store:
+	registry = Registry()
+	registry.model(database.Record)
+	registry.codec(helios.session.driver.database.token.Codec())
+	registry.codec(helios.session.driver.database.items.Codec())
+	with Database(path, registry).store() as store:
 		database.Driver(store).write(session)
 
 
 def read_session(path: Path, token: str) -> Session | None:
-	with Database(path, Registry([database.Record])).store() as store:
+	registry = Registry()
+	registry.model(database.Record)
+	registry.codec(helios.session.driver.database.token.Codec())
+	registry.codec(helios.session.driver.database.items.Codec())
+	with Database(path, registry).store() as store:
 		return database.Driver(store).read(token)
 
 
@@ -169,6 +179,9 @@ def test_request_without_a_cookie_takes_no_write_lock():
 			context.get(helios.auth.Authenticator)
 			return Response.empty(Status.OK)
 
+		registry = Registry()
+		registry.model(User)
+		registry.model(database.Record)
 		app = helios.app.Application(
 			helios.app.Config(),
 			Router([Route.get("/", index)]),
@@ -176,7 +189,7 @@ def test_request_without_a_cookie_takes_no_write_lock():
 				helios.session.Provider(helios.session.Config(database.Config())),
 				helios.database.provider.Provider(
 					helios.database.Config(path, busy_timeout=timedelta(0)),
-					[User, database.Record],
+					registry,
 				),
 				helios.auth.Provider(User),
 			],
@@ -195,6 +208,8 @@ def test_request_without_a_cookie_takes_no_write_lock():
 
 def test_boot_refuses_an_unregistered_session_model():
 	with TemporaryDirectory() as directory:
+		registry = Registry()
+		registry.model(User)
 		app = helios.app.Application(
 			helios.app.Config(),
 			Router([]),
@@ -202,7 +217,7 @@ def test_boot_refuses_an_unregistered_session_model():
 				helios.session.Provider(helios.session.Config(database.Config())),
 				helios.database.provider.Provider(
 					helios.database.Config(Path(directory, "app.sqlite")),
-					[User],
+					registry,
 				),
 			],
 		)

@@ -18,6 +18,7 @@ from helios.database import (
 	DatabaseError,
 	Model,
 	ModelError,
+	Registry,
 	Store,
 	belongs_to,
 	has_many,
@@ -144,7 +145,10 @@ def open_store(
 		raw.close()
 		with Connection.open(path) as connection:
 			connection.begin()
-			yield Store(connection, model_types)
+			registry = Registry()
+			for model_type in model_types:
+				registry.model(model_type)
+			yield Store(connection, registry)
 
 
 @contextmanager

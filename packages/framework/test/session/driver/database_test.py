@@ -14,7 +14,7 @@ from luna.test.assertion import (
 from helios.database import Database
 from helios.database.registry import Registry
 from helios.session.command import MIGRATION_FILE
-from helios.session.driver.database import Driver, Record
+from helios.session.driver.database import Driver, Record, items, token
 from helios.session.driver.database.items import Items
 from helios.session.driver.database.token import Token
 from helios.session.session import Session
@@ -26,7 +26,11 @@ def create_database(path: Path) -> Database:
 		connection.executescript(MIGRATION_FILE.read_text())
 	finally:
 		connection.close()
-	return Database(path, Registry([Record]))
+	registry = Registry()
+	registry.model(Record)
+	registry.codec(token.Codec())
+	registry.codec(items.Codec())
+	return Database(path, registry)
 
 
 def test_round_trips_a_record():
@@ -68,7 +72,7 @@ def test_finds_a_record_by_its_token():
 
 def test_items_refuse_json_that_is_not_an_object():
 	with assert_raises(TypeError):
-		Items.Codec().decode('["notice"]')
+		items.Codec().decode('["notice"]')
 
 
 def test_driver_reads_a_written_session():

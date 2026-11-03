@@ -1,12 +1,13 @@
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, get_args, get_origin
 
 from luna.declarative import Declaration, DeclarationError, MISSING, split_nullable
 
-from .codec import Codec, Scalar, encode
+from .codec import Codec, JSON, Scalar, encode
 from .error import ModelError
 
 if TYPE_CHECKING:
 	from .model import Model
+	from .registry import Namespace
 
 
 def generated(init: bool = False) -> Any:
@@ -19,24 +20,32 @@ def generated(init: bool = False) -> Any:
 
 
 class Column:
-	"""One column of a model, stored through the codec its annotation chooses.
+	"""One column of a model, stored through the codec its annotation selects.
 
-	`X | None` makes the column nullable. The annotation resolves on first use.
+	`X | None` makes the column nullable. The annotation resolves on first use,
+	and is enough to check values. The codec resolves on the first encode or
+	decode, through the namespace the column's model is registered in.
 	"""
 
 	name: str
 	declaration: Declaration
-	_annotation: type[Any]
-	_codec: Codec[object]
+	_annotation: object
+	_value_type: type[Any]
 	_nullable: bool
 
 	def __init__(self, init: bool = True):
 		self.init = init
 		self.resolved = False
+		self.namespace: Namespace | None = None
+		self._codec: Codec[object] | None = None
 
 	def bind(self, declaration: Declaration):
 		self.name = declaration.name
 		self.declaration = declaration
+
+	def bind_namespace(self, namespace: Namespace):
+		self.namespace = namespace
+		self._codec = None
 
 	def resolve(self):
 		if self.resolved:
@@ -46,16 +55,18 @@ class Column:
 				self.name,
 				self.declaration.resolve(),
 			)
-			codec = Codec.for_type(annotation)
-			if codec is None or not isinstance(annotation, type):
-				raise DeclarationError(
-					self.name,
-					f"unsupported column type: {annotation!r}",
-				)
+			value_type = annotation
+			if get_origin(value_type) is JSON:
+				(value_type,) = get_args(value_type)
+			value_type = get_origin(value_type) or value_type
+
+			# `Any` is a class, but values cannot be checked against it.
+			if value_type is Any or not isinstance(value_type, type):
+				raise self.unsupported(annotation)
 		except DeclarationError as error:
 			raise self.declaration.reject(error) from error
 		self._annotation = annotation
-		self._codec = codec
+		self._value_type = value_type
 		self._nullable = nullable
 		self.resolved = True
 
@@ -71,15 +82,35 @@ class Column:
 		return self.default is MISSING
 
 	@property
-	def annotation(self) -> type[Any]:
-		"""Return the column's type, without `| None`."""
+	def annotation(self) -> object:
+		"""Return the column's annotation, without `| None`."""
 
 		self.resolve()
 		return self._annotation
 
 	@property
-	def codec(self) -> Codec[object]:
+	def value_type(self) -> type[Any]:
+		"""Return the class the column's values are instances of.
+
+		For `JSON[T]`, the class is the outer type of `T`.
+		"""
+
 		self.resolve()
+		return self._value_type
+
+	@property
+	def codec(self) -> Codec[object]:
+		if self._codec is None:
+			if self.namespace is None:
+				raise ModelError(
+					f"{self.declaration.owner.__name__}.{self.name}: "
+					"the model is not registered"
+				)
+
+			codec = self.namespace.codec_for(self.annotation)
+			if codec is None:
+				raise self.declaration.reject(self.unsupported(self.annotation))
+			self._codec = codec
 		return self._codec
 
 	@property
@@ -104,7 +135,7 @@ class Column:
 			else:
 				raise ValueError("cannot be null")
 
-		expected = self.annotation
+		expected = self.value_type
 		if not isinstance(value, expected):
 			raise TypeError(f"expected {expected.__name__}, got {type(value).__name__}")
 		elif isinstance(value, bool) and expected is int:
@@ -112,12 +143,13 @@ class Column:
 			raise TypeError("expected int, got bool")
 
 	def encode(self, value: object, model_type: type) -> Scalar | None:
+		codec = self.codec
 		try:
 			self.check(value)
 			if value is None:
 				return None
 			else:
-				return encode(self.codec, value)
+				return encode(codec, value)
 		except (TypeError, ValueError) as error:
 			raise ModelError(f"{model_type.__name__}.{self.name}: {error}") from error
 
@@ -130,3 +162,6 @@ class Column:
 		raise AttributeError(
 			f"{type(instance).__name__}.{self.name} is read-only; use store.update"
 		)
+
+	def unsupported(self, annotation: object) -> DeclarationError:
+		return DeclarationError(self.name, f"unsupported column type: {annotation!r}")

@@ -26,15 +26,9 @@ class Store:
 	begins, commits, or rolls back a transaction itself.
 	"""
 
-	def __init__(
-		self,
-		connection: Connection | Transaction,
-		model_types: Iterable[type[Model]] | Registry,
-	):
+	def __init__(self, connection: Connection | Transaction, registry: Registry):
 		self.connection = connection
-		self.registry = (
-			model_types if isinstance(model_types, Registry) else Registry(model_types)
-		)
+		self.registry = registry
 		self.grammar = Grammar()
 
 	def create[**P, T: Model](
@@ -157,6 +151,8 @@ class Store:
 		_columns, rows = self.read(statement)
 		try:
 			return {column.decode(key): cast(int, count) for key, count in rows}
+		except ModelError:
+			raise
 		except (TypeError, ValueError) as error:
 			raise DatabaseError(
 				"database row contains an invalid model value"
@@ -204,6 +200,8 @@ class Store:
 		try:
 			for name, raw_value in zip(column_names, row, strict=True):
 				values[name] = model_type.columns[name].decode(raw_value)
+		except ModelError:
+			raise
 		except (TypeError, ValueError) as error:
 			raise DatabaseError(
 				"database row contains an invalid model value"

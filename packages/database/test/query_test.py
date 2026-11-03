@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.database import DatabaseError, Model, ModelError, Store
+from helios.database import DatabaseError, Model, ModelError, Registry, Store
 from helios.database.sqlite import Connection
 
 
@@ -37,7 +37,9 @@ def open_store(path: Path):
 	raw.close()
 	connection = Connection.open(path)
 	connection.begin()
-	store = Store(connection, [Item])
+	registry = Registry()
+	registry.model(Item)
+	store = Store(connection, registry)
 	store.create(Item, name="Alpha", group="one", rank=2)
 	store.create(Item, name="Beta", group="one", rank=1)
 	store.create(Item, name="Gamma", group=None, rank=3)

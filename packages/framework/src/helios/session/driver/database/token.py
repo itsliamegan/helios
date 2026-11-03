@@ -15,11 +15,14 @@ class Token:
 	def from_plaintext(cls, plaintext: str) -> Self:
 		return cls(hashlib.sha256(plaintext.encode()).hexdigest())
 
-	class Codec(Codec):
-		def encode(self, value: Token) -> Scalar:
-			return value.digest
 
-		def decode(self, value: Scalar) -> Token:
-			if not isinstance(value, str):
-				raise TypeError(f"expected a string, got {type(value).__name__}")
-			return Token(value)
+class Codec(Codec):
+	converts = Token
+
+	def encode(self, value: Token) -> Scalar:
+		return value.digest
+
+	def decode(self, value: Scalar) -> Token:
+		if not isinstance(value, str):
+			raise TypeError(f"expected a string, got {type(value).__name__}")
+		return Token(value)

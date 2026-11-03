@@ -1,13 +1,14 @@
 from datetime import UTC, datetime
 
 from helios.app import Application, Container, Context, Handler, Provider
-from helios.database import Database, Store
+from helios.database import Registry, Store
 from helios.http import Cookie, Request, Response
 from helios.view import View
 from helios.view.composer import Composers
 
 from .config import Config
 from .driver import Driver, database, memory
+from .driver.database import items, token
 from .flash import Flash
 from .session import Session
 from .sessions import Sessions
@@ -43,8 +44,10 @@ class Provider(Provider):
 
 	def boot(self, application: Application):
 		if isinstance(self.config.driver, database.Config):
-			database_ = application.container.get(Database)
-			database_.registry.get(database.Record)
+			registry = application.container.get(Registry)
+			registry.get(database.Record)
+			registry.codec(token.Codec())
+			registry.codec(items.Codec())
 		application.use(self.middleware)
 		if application.container.bound(Composers):
 			composers = application.container.get(Composers)

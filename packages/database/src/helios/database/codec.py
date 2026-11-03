@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
+import json
 from typing import Any, ClassVar, TypeAliasType
 import uuid
 
@@ -7,32 +8,22 @@ from helios import url
 
 type Scalar = int | float | str | bytes
 
+type JSON[T] = T
+
 
 class Codec[T](ABC):
 	"""Converts the values of the attributes its `converts` selects.
 
-	A codec converts between Python and SQLite. `converts` selects every attribute whose annotation, without `| None`, has it
-	as its outer type: the annotation itself, or its origin when it has one. The
-	match is exact, so a subclass of a converted type does not select the codec.
+	A codec converts between Python and SQLite. `converts` selects every
+	attribute whose annotation, without `| None`, has it as its outer type: the
+	annotation itself, or its origin when it has one. The match is exact, so a
+	subclass of a converted type does not select the codec.
 
 	The column checks a value's outer type before encoding it. A codec raises
 	`ValueError` for a value of that type that it cannot store.
 	"""
 
 	converts: ClassVar[type[Any] | TypeAliasType]
-
-	@classmethod
-	def for_type(cls, annotation: object) -> Codec[Any] | None:
-		try:
-			found = CODECS.get(annotation)
-		except TypeError:
-			found = None
-
-		if found is None and isinstance(annotation, type):
-			declared = vars(annotation).get("Codec")
-			if isinstance(declared, type) and issubclass(declared, Codec):
-				return declared()
-		return found
 
 	@abstractmethod
 	def encode(self, value: T) -> Scalar: ...
@@ -139,6 +130,23 @@ class URL(Text[url.URL]):
 		return url.URL.parse(self.text(value))
 
 
-CODECS: dict[object, Codec[Any]] = {}
-for codec in [Str(), Bool(), Int(), UUID(), Date(), URL()]:
-	CODECS[codec.converts] = codec
+class JSONText(Text[Any]):
+	"""Stores a JSON value as JSON text.
+
+	Only JSON values round-trip: a tuple comes back as a list, and integer keys
+	come back as strings.
+	"""
+
+	converts = JSON
+
+	def encode(self, value: Any) -> Scalar:
+		try:
+			return json.dumps(value)
+		except TypeError as error:
+			raise ValueError(str(error)) from error
+
+	def decode(self, value: Scalar) -> Any:
+		return json.loads(self.text(value))
+
+
+CODECS: list[Codec[Any]] = [Str(), Bool(), Int(), UUID(), Date(), URL(), JSONText()]

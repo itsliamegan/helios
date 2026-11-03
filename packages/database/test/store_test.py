@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
-from typing import Any, cast
+from typing import Any
 from uuid import UUID, uuid4
 
 from luna.test.assertion import (
@@ -15,15 +15,15 @@ from luna.test.assertion import (
 
 from helios.database import (
 	Codec,
-	Config,
 	DatabaseError,
+	JSON,
 	Model,
 	ModelError,
 	NotFoundError,
+	Registry,
 	Scalar,
 	Store,
 )
-from helios.database.provider import Provider
 from helios.database.sqlite import Connection
 from helios.database.transaction import Transaction
 from helios.url import URL
@@ -33,14 +33,17 @@ class Token:
 	def __init__(self, value: str):
 		self.value = value
 
-	class Codec(Codec):
-		def encode(self, value: Token) -> Scalar:
-			return value.value
 
-		def decode(self, value: Scalar) -> Token:
-			if not isinstance(value, str):
-				raise TypeError("expected token text")
-			return Token(value)
+class TokenCodec(Codec[Token]):
+	converts = Token
+
+	def encode(self, value: Token) -> Scalar:
+		return value.value
+
+	def decode(self, value: Scalar) -> Token:
+		if not isinstance(value, str):
+			raise TypeError("expected token text")
+		return Token(value)
 
 
 class Record(Model):
@@ -98,7 +101,10 @@ def test_crud_and_scalar_round_trip():
 		create_database(path)
 		connection = Connection.open(path)
 		connection.begin()
-		store = Store(connection, [Record])
+		registry = Registry()
+		registry.model(Record)
+		registry.codec(TokenCodec())
+		store = Store(connection, registry)
 		try:
 			created = store.create(Record, **record_values())
 			found = store.find_one(Record, created.id)
@@ -127,7 +133,10 @@ def test_crud_and_scalar_round_trip():
 		second_connection = Connection.open(path)
 		second_connection.begin()
 		try:
-			reloaded = Store(second_connection, [Record]).find_one(Record, created.id)
+			registry = Registry()
+			registry.model(Record)
+			registry.codec(TokenCodec())
+			reloaded = Store(second_connection, registry).find_one(Record, created.id)
 			assert_eq(reloaded.name, "Revised")
 			assert_eq(reloaded.active, True)
 			assert_eq(reloaded.owner_id, created.owner_id)
@@ -145,7 +154,10 @@ def test_find_by_matches_the_equivalent_query():
 		create_database(path)
 		connection = Connection.open(path)
 		connection.begin()
-		store = Store(connection, [Record])
+		registry = Registry()
+		registry.model(Record)
+		registry.codec(TokenCodec())
+		store = Store(connection, registry)
 		try:
 			created = [
 				store.create(Record, **record_values(name))
@@ -169,7 +181,10 @@ def test_find_by_supports_only_column_equality():
 		create_database(path)
 		connection = Connection.open(path)
 		connection.begin()
-		store = Store(connection, [Record])
+		registry = Registry()
+		registry.model(Record)
+		registry.codec(TokenCodec())
+		store = Store(connection, registry)
 		try:
 			store.create(Record, **record_values("Alpha"))
 
@@ -185,7 +200,10 @@ def test_failed_create_leaves_no_row():
 		create_database(path)
 		connection = Connection.open(path)
 		connection.begin()
-		store = Store(connection, [Record])
+		registry = Registry()
+		registry.model(Record)
+		registry.codec(TokenCodec())
+		store = Store(connection, registry)
 		try:
 			with assert_raises(DatabaseError):
 				store.create(Record, **record_values(name=""))
@@ -228,7 +246,10 @@ def test_failed_update_leaves_model_unchanged():
 		)
 		connection = Connection.open(path)
 		connection.begin()
-		store = Store(connection, [Record])
+		registry = Registry()
+		registry.model(Record)
+		registry.codec(TokenCodec())
+		store = Store(connection, registry)
 		try:
 			model = store.create(Record, **record_values())
 			original = model.name
@@ -272,7 +293,10 @@ def test_update_rejects_bad_arguments_before_writing():
 		connection = Connection.open(path)
 		connection.begin()
 		try:
-			store = Store(connection, [Record])
+			registry = Registry()
+			registry.model(Record)
+			registry.codec(TokenCodec())
+			store = Store(connection, registry)
 			model = store.create(Record, **record_values())
 			with assert_raises(ModelError):
 				store.update(model)
@@ -320,7 +344,10 @@ def test_update_writes_only_given_columns():
 		connection = Connection.open(path)
 		connection.begin()
 		try:
-			store = Store(connection, [Record])
+			registry = Registry()
+			registry.model(Record)
+			registry.codec(TokenCodec())
+			store = Store(connection, registry)
 			model = store.create(Record, **record_values())
 			store.update(model, name=model.name)
 			connection.commit()
@@ -344,7 +371,10 @@ def test_deletes_model_and_reports_missing_lookup():
 		connection = Connection.open(path)
 		connection.begin()
 		try:
-			store = Store(connection, [Record])
+			registry = Registry()
+			registry.model(Record)
+			registry.codec(TokenCodec())
+			store = Store(connection, registry)
 			model = store.create(Record, **record_values())
 			store.delete(model)
 
@@ -386,14 +416,17 @@ def test_malformed_stored_scalar_is_database_error():
 
 		connection = Connection.open(path)
 		connection.begin()
+		registry = Registry()
+		registry.model(Record)
+		registry.codec(TokenCodec())
 		try:
 			with assert_raises(DatabaseError):
-				Store(connection, [Record]).find_all(Record)
+				Store(connection, registry).find_all(Record)
 		finally:
 			connection.close()
 
 
-def test_round_trips_models_with_codecs_declared_later():
+def test_round_trips_models_with_value_types_declared_later():
 	class Badge(Model):
 		table = "badges"
 		label: Label
@@ -402,12 +435,14 @@ def test_round_trips_models_with_codecs_declared_later():
 		def __init__(self, text: str):
 			self.text = text
 
-		class Codec(Codec):
-			def encode(self, value: Label) -> Scalar:
-				return value.text
+	class LabelCodec(Codec[Label]):
+		converts = Label
 
-			def decode(self, value: Scalar) -> Label:
-				return Label(str(value))
+		def encode(self, value: Label) -> Scalar:
+			return value.text
+
+		def decode(self, value: Scalar) -> Label:
+			return Label(str(value))
 
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
@@ -422,7 +457,10 @@ def test_round_trips_models_with_codecs_declared_later():
 		connection = Connection.open(path)
 		connection.begin()
 		try:
-			created = Store(connection, [Badge]).create(Badge, label=Label("new"))
+			registry = Registry()
+			registry.model(Badge)
+			registry.codec(LabelCodec())
+			created = Store(connection, registry).create(Badge, label=Label("new"))
 			connection.commit()
 		finally:
 			connection.close()
@@ -430,7 +468,10 @@ def test_round_trips_models_with_codecs_declared_later():
 		second_connection = Connection.open(path)
 		second_connection.begin()
 		try:
-			found = Store(second_connection, [Badge]).find_one(Badge, created.id)
+			registry = Registry()
+			registry.model(Badge)
+			registry.codec(LabelCodec())
+			found = Store(second_connection, registry).find_one(Badge, created.id)
 		finally:
 			second_connection.close()
 
@@ -456,7 +497,9 @@ def test_quotes_declared_table_and_column_identifiers():
 		connection = Connection.open(path)
 		connection.begin()
 		try:
-			store = Store(connection, [OddRecord])
+			registry = Registry()
+			registry.model(OddRecord)
+			store = Store(connection, registry)
 			model = store.create(OddRecord, select="value")
 
 			assert_eq(store.find_one(OddRecord, model.id).id, model.id)
@@ -468,24 +511,13 @@ def test_quotes_declared_table_and_column_identifiers():
 			connection.close()
 
 
-def test_validates_registry_and_rejects_unregistered_models():
-	class Abstract(Model):
-		pass
-
+def test_rejects_unregistered_models():
 	class Other(Model):
 		table = "others"
 
 	with TemporaryDirectory() as directory:
-		path = Path(directory, "app.sqlite")
-		create_database(path)
-		connection = Connection.open(path)
+		connection, store = open_record_store(directory)
 		try:
-			with assert_raises(ModelError):
-				Store(connection, [Abstract])
-			with assert_raises(ModelError):
-				Store(connection, cast(Any, [object]))
-
-			store = Store(connection, [Record])
 			with assert_raises(ModelError):
 				store.find_all(Other)
 			with assert_raises(ModelError):
@@ -494,29 +526,15 @@ def test_validates_registry_and_rejects_unregistered_models():
 			connection.close()
 
 
-def test_rejects_registered_models_that_share_a_name():
-	first = model_named("Twin", "first")
-	second = model_named("Twin", "second")
-
-	with assert_raises(ModelError) as raised:
-		Provider(Config(Path("app.sqlite")), [first, second])
-
-	assert_eq(
-		str(raised.exception),
-		"registered models share the name Twin: first.Twin, second.Twin",
-	)
-
-
-def model_named(name: str, module: str) -> type[Model]:
-	return type(name, (Model,), {"__module__": module, "table": f"{name.lower()}s"})
-
-
 def open_record_store(directory: str):
 	path = Path(directory, "app.sqlite")
 	create_database(path)
 	connection = Connection.open(path)
 	connection.begin()
-	return connection, Store(connection, [Record])
+	registry = Registry()
+	registry.model(Record)
+	registry.codec(TokenCodec())
+	return connection, Store(connection, registry)
 
 
 def test_reads_return_distinct_models():
@@ -633,7 +651,9 @@ def open_post_store(directory: str):
 	)
 	connection = Connection.open(path)
 	transaction = Transaction(connection)
-	return connection, transaction, Store(transaction, [Post])
+	registry = Registry()
+	registry.model(Post)
+	return connection, transaction, Store(transaction, registry)
 
 
 def test_store_over_ended_transaction_refuses_writes():
@@ -658,5 +678,136 @@ def test_store_over_ended_transaction_refuses_reads():
 			with assert_raises(RuntimeError) as raised:
 				store.find_all(Post)
 			assert_is(type(raised.exception), RuntimeError)
+		finally:
+			connection.close()
+
+
+JSON_SCHEMA = """
+CREATE TABLE posts (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	metadata TEXT NOT NULL,
+	tag_ids TEXT
+);
+"""
+
+
+def test_round_trips_a_json_object():
+	class Post(Model):
+		table = "posts"
+		metadata: JSON[dict[str, Any]]
+
+	registry = Registry()
+	registry.model(Post)
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path, JSON_SCHEMA)
+		connection = Connection.open(path)
+		connection.begin()
+		try:
+			store = Store(connection, registry)
+			created = store.create(Post, metadata={"summary": "Intro", "pinned": True})
+
+			found = store.find_one(Post, created.id)
+		finally:
+			connection.close()
+
+	assert_eq(found.metadata, {"summary": "Intro", "pinned": True})
+
+
+def test_stores_null_in_a_nullable_json_column():
+	class Post(Model):
+		table = "posts"
+		metadata: JSON[dict[str, Any]]
+		tag_ids: JSON[list[int]] | None = None
+
+	registry = Registry()
+	registry.model(Post)
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path, JSON_SCHEMA)
+		connection = Connection.open(path)
+		connection.begin()
+		try:
+			store = Store(connection, registry)
+			created = store.create(Post, metadata={}, tag_ids=None)
+
+			found = store.find_one(Post, created.id)
+		finally:
+			connection.close()
+
+	assert_eq(found.tag_ids, None)
+
+
+def test_refuses_to_store_a_value_that_is_not_json():
+	class Post(Model):
+		table = "posts"
+		metadata: JSON[dict[str, Any]]
+
+	registry = Registry()
+	registry.model(Post)
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path, JSON_SCHEMA)
+		connection = Connection.open(path)
+		connection.begin()
+		try:
+			store = Store(connection, registry)
+
+			with assert_raises(ModelError):
+				store.create(Post, metadata={"tags": {"intro"}})
+		finally:
+			connection.close()
+
+
+def test_stored_json_of_the_wrong_type_is_database_error():
+	class Post(Model):
+		table = "posts"
+		metadata: JSON[dict[str, Any]]
+
+	registry = Registry()
+	registry.model(Post)
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(
+			path,
+			JSON_SCHEMA
+			+ f"""
+			INSERT INTO posts VALUES (
+				'{uuid4()}',
+				'2025-01-02T03:04:05.000006Z',
+				'[1]',
+				NULL
+			);
+			""",
+		)
+		connection = Connection.open(path)
+		connection.begin()
+		try:
+			store = Store(connection, registry)
+
+			with assert_raises(DatabaseError):
+				store.find_all(Post)
+		finally:
+			connection.close()
+
+
+def test_refuses_to_store_an_unsupported_column_type():
+	class Post(Model):
+		table = "posts"
+		metadata: list[str]
+
+	registry = Registry()
+	registry.model(Post)
+	with TemporaryDirectory() as directory:
+		path = Path(directory, "app.sqlite")
+		create_database(path, JSON_SCHEMA)
+		connection = Connection.open(path)
+		connection.begin()
+		try:
+			store = Store(connection, registry)
+
+			with assert_raises(ModelError):
+				store.create(Post, metadata=["intro"])
 		finally:
 			connection.close()

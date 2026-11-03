@@ -61,6 +61,8 @@ class ConditionParser:
 			)
 		try:
 			return term.key.condition(column, term.value)
+		except ModelError:
+			raise
 		except (TypeError, ValueError) as error:
 			raise ModelError(
 				f"{self.subject} has an invalid value for {term.text!r}: {error}"

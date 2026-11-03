@@ -21,12 +21,15 @@ class Password:
 	def __repr__(self) -> str:
 		return "Password(<redacted>)"
 
-	class Codec(Codec):
-		def encode(self, value: Password) -> Scalar:
-			return value.digest.encode()
 
-		def decode(self, value: Scalar) -> Password:
-			return Password(Digest.decode(value))
+class Codec(Codec):
+	converts = Password
+
+	def encode(self, value: Password) -> Scalar:
+		return value.digest.encode()
+
+	def decode(self, value: Scalar) -> Password:
+		return Password(Digest.decode(value))
 
 
 class Digest:

@@ -1,10 +1,10 @@
 from collections.abc import Mapping
+from copy import copy
 from datetime import datetime
-from typing import Any, ClassVar, Self, dataclass_transform
+from typing import Any, ClassVar, Self, TYPE_CHECKING, dataclass_transform
 from uuid import UUID, uuid4
 
 from luna.declarative import (
-	Namespace,
 	check_init_keywords,
 	check_reserved_names,
 	check_single_base,
@@ -22,6 +22,9 @@ from .relationship import (
 	has_one,
 )
 from .relationships import Relationships
+
+if TYPE_CHECKING:
+	from .registry import Namespace
 
 
 @dataclass_transform(
@@ -109,14 +112,16 @@ class Model:
 		return values
 
 	@classmethod
-	def fall_back_to(cls, namespace: Namespace):
-		"""Set pending annotations to resolve by name in `namespace`.
+	def bind_namespace(cls, namespace: Namespace):
+		"""Look up the model's codecs and annotation names in `namespace`.
 
 		An annotation can name a type that its module imports only under
-		`TYPE_CHECKING`. Setting the fallback namespace here allows the
-		annotation to resolve to that type, if it is registered on the
-		namespace.
+		`TYPE_CHECKING`. Such an annotation resolves to the model registered
+		under that name in the namespace.
 		"""
+
+		for column in cls.columns.declared.values():
+			column.bind_namespace(namespace)
 
 		attributes = [
 			*cls.columns.declared.values(),
@@ -131,7 +136,12 @@ class Model:
 
 
 def declare_attributes(model_type: type[Model]):
-	reserved = Model.columns.declared
+	# Each model has its own `id` and `created_at`, so binding one model to a
+	# namespace leaves the others' columns alone.
+	reserved = {}
+	for name, column in Model.columns.declared.items():
+		reserved[name] = copy(column)
+
 	columns = {}
 	relationships = {}
 	for declaration in declarations(model_type, ModelError):

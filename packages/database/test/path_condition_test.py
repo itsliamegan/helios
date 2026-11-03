@@ -10,6 +10,7 @@ from luna.test.assertion import assert_eq, assert_raises
 from helios.database import (
 	Model,
 	ModelError,
+	Registry,
 	Store,
 	belongs_to,
 	has_many,
@@ -131,7 +132,10 @@ def open_store() -> Generator[Store]:
 		raw.close()
 		with Connection.open(path) as connection:
 			connection.begin()
-			yield Store(connection, MODELS)
+			registry = Registry()
+			for model_type in MODELS:
+				registry.model(model_type)
+			yield Store(connection, registry)
 
 
 class Fixture:

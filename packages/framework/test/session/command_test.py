@@ -9,7 +9,7 @@ from luna.test.assertion import assert_eq, assert_raises
 import helios.app
 from helios.app import Application
 from helios.console import Program
-from helios.database import Config
+from helios.database import Config, Registry
 from helios.database.migration import Migrations, Migrator
 from helios.database.provider import Provider
 from helios.routing import Router
@@ -26,7 +26,7 @@ def test_writes_the_migration_at_the_next_number():
 		app = Application(
 			helios.app.Config(),
 			Router([]),
-			[Provider(Config(Path(directory, "app.sqlite"), migrations), [])],
+			[Provider(Config(Path(directory, "app.sqlite"), migrations), Registry())],
 		)
 
 		with redirect_stderr(StringIO()):
@@ -47,7 +47,7 @@ def test_written_migration_applies():
 		app = Application(
 			helios.app.Config(),
 			Router([]),
-			[Provider(Config(path, migrations), [])],
+			[Provider(Config(path, migrations), Registry())],
 		)
 		with redirect_stderr(StringIO()):
 			Program.main(["sessions:migration"], app)

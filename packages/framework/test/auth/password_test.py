@@ -12,8 +12,8 @@ from luna.test.assertion import (
 	assert_that,
 )
 
-from helios.auth.password import Digest, Password
-from helios.database import Model, Store
+from helios.auth.password import Codec, Digest, Password
+from helios.database import Model, Registry, Store
 from helios.database.sqlite import Connection
 
 Digest.method = "pbkdf2:sha256:1"
@@ -28,7 +28,7 @@ def test_creates_and_matches_password():
 
 def test_redacts_password_representation():
 	password = Password.from_plaintext("secret")
-	encoded = Password.Codec().encode(password)
+	encoded = Codec().encode(password)
 	assert_is_instance(encoded, str)
 
 	assert_not_in(encoded, repr(password))
@@ -58,7 +58,10 @@ def test_round_trips_password_attrs():
 		raw.close()
 		connection = Connection.open(path)
 		connection.begin()
-		store = Store(connection, [Account])
+		registry = Registry()
+		registry.model(Account)
+		registry.codec(Codec())
+		store = Store(connection, registry)
 		created = store.create(
 			Account,
 			password=Password.from_plaintext("secret"),
@@ -69,7 +72,10 @@ def test_round_trips_password_attrs():
 		connection = Connection.open(path)
 		connection.begin()
 		try:
-			found = Store(connection, [Account]).find_one(Account, created.id)
+			registry = Registry()
+			registry.model(Account)
+			registry.codec(Codec())
+			found = Store(connection, registry).find_one(Account, created.id)
 			password: Password = found.password
 			backup_password: Password | None = found.backup_password
 
@@ -81,7 +87,7 @@ def test_round_trips_password_attrs():
 
 def test_rejects_malformed_encoded_password():
 	with assert_raises(TypeError):
-		Password.Codec().decode(42)
+		Codec().decode(42)
 
 
 def test_generates_and_checks_digest():

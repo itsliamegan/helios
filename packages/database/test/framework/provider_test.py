@@ -8,7 +8,7 @@ from luna.test.assertion import assert_eq, assert_is, assert_is_instance, assert
 
 import helios.app
 from helios.app import Application
-from helios.database import Config, Database, Model, Store
+from helios.database import Config, Database, Model, Registry, Store
 from helios.database.provider import Provider
 from helios.database.sqlite import Connection
 from helios.http import Method, Request, Response, Status
@@ -34,10 +34,13 @@ def request() -> Request:
 
 
 def application(path: Path, action, model_types=None) -> Application:
+	registry = Registry()
+	for model_type in model_types or [Post]:
+		registry.model(model_type)
 	app = Application(
 		helios.app.Config(),
 		Router([Route.get("/", action)]),
-		[Provider(Config(path), model_types or [Post])],
+		[Provider(Config(path), registry)],
 	)
 	app.boot()
 	return app
@@ -247,10 +250,12 @@ def test_commits_after_middleware_returns():
 			context.get(Store).create(Post, title="Intro")
 			return Response.empty(Status.OK)
 
+		registry = Registry()
+		registry.model(Post)
 		app = Application(
 			helios.app.Config(),
 			Router([Route.get("/", create)]),
-			[Provider(Config(path), [Post])],
+			[Provider(Config(path), registry)],
 			[observe],
 		)
 		app.boot()
@@ -303,7 +308,9 @@ def test_provider_registers_config_before_boot():
 	with TemporaryDirectory() as dir:
 		config = Config(Path(dir, "database.sqlite3"))
 
-		app = Application(helios.app.Config(), Router([]), [Provider(config, [Post])])
+		registry = Registry()
+		registry.model(Post)
+		app = Application(helios.app.Config(), Router([]), [Provider(config, registry)])
 
 		assert_is(app.container.get(Config), config)
 
@@ -312,6 +319,18 @@ def test_provider_binds_database():
 	with TemporaryDirectory() as directory:
 		config = Config(Path(directory, "database.sqlite3"))
 
-		app = Application(helios.app.Config(), Router([]), [Provider(config, [Post])])
+		registry = Registry()
+		registry.model(Post)
+		app = Application(helios.app.Config(), Router([]), [Provider(config, registry)])
 
 		assert_is_instance(app.container.get(Database), Database)
+
+
+def test_provider_binds_registry():
+	with TemporaryDirectory() as directory:
+		config = Config(Path(directory, "database.sqlite3"))
+		registry = Registry()
+
+		app = Application(helios.app.Config(), Router([]), [Provider(config, registry)])
+
+		assert_is(app.container.get(Registry), registry)

@@ -44,21 +44,25 @@ def test_signs_a_user_in_for_the_next_request():
 			)
 		finally:
 			connection.close()
-		with Database(path, Registry([User])).store() as store:
+		registry = Registry()
+		registry.model(User)
+		with Database(path, registry).store() as store:
 			user = store.create(User, name="Alice")
 
 		def index(request, context):
 			authenticator = context.get(Authenticator[User])
 			return Response.text(authenticator.user.name)
 
+		registry = Registry()
+		registry.model(User)
+		registry.model(database.Record)
 		app = Application(
 			helios.app.Config(),
 			Router([Route.get("/", index)]),
 			[
 				helios.session.Provider(helios.session.Config(database.Config())),
 				helios.database.provider.Provider(
-					helios.database.Config(path),
-					[User, database.Record],
+					helios.database.Config(path), registry
 				),
 				helios.auth.Provider(User),
 			],

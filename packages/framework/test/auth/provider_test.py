@@ -15,7 +15,7 @@ from luna.test.assertion import (
 from helios.app import Application, Config, Container, Provider
 import helios.auth
 from helios.auth import Authenticator
-from helios.database import Model, Store
+from helios.database import Model, Registry, Store
 from helios.database.sqlite import Connection
 from helios.http import Method, Request, Response
 from helios.routing import Route, Router
@@ -68,7 +68,9 @@ def create_store(path: Path):
 	raw.close()
 	connection = Connection.open(path)
 	connection.begin()
-	return connection, Store(connection, [User])
+	registry = Registry()
+	registry.model(User)
+	return connection, Store(connection, registry)
 
 
 def resolve(store: Store, session: Session) -> Authenticator[User]:

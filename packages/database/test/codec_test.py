@@ -3,7 +3,6 @@ from uuid import uuid4
 
 from luna.test.assertion import (
 	assert_eq,
-	assert_is_instance,
 	assert_raises,
 )
 
@@ -62,6 +61,8 @@ def test_normalizes_datetimes_to_canonical_utc_text():
 
 def test_supports_custom_codec():
 	class Uppercase(Codec[str]):
+		converts = str
+
 		def encode(self, value: str):
 			return value.upper()
 
@@ -75,27 +76,6 @@ def test_supports_custom_codec():
 
 	assert_eq(encoded, "EXAMPLE")
 	assert_eq(uppercase.decode(encoded), "example")
-
-
-def test_finds_codecs_for_types():
-	class Slug:
-		def __init__(self, text: str):
-			self.text = text
-
-		class Codec(Codec):
-			def encode(self, value: Slug) -> Scalar:
-				return value.text
-
-			def decode(self, value: Scalar) -> Slug:
-				return Slug(str(value))
-
-	found = Codec.for_type(Slug)
-
-	assert_is_instance(Codec.for_type(str), Str)
-	found = assert_is_instance(found, Slug.Codec)
-	assert_eq(encode(found, Slug("today")), "today")
-	assert_eq(Codec.for_type(list[str]), None)
-	assert_eq(Codec.for_type(object), None)
 
 
 def test_rejects_non_scalar_custom_encoding():

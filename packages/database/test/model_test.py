@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
 from luna.test.assertion import (
@@ -9,7 +9,7 @@ from luna.test.assertion import (
 	assert_raises,
 )
 
-from helios.database import Codec, Model, ModelError, Scalar, generated
+from helios.database import JSON, Model, ModelError, generated
 
 
 def test_constructs_model_with_table_defaults_and_nulls():
@@ -95,6 +95,14 @@ def test_rejects_a_boolean_for_an_integer_column():
 		Post(views=True)
 
 
+def test_rejects_a_json_value_of_the_wrong_outer_type():
+	class Post(Model):
+		metadata: JSON[dict[str, Any]]
+
+	with assert_raises(ModelError):
+		Post(metadata=["intro"])  # ty: ignore[invalid-argument-type]
+
+
 def test_declares_columns_only_from_instance_annotations():
 	class Post(Model):
 		table = "posts"
@@ -104,18 +112,11 @@ def test_declares_columns_only_from_instance_annotations():
 	assert_eq(list(Post.columns), ["id", "created_at", "title"])
 
 
-def test_resolves_codecs_nested_in_the_model():
+def test_resolves_value_types_nested_in_the_model():
 	class Post(Model):
 		class Slug:
 			def __init__(self, text: str):
 				self.text = text
-
-			class Codec(Codec):
-				def encode(self, value: Post.Slug) -> Scalar:
-					return value.text
-
-				def decode(self, value: Scalar) -> Post.Slug:
-					return Post.Slug(str(value))
 
 		slug: Slug
 
@@ -126,18 +127,11 @@ def test_resolves_codecs_nested_in_the_model():
 		Post(slug="intro")  # ty: ignore[invalid-argument-type]
 
 
-def test_resolves_codecs_that_refer_to_the_model():
+def test_resolves_value_types_that_refer_to_the_model():
 	class Post(Model):
 		class Slug:
 			def __init__(self, text: str):
 				self.text = text
-
-			class Codec(Codec):
-				def encode(self, value: Post.Slug) -> Scalar:
-					return value.text
-
-				def decode(self, value: Scalar) -> Post.Slug:
-					return Post.Slug(str(value))
 
 		slug: Post.Slug | None = None
 
@@ -148,20 +142,13 @@ def test_resolves_codecs_that_refer_to_the_model():
 		Post(slug="intro")  # ty: ignore[invalid-argument-type]
 
 
-def test_resolves_codecs_declared_after_the_model():
+def test_resolves_value_types_declared_after_the_model():
 	class Post(Model):
 		slug: Slug
 
 	class Slug:
 		def __init__(self, text: str):
 			self.text = text
-
-		class Codec(Codec):
-			def encode(self, value: Slug) -> Scalar:
-				return value.text
-
-			def decode(self, value: Scalar) -> Slug:
-				return Slug(str(value))
 
 	post = Post(slug=Slug("intro"))
 
@@ -196,7 +183,7 @@ def test_rejects_columns_without_supported_annotations():
 	with assert_raises(ModelError):
 
 		class Unsupported(Model):
-			score: dict[str, str]
+			score: JSON[Any]
 
 	with assert_raises(ModelError):
 

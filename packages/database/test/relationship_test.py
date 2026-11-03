@@ -16,15 +16,14 @@ from luna.test.assertion import (
 )
 
 from helios.database import (
-	Config,
 	Model,
 	ModelError,
+	Registry,
 	Store,
 	belongs_to,
 	has_many,
 	has_one,
 )
-from helios.database.provider import Provider
 from helios.database.sqlite import Connection
 
 
@@ -141,7 +140,10 @@ def open_store() -> Generator[Store]:
 		raw.close()
 		with Connection.open(path) as connection:
 			connection.begin()
-			yield Store(connection, MODELS)
+			registry = Registry()
+			for model_type in MODELS:
+				registry.model(model_type)
+			yield Store(connection, registry)
 
 
 @contextmanager
@@ -297,7 +299,9 @@ def test_resolves_targets_imported_only_for_type_checking():
 
 		with assert_raises(ModelError) as unregistered:
 			memoir.relationships["memoirist"]
-		Provider(Config(Path("app.sqlite")), [memoirist, memoir])
+		registry = Registry()
+		registry.model(memoirist)
+		registry.model(memoir)
 		memoirs = memoirist.relationships["memoirs"].target
 		author = memoir.relationships["memoirist"].target
 
