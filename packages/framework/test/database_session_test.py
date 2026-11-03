@@ -3,23 +3,22 @@ from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 
-from luna.test.assertion import assert_eq, assert_not_none, assert_raises
+from luna.test.assertion import assert_eq, assert_is, assert_not_none
 
 import helios.app
 import helios.auth
 import helios.database
-from helios.database import Database, Model, ModelError, Store
+from helios.database import Database, Model, Store
 import helios.database.provider
 from helios.database.registry import Registry
 from helios.database.sqlite import Connection
 from helios.http import Headers, Method, Request, Response, Status
 from helios.routing import Route, Router
 import helios.session
-from helios.session import Session, Sessions
+from helios.session import Session, Sessions, Token
 from helios.session.command import MIGRATION_FILE
 from helios.session.driver import database
-import helios.session.driver.database.items
-import helios.session.driver.database.token
+from helios.session.driver.database.token import Codec
 from helios.url import URL
 
 
@@ -27,6 +26,12 @@ class User(Model):
 	table = "users"
 
 	name: str
+
+
+class Record(Model):
+	table = "records"
+
+	title: str
 
 
 SCHEMA = f"""
@@ -50,7 +55,7 @@ def request(token: str | None = None) -> Request:
 def application(path: Path, action) -> helios.app.Application:
 	registry = Registry()
 	registry.model(User)
-	registry.model(database.Record)
+	registry.model(Record)
 	app = helios.app.Application(
 		helios.app.Config(),
 		Router([Route.get("/", action)]),
@@ -74,20 +79,20 @@ def create_database(path: Path):
 
 def store_session(path: Path, session: Session):
 	registry = Registry()
-	registry.model(database.Record)
-	registry.codec(helios.session.driver.database.token.Codec())
-	registry.codec(helios.session.driver.database.items.Codec())
+	namespace = registry.namespace("session")
+	namespace.model(database.Record)
+	namespace.codec(Codec())
 	with Database(path, registry).store() as store:
 		database.Driver(store).write(session)
 
 
-def read_session(path: Path, token: str) -> Session | None:
+def read_session(path: Path, plaintext: str) -> Session | None:
 	registry = Registry()
-	registry.model(database.Record)
-	registry.codec(helios.session.driver.database.token.Codec())
-	registry.codec(helios.session.driver.database.items.Codec())
+	namespace = registry.namespace("session")
+	namespace.model(database.Record)
+	namespace.codec(Codec())
 	with Database(path, registry).store() as store:
-		return database.Driver(store).read(token)
+		return database.Driver(store).read(Token.from_plaintext(plaintext))
 
 
 def user_names(path: Path) -> list[str]:
@@ -127,7 +132,9 @@ def test_session_and_domain_writes_roll_back_together():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path)
-		store_session(path, Session("visitor-token", {"message": "Before"}))
+		store_session(
+			path, Session(Token.from_plaintext("visitor-token"), {"message": "Before"})
+		)
 
 		def fail(request, context):
 			store = context.get(Store)
@@ -152,7 +159,9 @@ def test_failed_request_rolls_back_a_rotation():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
 		create_database(path)
-		store_session(path, Session("visitor-token", {"message": "Hello"}))
+		store_session(
+			path, Session(Token.from_plaintext("visitor-token"), {"message": "Hello"})
+		)
 
 		def fail(request, context):
 			sessions = context.get(Sessions)
@@ -181,7 +190,7 @@ def test_request_without_a_cookie_takes_no_write_lock():
 
 		registry = Registry()
 		registry.model(User)
-		registry.model(database.Record)
+		registry.model(Record)
 		app = helios.app.Application(
 			helios.app.Config(),
 			Router([Route.get("/", index)]),
@@ -206,21 +215,13 @@ def test_request_without_a_cookie_takes_no_write_lock():
 		assert_eq(response.status, Status.OK)
 
 
-def test_boot_refuses_an_unregistered_session_model():
+def test_keeps_the_session_record_apart_from_an_application_record():
 	with TemporaryDirectory() as directory:
-		registry = Registry()
-		registry.model(User)
-		app = helios.app.Application(
-			helios.app.Config(),
-			Router([]),
-			[
-				helios.session.Provider(helios.session.Config(database.Config())),
-				helios.database.provider.Provider(
-					helios.database.Config(Path(directory, "app.sqlite")),
-					registry,
-				),
-			],
-		)
+		app = application(Path(directory, "app.sqlite"), lambda request, context: None)
+		try:
+			registry = app.container.get(Registry)
 
-		with assert_raises(ModelError):
-			app.boot()
+			assert_is(registry.get(Record), Record)
+			assert_is(registry.get(database.Record), database.Record)
+		finally:
+			app.close()

@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from .driver import Driver
 from .session import Session
+from .token import Token
 
 
 class Sessions:
@@ -16,7 +17,7 @@ class Sessions:
 		self.maximum_age = maximum_age
 		self.closed = False
 
-	def find(self, token: str) -> Session | None:
+	def find(self, token: Token) -> Session | None:
 		session = self.driver.read(token)
 		if session is None or session.is_expired(self.maximum_age):
 			return None
@@ -51,7 +52,7 @@ class Sessions:
 
 		if session.stored:
 			self.driver.destroy(session.token)
-		session.token = Session.generate_token()
+		session.token = Token.generate()
 		session.stored = False
 
 	def purge(self):

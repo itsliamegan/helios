@@ -1,22 +1,11 @@
-from dataclasses import dataclass
-import hashlib
-from typing import Self
-
 from helios.database import Codec, Scalar
 
-
-@dataclass
-class Token:
-	"""A session token stored only as its SHA-256 digest."""
-
-	digest: str
-
-	@classmethod
-	def from_plaintext(cls, plaintext: str) -> Self:
-		return cls(hashlib.sha256(plaintext.encode()).hexdigest())
+from ...token import Token
 
 
 class Codec(Codec):
+	"""Stores a session token as its digest."""
+
 	converts = Token
 
 	def encode(self, value: Token) -> Scalar:

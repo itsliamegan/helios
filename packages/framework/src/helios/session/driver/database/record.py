@@ -1,14 +1,14 @@
 from datetime import datetime
+from typing import Any
 
-from helios.database import Model
+from helios.database import JSON, Model
 
-from .items import Items
-from .token import Token
+from ...token import Token
 
 
 class Record(Model):
 	table = "sessions"
 
 	token: Token
-	items: Items
+	items: JSON[dict[str, Any]]
 	last_active_at: datetime

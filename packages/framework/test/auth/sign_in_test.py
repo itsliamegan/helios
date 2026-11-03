@@ -55,7 +55,6 @@ def test_signs_a_user_in_for_the_next_request():
 
 		registry = Registry()
 		registry.model(User)
-		registry.model(database.Record)
 		app = Application(
 			helios.app.Config(),
 			Router([Route.get("/", index)]),

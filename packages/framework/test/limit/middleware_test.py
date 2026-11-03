@@ -10,7 +10,7 @@ from helios.http import Headers, Method, Request, Response, Status
 import helios.limit
 from helios.limit.config import Config
 from helios.routing import Route, Router
-from helios.session import Session, Sessions
+from helios.session import Session, Sessions, Token
 from helios.session.driver import memory
 from helios.url import URL
 
@@ -29,7 +29,7 @@ class Authentication(Provider):
 		container.scoped(Authenticator, self.authenticator)
 
 	def authenticator(self, context):
-		session = Session("visitor-token")
+		session = Session(Token.from_plaintext("visitor-token"))
 		sessions = Sessions(memory.Driver(), timedelta(days=30))
 		if self.signed_in:
 			return Authenticator(session, sessions, User(name="Alice"))

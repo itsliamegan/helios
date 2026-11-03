@@ -1,8 +1,9 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-import secrets
 from typing import Any
+
+from .token import Token
 
 
 @dataclass(init=False)
@@ -14,14 +15,14 @@ class Session:
 	`RuntimeError`, but its items can still be read.
 	"""
 
-	token: str
+	token: Token
 	items: dict[str, Any]
 	last_active_at: datetime
 	stored: bool
 
 	def __init__(
 		self,
-		token: str,
+		token: Token,
 		items: Mapping[str, Any] | None = None,
 		last_active_at: datetime | None = None,
 		stored: bool = False,
@@ -31,10 +32,6 @@ class Session:
 		self.last_active_at = last_active_at or datetime.now(UTC)
 		self.stored = stored
 		self.closed = False
-
-	@staticmethod
-	def generate_token() -> str:
-		return secrets.token_urlsafe(32)
 
 	def __getitem__(self, key: str) -> Any:
 		return self.items[key]
