@@ -23,8 +23,8 @@ class Column:
 	"""One column of a model, stored through the codec its annotation selects.
 
 	`X | None` makes the column nullable. The annotation resolves on first use.
-	The codec corresponding to this annotation resolves on the first encode or
-	decode, through the namespace the column's model is registered in.
+	The codec corresponding to this annotation comes from the namespace the
+	column's model is registered in.
 	"""
 
 	name: str
@@ -36,16 +36,10 @@ class Column:
 	def __init__(self, init: bool = True):
 		self.init = init
 		self.resolved = False
-		self.namespace: Namespace | None = None
-		self._codec: Codec[object] | None = None
 
 	def bind(self, declaration: Declaration):
 		self.name = declaration.name
 		self.declaration = declaration
-
-	def bind_namespace(self, namespace: Namespace):
-		self.namespace = namespace
-		self._codec = None
 
 	def resolve(self):
 		if self.resolved:
@@ -98,20 +92,13 @@ class Column:
 		self.resolve()
 		return self._value_type
 
-	@property
-	def codec(self) -> Codec[object]:
-		if self._codec is None:
-			if self.namespace is None:
-				raise ModelError(
-					f"{self.declaration.owner.__name__}.{self.name}: "
-					"the model is not registered"
-				)
+	def codec(self, namespace: Namespace) -> Codec[object]:
+		"""Return the codec for the column's annotation in `namespace`."""
 
-			codec = self.namespace.codec_for(self.annotation)
-			if codec is None:
-				raise self.declaration.reject(self.unsupported(self.annotation))
-			self._codec = codec
-		return self._codec
+		codec = namespace.codecs.find(self.annotation)
+		if codec is None:
+			raise self.declaration.reject(self.unsupported(self.annotation))
+		return codec
 
 	@property
 	def nullable(self) -> bool:
@@ -142,8 +129,12 @@ class Column:
 			# `bool` subclasses `int`, but a boolean is not an integer.
 			raise TypeError("expected int, got bool")
 
-	def encode(self, value: object, model_type: type) -> Scalar | None:
-		codec = self.codec
+	def encode(
+		self,
+		value: object,
+		codec: Codec[object],
+		model_type: type,
+	) -> Scalar | None:
 		try:
 			self.check(value)
 			if value is None:
@@ -153,8 +144,8 @@ class Column:
 		except (TypeError, ValueError) as error:
 			raise ModelError(f"{model_type.__name__}.{self.name}: {error}") from error
 
-	def decode(self, raw: Scalar | None) -> object:
-		value = None if raw is None else self.codec.decode(raw)
+	def decode(self, raw: Scalar | None, codec: Codec[object]) -> object:
+		value = None if raw is None else codec.decode(raw)
 		self.check(value)
 		return value
 

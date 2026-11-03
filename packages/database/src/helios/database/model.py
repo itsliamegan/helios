@@ -1,10 +1,10 @@
 from collections.abc import Mapping
-from copy import copy
 from datetime import datetime
-from typing import Any, ClassVar, Self, TYPE_CHECKING, dataclass_transform
+from typing import Any, ClassVar, Self, dataclass_transform
 from uuid import UUID, uuid4
 
 from luna.declarative import (
+	Declaration,
 	check_init_keywords,
 	check_reserved_names,
 	check_single_base,
@@ -22,9 +22,6 @@ from .relationship import (
 	has_one,
 )
 from .relationships import Relationships
-
-if TYPE_CHECKING:
-	from .registry import Namespace
 
 
 @dataclass_transform(
@@ -112,36 +109,30 @@ class Model:
 		return values
 
 	@classmethod
-	def bind_namespace(cls, namespace: Namespace):
-		"""Look up the model's codecs and annotation names in `namespace`.
+	def pending_declarations(cls) -> list[Declaration]:
+		"""Return the declarations whose annotations name types not yet declared.
 
 		An annotation can name a type that its module imports only under
-		`TYPE_CHECKING`. Such an annotation resolves to the model registered
-		under that name in the namespace.
+		`TYPE_CHECKING`, so it resolves through the models registered in the same
+		namespace.
 		"""
 
-		for column in cls.columns.declared.values():
-			column.bind_namespace(namespace)
-
+		pending = []
 		attributes = [
 			*cls.columns.declared.values(),
 			*cls.relationships.declared.values(),
 		]
 		for attribute in attributes:
 			if attribute.declaration.pending:
-				attribute.declaration.fallback = namespace
+				pending.append(attribute.declaration)
+		return pending
 
 	def __repr__(self) -> str:
 		return f"{type(self).__name__}({self.id!r})"
 
 
 def declare_attributes(model_type: type[Model]):
-	# Each model has its own `id` and `created_at`, so binding one model to a
-	# namespace leaves the others' columns alone.
-	reserved = {}
-	for name, column in Model.columns.declared.items():
-		reserved[name] = copy(column)
-
+	reserved = Model.columns.declared
 	columns = {}
 	relationships = {}
 	for declaration in declarations(model_type, ModelError):

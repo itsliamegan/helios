@@ -31,7 +31,7 @@ class Query[T: Model]:
 	def __init__(self, store: Store, model_type: type[T]):
 		self.store = store
 		self.model_type = model_type
-		self.parser = ConditionParser(store.registry, model_type)
+		self.parser = ConditionParser(store, model_type)
 		self.clauses: list[AnyOf] = []
 		self.orders: list[Order] = []
 		self.count: int | None = None
@@ -111,7 +111,7 @@ class Query[T: Model]:
 			where=tuple(self.clauses),
 			group_by=(name,),
 		)
-		return self.store.counts(column, statement)
+		return self.store.counts(self.model_type, column, statement)
 
 	def exists(self) -> bool:
 		"""Return whether any row matches."""

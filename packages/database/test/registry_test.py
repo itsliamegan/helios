@@ -1,7 +1,13 @@
 from typing import Any
 from uuid import UUID
 
-from luna.test.assertion import assert_eq, assert_is, assert_is_instance, assert_raises
+from luna.test.assertion import (
+	assert_eq,
+	assert_is,
+	assert_is_instance,
+	assert_not_none,
+	assert_raises,
+)
 
 from helios.database import JSON, Model, ModelError, Registry, belongs_to
 from helios.database.codec import Codec, JSONText, Scalar, Str
@@ -35,15 +41,17 @@ class UppercaseSlugCodec(Codec[Slug]):
 def test_root_starts_with_the_core_codecs():
 	registry = Registry()
 
-	assert_is_instance(registry.root.codec_for(str), Str)
-	assert_is_instance(registry.root.codec_for(JSON[dict[str, Any]]), JSONText)
+	assert_is_instance(registry.namespaces.root.codecs.find(str), Str)
+	assert_is_instance(
+		registry.namespaces.root.codecs.find(JSON[dict[str, Any]]), JSONText
+	)
 
 
 def test_finds_no_codec_for_an_unregistered_type():
 	registry = Registry()
 
-	assert_eq(registry.root.codec_for(list[str]), None)
-	assert_eq(registry.root.codec_for(object), None)
+	assert_eq(registry.namespaces.root.codecs.find(list[str]), None)
+	assert_eq(registry.namespaces.root.codecs.find(object), None)
 
 
 def test_finds_no_codec_for_a_subclass_of_a_converted_type():
@@ -52,7 +60,7 @@ def test_finds_no_codec_for_a_subclass_of_a_converted_type():
 
 	registry = Registry()
 
-	assert_eq(registry.root.codec_for(Title), None)
+	assert_eq(registry.namespaces.root.codecs.find(Title), None)
 
 
 def test_encodes_a_namespaced_model_with_a_codec_in_its_namespace():
@@ -64,8 +72,9 @@ def test_encodes_a_namespaced_model_with_a_codec_in_its_namespace():
 	blog = registry.namespace("blog")
 	blog.model(Post)
 	blog.codec(SlugCodec())
+	namespace = assert_not_none(registry.namespaces.find(Post))
 
-	assert_eq(Post.column("slug").encode(Slug("intro"), Post), "intro")
+	assert_eq(Post.column("slug").codec(namespace).encode(Slug("intro")), "intro")
 
 
 def test_encodes_a_namespaced_model_with_a_root_codec():
@@ -77,8 +86,9 @@ def test_encodes_a_namespaced_model_with_a_root_codec():
 	registry.codec(SlugCodec())
 	blog = registry.namespace("blog")
 	blog.model(Post)
+	namespace = assert_not_none(registry.namespaces.find(Post))
 
-	assert_eq(Post.column("slug").encode(Slug("intro"), Post), "intro")
+	assert_eq(Post.column("slug").codec(namespace).encode(Slug("intro")), "intro")
 
 
 def test_root_model_does_not_use_a_codec_in_a_namespace():
@@ -90,9 +100,10 @@ def test_root_model_does_not_use_a_codec_in_a_namespace():
 	registry.model(Post)
 	blog = registry.namespace("blog")
 	blog.codec(SlugCodec())
+	namespace = assert_not_none(registry.namespaces.find(Post))
 
 	with assert_raises(ModelError):
-		Post.column("slug").encode(Slug("intro"), Post)
+		Post.column("slug").codec(namespace)
 
 
 def test_namespace_codec_wins_over_a_root_codec_for_its_models():
@@ -105,11 +116,12 @@ def test_namespace_codec_wins_over_a_root_codec_for_its_models():
 	blog = registry.namespace("blog")
 	blog.model(Post)
 	blog.codec(UppercaseSlugCodec())
+	namespace = assert_not_none(registry.namespaces.find(Post))
 
-	assert_eq(Post.column("slug").encode(Slug("intro"), Post), "INTRO")
+	assert_eq(Post.column("slug").codec(namespace).encode(Slug("intro")), "INTRO")
 
 
-def test_rebinding_a_model_in_a_new_registry_replaces_its_codecs():
+def test_keeps_the_codecs_of_each_registry_that_holds_a_model():
 	class Post(Model):
 		table = "posts"
 		slug: Slug
@@ -118,21 +130,24 @@ def test_rebinding_a_model_in_a_new_registry_replaces_its_codecs():
 	blog = first.namespace("blog")
 	blog.model(Post)
 	blog.codec(UppercaseSlugCodec())
-	Post.column("slug").encode(Slug("intro"), Post)
 	second = Registry()
 	second.model(Post)
 	second.codec(SlugCodec())
+	first_namespace = assert_not_none(first.namespaces.find(Post))
+	second_namespace = assert_not_none(second.namespaces.find(Post))
 
-	assert_eq(Post.column("slug").encode(Slug("intro"), Post), "intro")
+	column = Post.column("slug")
+	assert_eq(column.codec(first_namespace).encode(Slug("intro")), "INTRO")
+	assert_eq(column.codec(second_namespace).encode(Slug("intro")), "intro")
 
 
-def test_unregistered_model_has_no_codecs():
+def test_finds_no_namespace_for_an_unregistered_model():
 	class Post(Model):
 		table = "posts"
-		title: str
 
-	with assert_raises(ModelError):
-		_ = Post.column("title").codec
+	registry = Registry()
+
+	assert_eq(registry.namespaces.find(Post), None)
 
 
 def test_registers_models_that_share_a_name_in_different_namespaces():
@@ -144,8 +159,8 @@ def test_registers_models_that_share_a_name_in_different_namespaces():
 	blog = registry.namespace("blog")
 	blog.model(blog_post)
 
-	assert_is(registry.get(application_post), application_post)
-	assert_is(registry.get(blog_post), blog_post)
+	assert_is(registry.namespaces.find(application_post), registry.namespaces.root)
+	assert_is(registry.namespaces.find(blog_post), blog)
 
 
 def test_resolves_a_forward_reference_within_its_namespace():
@@ -247,13 +262,3 @@ def test_rejects_a_class_that_is_not_a_model():
 
 	with assert_raises(ModelError):
 		registry.model(object)  # ty: ignore[invalid-argument-type]
-
-
-def test_rejects_an_unregistered_model():
-	class Post(Model):
-		table = "posts"
-
-	registry = Registry()
-
-	with assert_raises(ModelError):
-		registry.get(Post)

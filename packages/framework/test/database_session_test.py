@@ -221,7 +221,10 @@ def test_keeps_the_session_record_apart_from_an_application_record():
 		try:
 			registry = app.container.get(Registry)
 
-			assert_is(registry.get(Record), Record)
-			assert_is(registry.get(database.Record), database.Record)
+			assert_is(registry.namespaces.find(Record), registry.namespaces.root)
+			assert_is(
+				registry.namespaces.find(database.Record),
+				registry.namespaces.named["session"],
+			)
 		finally:
 			app.close()

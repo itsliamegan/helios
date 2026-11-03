@@ -2,7 +2,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Literal, Self
 
-from .codec import Scalar, encode
+from .codec import Codec, Scalar, encode
 from .column import Column
 
 
@@ -35,12 +35,18 @@ class Comparison:
 	value: Scalar
 
 	@classmethod
-	def parse(cls, column: Column, comparator: Comparator, value: object) -> Self:
+	def parse(
+		cls,
+		column: Column,
+		codec: Codec[object],
+		comparator: Comparator,
+		value: object,
+	) -> Self:
 		if value is None:
 			raise ValueError("cannot compare with None")
 
 		column.check(value)
-		return cls(column.name, comparator, encode(column.codec, value))
+		return cls(column.name, comparator, encode(codec, value))
 
 
 @dataclass
@@ -60,7 +66,7 @@ class Membership:
 	includes_null: bool
 
 	@classmethod
-	def parse(cls, column: Column, value: object) -> Self:
+	def parse(cls, column: Column, codec: Codec[object], value: object) -> Self:
 		if isinstance(value, (str, bytes)) or not isinstance(value, Iterable):
 			raise TypeError(
 				"expected an iterable other than str or bytes, "
@@ -72,7 +78,7 @@ class Membership:
 			column.check(member)
 		values = tuple(
 			dict.fromkeys(
-				encode(column.codec, member) for member in members if member is not None
+				encode(codec, member) for member in members if member is not None
 			)
 		)
 		return cls(column.name, values, None in members)
