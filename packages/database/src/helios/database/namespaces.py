@@ -9,7 +9,7 @@ from .namespace import Namespace
 class Namespaces:
 	"""The root namespace, the named namespaces, and each model's namespace.
 
-	A model is registered in exactly one namespace.
+	A model is registered in exactly one namespace per registry.
 	"""
 
 	root: Namespace

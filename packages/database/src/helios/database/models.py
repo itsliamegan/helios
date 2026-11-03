@@ -8,7 +8,7 @@ from .model import Model
 class Models:
 	"""Models by their class name.
 
-	A model not found in this collection defers to the parent namespace, if
+	A lookup that finds no model in this collection defers to the parent, if
 	there is one. A pending annotation on any of this collection's models
 	resolves through this collection.
 	"""

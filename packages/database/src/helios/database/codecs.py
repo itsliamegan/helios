@@ -9,7 +9,7 @@ from .error import ModelError, qualified
 class Codecs:
 	"""Codecs by the type that they convert.
 
-	A codec not found in this collection defers to the parent namespace, if
+	A lookup that finds no codec in this collection defers to the parent, if
 	there is one.
 	"""
 
