@@ -6,12 +6,13 @@ from .model import Model
 
 
 class Registry:
-	"""The models one database stores and the codecs that convert their columns.
+	"""The models and codecs registered for a single database.
 
-	The registry has a root namespace, which starts with the core codecs, and
-	named namespaces. A lookup from a named namespace checks that namespace,
-	then the root, so a component can keep models and codecs of its own without
-	changing the application's.
+	The registry is made up of the root namespace and a set of named
+	namespaces. The root namespace contains the core codecs and those that an
+	application declares. Each named namespace contains models and codecs of
+	its own. A lookup from a named namespace first checks its own registrations
+	before checking the root.
 	"""
 
 	def __init__(self):

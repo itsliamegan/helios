@@ -3,8 +3,8 @@ from uuid import UUID
 
 from luna.test.assertion import assert_eq, assert_is, assert_is_instance, assert_raises
 
-from helios.database import Codec, JSON, Model, ModelError, Registry, Scalar, belongs_to
-from helios.database.codec import JSONText, Str
+from helios.database import JSON, Model, ModelError, Registry, belongs_to
+from helios.database.codec import Codec, JSONText, Scalar, Str
 
 
 class Slug:

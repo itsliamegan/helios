@@ -2,7 +2,7 @@ from typing import Self
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from helios.database import Codec, Scalar
+from helios.database.codec import Codec, Scalar
 
 
 class Password:

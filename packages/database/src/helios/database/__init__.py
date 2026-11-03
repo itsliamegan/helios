@@ -1,4 +1,4 @@
-from .codec import Codec, JSON, Scalar
+from .codec import JSON
 from .column import generated
 from .config import Config
 from .database import Database
@@ -12,7 +12,6 @@ from .transaction import Transaction
 
 __all__ = [
 	"JSON",
-	"Codec",
 	"Config",
 	"Database",
 	"DatabaseBusyError",
@@ -22,7 +21,6 @@ __all__ = [
 	"NotFoundError",
 	"Query",
 	"Registry",
-	"Scalar",
 	"Store",
 	"Transaction",
 	"belongs_to",

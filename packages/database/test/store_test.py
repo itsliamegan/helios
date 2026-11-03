@@ -14,16 +14,15 @@ from luna.test.assertion import (
 )
 
 from helios.database import (
-	Codec,
 	DatabaseError,
 	JSON,
 	Model,
 	ModelError,
 	NotFoundError,
 	Registry,
-	Scalar,
 	Store,
 )
+from helios.database.codec import Codec, Scalar
 from helios.database.sqlite import Connection
 from helios.database.transaction import Transaction
 from helios.url import URL

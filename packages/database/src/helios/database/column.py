@@ -22,8 +22,8 @@ def generated(init: bool = False) -> Any:
 class Column:
 	"""One column of a model, stored through the codec its annotation selects.
 
-	`X | None` makes the column nullable. The annotation resolves on first use,
-	and is enough to check values. The codec resolves on the first encode or
+	`X | None` makes the column nullable. The annotation resolves on first use.
+	The codec corresponding to this annotation resolves on the first encode or
 	decode, through the namespace the column's model is registered in.
 	"""
 

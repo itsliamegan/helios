@@ -12,15 +12,15 @@ type JSON[T] = T
 
 
 class Codec[T](ABC):
-	"""Converts the values of the attributes its `converts` selects.
+	"""Converts one column's values between Python and SQLite.
 
-	A codec converts between Python and SQLite. `converts` selects every
-	attribute whose annotation, without `| None`, has it as its outer type: the
-	annotation itself, or its origin when it has one. The match is exact, so a
-	subclass of a converted type does not select the codec.
+	A codec converts the values of any attribute annotated with the type named
+	by `converts`. It matches this type exactly, so a subclass of the specified
+	type does not use the codec.
 
-	The column checks a value's outer type before encoding it. A codec raises
-	`ValueError` for a value of that type that it cannot store.
+	The model's column checks the type of an attribute before attempting to
+	encode it. After this check, a codec may raise a `ValueError` for a value
+	that it cannot store.
 	"""
 
 	converts: ClassVar[type[Any] | TypeAliasType]
@@ -131,10 +131,10 @@ class URL(Text[url.URL]):
 
 
 class JSONText(Text[Any]):
-	"""Stores a JSON value as JSON text.
+	"""Encodes a JSON value as JSON text.
 
-	Only JSON values round-trip: a tuple comes back as a list, and integer keys
-	come back as strings.
+	Follows Python's normal lossy rules of round-tripping values through JSON,
+	e.g. a tuple comes back as a list.
 	"""
 
 	converts = JSON

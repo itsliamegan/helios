@@ -1,4 +1,4 @@
-from helios.database import Codec, Scalar
+from helios.database.codec import Codec, Scalar
 
 from ...token import Token
 
