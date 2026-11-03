@@ -25,25 +25,46 @@ class Serve(Command):
 
 	name = "serve"
 	no_reload: bool = option(default=False, help="serve without watching for changes")
+	host: str | None = option(
+		default=None,
+		help="bind this host instead of the base URL's",
+	)
+	port: int | None = option(
+		default=None,
+		help="bind this port instead of the base URL's",
+	)
 
 	def __init__(self, application: Application, **values: Any):
 		super().__init__(**values)
 		self.application = application
 
 	def run(self):
-		base_url = self.application.container.get(helios.app.Config).base_url
-		if base_url is None:
-			self.fail("the application has no base URL")
-		if base_url.host is None:
-			self.fail(f"the base URL {base_url} has no host")
-		if base_url.port is None:
-			self.fail(f"the base URL {base_url} has no port")
+		host, port = self.address()
 
 		root = Path.cwd()
 		if self.no_reload:
-			self.serve(root, base_url.host, base_url.port)
+			self.serve(root, host, port)
 		else:
 			self.watch(root)
+
+	def address(self) -> tuple[str, int]:
+		"""Return the host and port to bind.
+
+		Each option overrides its part of the base URL.
+		"""
+
+		base_url = self.application.container.get(helios.app.Config).base_url
+		if base_url is None:
+			self.fail("the application has no base URL")
+
+		host = self.host or base_url.host
+		if host is None:
+			self.fail(f"the base URL {base_url} has no host")
+		port = self.port or base_url.port
+		if port is None:
+			self.fail(f"the base URL {base_url} has no port")
+
+		return host, port
 
 	def serve(self, root: Path, host: str, port: int):
 		if self.application.container.bound(helios.assets.config.Config):
