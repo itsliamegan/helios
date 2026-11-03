@@ -27,7 +27,9 @@ class Post(Model):
 def test_connection_commits_each_statement():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with database.connection() as connection:
 			connection.execute("CREATE TABLE tags (name TEXT NOT NULL)").close()
@@ -47,7 +49,9 @@ def test_read_only_connection_refuses_writes():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute(SCHEMA)
 		connection.close()
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with (
 			database.connection(read_only=True) as connection,
@@ -62,7 +66,9 @@ def test_transaction_commits_statements_when_block_ends():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute("CREATE TABLE tags (name TEXT NOT NULL)")
 		connection.close()
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with database.transaction() as transaction:
 			transaction.execute("INSERT INTO tags (name) VALUES ('python')").close()
@@ -76,7 +82,9 @@ def test_transaction_commits_statements_when_block_ends():
 def test_transaction_without_statements_leaves_write_lock_free():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 		other = Connection.open(path, busy_timeout=timedelta(milliseconds=10))
 
 		try:
@@ -93,7 +101,9 @@ def test_transaction_holds_write_lock_from_first_read():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute(SCHEMA)
 		connection.close()
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 		other = Connection.open(path, busy_timeout=timedelta(milliseconds=10))
 
 		try:
@@ -108,7 +118,9 @@ def test_transaction_holds_write_lock_from_first_read():
 def test_each_transaction_opens_its_own_connection():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with database.transaction() as first:
 			pass
@@ -124,7 +136,9 @@ def test_store_commits_when_block_ends():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute(SCHEMA)
 		connection.close()
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with database.store() as store:
 			store.create(Post, title="Intro")
@@ -141,7 +155,9 @@ def test_store_rolls_back_when_block_raises():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute(SCHEMA)
 		connection.close()
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with assert_raises(ValueError), database.store() as store:
 			store.create(Post, title="Intro")
@@ -159,7 +175,9 @@ def test_store_refuses_work_after_block_commits():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute(SCHEMA)
 		connection.close()
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with database.store() as store:
 			pass
@@ -175,7 +193,9 @@ def test_store_refuses_work_after_block_raises():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute(SCHEMA)
 		connection.close()
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with assert_raises(ValueError), database.store() as store:
 			raise ValueError("failed")
@@ -188,7 +208,9 @@ def test_store_refuses_work_after_block_raises():
 def test_connection_inside_transaction_raises():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with database.transaction():
 			with assert_raises(RuntimeError) as raised, database.connection():
@@ -199,7 +221,9 @@ def test_connection_inside_transaction_raises():
 def test_transaction_inside_transaction_raises():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with database.transaction():
 			with assert_raises(RuntimeError) as raised, database.transaction():
@@ -210,7 +234,9 @@ def test_transaction_inside_transaction_raises():
 def test_store_inside_transaction_raises():
 	with TemporaryDirectory() as directory:
 		path = Path(directory, "app.sqlite")
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with database.transaction():
 			with assert_raises(RuntimeError) as raised, database.store():
@@ -224,7 +250,9 @@ def test_transaction_opens_after_previous_transaction_ends():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute(SCHEMA)
 		connection.close()
-		database = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(path, registry)
 
 		with assert_raises(ValueError), database.store():
 			raise ValueError("failed")
@@ -243,8 +271,12 @@ def test_transaction_on_another_database_opens_inside_transaction():
 		connection = sqlite3.connect(path, autocommit=True)
 		connection.execute(SCHEMA)
 		connection.close()
-		database = Database(Path(directory, "app.sqlite"), Registry([Post]))
-		archive = Database(path, Registry([Post]))
+		registry = Registry()
+		registry.model(Post)
+		database = Database(Path(directory, "app.sqlite"), registry)
+		registry = Registry()
+		registry.model(Post)
+		archive = Database(path, registry)
 
 		with database.transaction(), archive.store() as store:
 			store.create(Post, title="Intro")

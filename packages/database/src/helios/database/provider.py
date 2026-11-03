@@ -1,4 +1,4 @@
-from collections.abc import Generator, Iterable
+from collections.abc import Generator
 
 from helios.app import Application, Container, Context, Provider
 from helios.http import Status
@@ -7,7 +7,6 @@ from .config import Config
 from .database import Database
 from .error import NotFoundError
 from .migration import Migrations, Migrator
-from .model import Model
 from .registry import Registry
 from .store import Store
 
@@ -20,16 +19,18 @@ class Provider(Provider):
 	when it fails.
 	"""
 
-	def __init__(self, config: Config, model_types: Iterable[type[Model]]):
+	def __init__(self, config: Config, registry: Registry):
 		self.config = config
+		self.registry = registry
 		self.database = Database(
 			config.path,
-			Registry(model_types),
+			registry,
 			busy_timeout=config.busy_timeout,
 		)
 
 	def register(self, container: Container):
 		container.instance(Config, self.config)
+		container.instance(Registry, self.registry)
 		container.instance(Database, self.database)
 		container.singleton(Migrator, self.migrator)
 		container.scoped(Store, self.store)

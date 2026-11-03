@@ -42,7 +42,8 @@ class Load:
 					f"{subject} has {path!r}, "
 					f"where {current.__name__}.{segment} is not a relationship"
 				)
-			current = self.store.registry.get(relationship.target)
+			current = relationship.target
+			self.store.namespace(current)
 			branch = level.setdefault(segment, Branch(relationship))
 			level = branch.branches
 

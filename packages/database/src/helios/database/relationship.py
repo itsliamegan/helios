@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Any, Literal, TYPE_CHECKING, TypeIs, cast, get_args, get_origin
+import uuid
 
 from luna.declarative import Declaration, DeclarationError, split_nullable
 
-from .codec import UUID
 from .error import ModelError
 
 if TYPE_CHECKING:
@@ -131,7 +131,7 @@ class BelongsTo(Relationship):
 		column = columns.get(self.id_name)
 		if column is None:
 			detail = "is not a column"
-		elif not isinstance(column.codec, UUID):
+		elif column.annotation is not uuid.UUID:
 			detail = "does not hold a UUID"
 		else:
 			return
@@ -159,7 +159,7 @@ class BelongsTo(Relationship):
 class Inverse(Relationship):
 	def check(self):
 		column = self.target.columns.get(self.id_name)
-		if column is None or not isinstance(column.codec, UUID):
+		if column is None or column.annotation is not uuid.UUID:
 			raise ModelError(
 				f"{self.label}: {self.target.__name__}.{self.id_name} "
 				"does not hold a UUID"

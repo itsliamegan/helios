@@ -4,7 +4,7 @@ from typing import Any, ClassVar, Self, dataclass_transform
 from uuid import UUID, uuid4
 
 from luna.declarative import (
-	Namespace,
+	Declaration,
 	check_init_keywords,
 	check_reserved_names,
 	check_single_base,
@@ -109,22 +109,23 @@ class Model:
 		return values
 
 	@classmethod
-	def fall_back_to(cls, namespace: Namespace):
-		"""Set pending annotations to resolve by name in `namespace`.
+	def pending_declarations(cls) -> list[Declaration]:
+		"""Return the declarations whose annotations name types not yet declared.
 
 		An annotation can name a type that its module imports only under
-		`TYPE_CHECKING`. Setting the fallback namespace here allows the
-		annotation to resolve to that type, if it is registered on the
+		`TYPE_CHECKING`, so it resolves through the models registered in the same
 		namespace.
 		"""
 
+		pending = []
 		attributes = [
 			*cls.columns.declared.values(),
 			*cls.relationships.declared.values(),
 		]
 		for attribute in attributes:
 			if attribute.declaration.pending:
-				attribute.declaration.fallback = namespace
+				pending.append(attribute.declaration)
+		return pending
 
 	def __repr__(self) -> str:
 		return f"{type(self).__name__}({self.id!r})"

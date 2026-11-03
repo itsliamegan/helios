@@ -10,6 +10,7 @@ from .error import DatabaseError, ModelError, NotFoundError
 from .grammar import Grammar
 from .load import Load
 from .model import Model
+from .namespace import Namespace
 from .parser import ConditionParser
 from .query import Query
 from .registry import Registry
@@ -26,15 +27,9 @@ class Store:
 	begins, commits, or rolls back a transaction itself.
 	"""
 
-	def __init__(
-		self,
-		connection: Connection | Transaction,
-		model_types: Iterable[type[Model]] | Registry,
-	):
+	def __init__(self, connection: Connection | Transaction, registry: Registry):
 		self.connection = connection
-		self.registry = (
-			model_types if isinstance(model_types, Registry) else Registry(model_types)
-		)
+		self.registry = registry
 		self.grammar = Grammar()
 
 	def create[**P, T: Model](
@@ -45,13 +40,14 @@ class Store:
 	) -> T:
 		"""Construct a model and insert it as a new row."""
 
-		registered = self.registry.get(cast(type[T], model_type))
+		registered = cast(type[T], model_type)
+		namespace = self.namespace(registered)
 		model = model_type(*args, **values)
 		model._values["created_at"] = datetime.now(UTC)
-		encoded = {
-			name: column.encode(model._values[name], registered)
-			for name, column in registered.columns.items()
-		}
+		encoded = {}
+		for name, column in registered.columns.items():
+			codec = column.codec(namespace)
+			encoded[name] = column.encode(model._values[name], codec, registered)
 		self.write(Insert(registered.table, encoded))
 		model._stored = True
 		return model
@@ -64,7 +60,8 @@ class Store:
 		relationship.
 		"""
 
-		model_type = self.registry.get(type(model))
+		model_type = type(model)
+		namespace = self.namespace(model_type)
 		if not values:
 			raise ModelError(f"{model_type.__name__}.update requires values")
 		encoded: dict[str, Scalar | None] = {}
@@ -72,7 +69,7 @@ class Store:
 			column = model_type.column(name)
 			if not column.init:
 				raise ModelError(f"{model_type.__name__}.{name} is generated")
-			encoded[name] = column.encode(value, model_type)
+			encoded[name] = column.encode(value, column.codec(namespace), model_type)
 		moved = [
 			relationship.name
 			for relationship in model_type.relationships.of_kind(BelongsTo)
@@ -89,7 +86,8 @@ class Store:
 	def delete(self, model: Model):
 		"""Delete the model's row, raising `NotFoundError` when no row matches."""
 
-		model_type = self.registry.get(type(model))
+		model_type = type(model)
+		self.namespace(model_type)
 		statement = Delete(model_type.table, self.identifying(model))
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
@@ -108,17 +106,22 @@ class Store:
 		model_types = {type(model) for model in models}
 		if len(model_types) > 1:
 			raise ModelError("store.load takes models of one model type")
-		model_type = self.registry.get(model_types.pop())
+		model_type = model_types.pop()
+		self.namespace(model_type)
 		if not all(model._stored for model in models):
 			raise ModelError("store.load can only be called with stored models")
 		Load(self, model_type, paths).load(models)
 
+	def namespace(self, model_type: type[Model]) -> Namespace:
+		"""Return the namespace the model is registered in."""
+
+		namespace = self.registry.namespaces.find(model_type)
+		if namespace is None:
+			raise ModelError(f"{model_type.__name__} is not a registered model")
+		return namespace
+
 	def identifying(self, model: Model) -> tuple[AnyOf, ...]:
-		return (
-			AnyOf(
-				(ConditionParser(self.registry, type(model)).parse({"id": model.id}),)
-			),
-		)
+		return (AnyOf((ConditionParser(self, type(model)).parse({"id": model.id}),)),)
 
 	def find_one[T: Model](self, model_type: type[T], id: UUID) -> T:
 		found = self.query(model_type).where({"id": id}).first()
@@ -135,7 +138,7 @@ class Store:
 		return self.query(model_type).where(columns).all()
 
 	def query[T: Model](self, model_type: type[T]) -> Query[T]:
-		self.registry.get(model_type)
+		self.namespace(model_type)
 		return Query(self, model_type)
 
 	def select[T: Model](
@@ -146,17 +149,23 @@ class Store:
 	) -> list[T]:
 		"""Run raw SQL that selects exactly the model's columns."""
 
-		self.registry.get(model_type)
+		self.namespace(model_type)
 		return self.models(model_type, Raw(sql, tuple(parameters)))
 
 	def models[T: Model](self, model_type: type[T], statement: Statement) -> list[T]:
 		column_names, rows = self.read(statement)
 		return [self.hydrate(model_type, column_names, row) for row in rows]
 
-	def counts(self, column: Column, statement: Select) -> dict[Any, int]:
+	def counts(
+		self,
+		model_type: type[Model],
+		column: Column,
+		statement: Select,
+	) -> dict[Any, int]:
+		codec = column.codec(self.namespace(model_type))
 		_columns, rows = self.read(statement)
 		try:
-			return {column.decode(key): cast(int, count) for key, count in rows}
+			return {column.decode(key, codec): cast(int, count) for key, count in rows}
 		except (TypeError, ValueError) as error:
 			raise DatabaseError(
 				"database row contains an invalid model value"
@@ -200,13 +209,16 @@ class Store:
 		):
 			raise DatabaseError("database result does not match model columns")
 
+		namespace = self.namespace(model_type)
 		values: dict[str, Any] = {}
-		try:
-			for name, raw_value in zip(column_names, row, strict=True):
-				values[name] = model_type.columns[name].decode(raw_value)
-		except (TypeError, ValueError) as error:
-			raise DatabaseError(
-				"database row contains an invalid model value"
-			) from error
+		for name, raw_value in zip(column_names, row, strict=True):
+			column = model_type.columns[name]
+			codec = column.codec(namespace)
+			try:
+				values[name] = column.decode(raw_value, codec)
+			except (TypeError, ValueError) as error:
+				raise DatabaseError(
+					"database row contains an invalid model value"
+				) from error
 
 		return model_type.hydrate(values)

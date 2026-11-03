@@ -28,3 +28,7 @@ class NotFoundError(LookupError):
 		self.model_type = model_type
 		self.id = id
 		super().__init__(f"{model_type.__name__} {id} not found")
+
+
+def qualified(named: type) -> str:
+	return f"{named.__module__}.{named.__qualname__}"

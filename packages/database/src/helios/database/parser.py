@@ -1,7 +1,8 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, Self, TypeIs
+from typing import Any, Literal, Self, TYPE_CHECKING, TypeIs
 
+from .codec import Codec
 from .column import Column
 from .condition import (
 	AllOf,
@@ -14,14 +15,16 @@ from .condition import (
 )
 from .error import ModelError
 from .model import Model
-from .registry import Registry
+
+if TYPE_CHECKING:
+	from .store import Store
 
 
 class ConditionParser:
 	"""Parses condition mappings, checking each key and value against the model."""
 
-	def __init__(self, registry: Registry, model_type: type[Model]):
-		self.registry = registry
+	def __init__(self, store: Store, model_type: type[Model]):
+		self.store = store
 		self.model_type = model_type
 		self.subject = f"Query on {model_type.__name__}"
 
@@ -59,8 +62,9 @@ class ConditionParser:
 				f"{self.subject} has {term.text!r}, "
 				f"where {model_type.__name__}.{name} is not a column"
 			)
+		codec = column.codec(self.store.namespace(model_type))
 		try:
-			return term.key.condition(column, term.value)
+			return term.key.condition(column, codec, term.value)
 		except (TypeError, ValueError) as error:
 			raise ModelError(
 				f"{self.subject} has an invalid value for {term.text!r}: {error}"
@@ -77,7 +81,8 @@ class ConditionParser:
 				f"{self.subject} has {first.text!r}, "
 				f"where {model_type.__name__}.{name} is not a relationship"
 			)
-		target = self.registry.get(relationship.target)
+		target = relationship.target
+		self.store.namespace(target)
 		return Exists(
 			target.table,
 			relationship.target_column,
@@ -137,15 +142,20 @@ class Key:
 		else:
 			raise ValueError("has an unknown operator")
 
-	def condition(self, column: Column, value: object) -> Condition:
+	def condition(
+		self,
+		column: Column,
+		codec: Codec[object],
+		value: object,
+	) -> Condition:
 		operator = self.operator
 		match operator:
 			case "in":
-				return Membership.parse(column, value)
+				return Membership.parse(column, codec, value)
 			case "=" if value is None:
 				return IsNull.parse(column)
 			case _:
-				return Comparison.parse(column, operator, value)
+				return Comparison.parse(column, codec, operator, value)
 
 
 OPERATORS = ("=", "<", "<=", ">", ">=", "in")

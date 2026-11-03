@@ -12,7 +12,7 @@ from luna.test.assertion import (
 
 from helios.auth import AuthenticationError, Authenticator
 from helios.database import Model
-from helios.session import Session, Sessions
+from helios.session import Session, Sessions, Token
 from helios.session.driver import memory
 
 MAXIMUM_AGE = timedelta(days=30)
@@ -26,46 +26,46 @@ class User(Model):
 
 def test_signs_in():
 	user = User(name="Alice")
-	session = Session("visitor-token")
+	session = Session(Token.from_plaintext("visitor-token"))
 	sessions = Sessions(memory.Driver(), MAXIMUM_AGE)
 	sessions.save(session)
 	auth = Authenticator(session, sessions)
 
 	auth.sign_in(user)
 
-	assert_not_eq(session.token, "visitor-token")
-	assert_is(sessions.find("visitor-token"), None)
+	assert_not_eq(session.token, Token.from_plaintext("visitor-token"))
+	assert_is(sessions.find(Token.from_plaintext("visitor-token")), None)
 	assert_eq(auth.user, user)
 	assert_eq(session["_user_id"], str(user.id))
 
 
 def test_signs_out():
 	user = User(name="Alice")
-	session = Session("visitor-token")
+	session = Session(Token.from_plaintext("visitor-token"))
 	sessions = Sessions(memory.Driver(), MAXIMUM_AGE)
 	sessions.save(session)
 	auth = Authenticator(session, sessions, user)
 
 	auth.sign_out()
 
-	assert_not_eq(session.token, "visitor-token")
-	assert_is(sessions.find("visitor-token"), None)
+	assert_not_eq(session.token, Token.from_plaintext("visitor-token"))
+	assert_is(sessions.find(Token.from_plaintext("visitor-token")), None)
 	assert_not(auth.is_signed_in())
 	assert_not_in("_user_id", session)
 
 
 def test_signs_out_when_already_signed_out():
-	session = Session("visitor-token")
+	session = Session(Token.from_plaintext("visitor-token"))
 	auth = Authenticator(session, Sessions(memory.Driver(), MAXIMUM_AGE))
 
 	auth.sign_out()
 
-	assert_not_eq(session.token, "visitor-token")
+	assert_not_eq(session.token, Token.from_plaintext("visitor-token"))
 	assert_not(auth.is_signed_in())
 
 
 def test_keeps_other_session_values_on_sign_out():
-	session = Session("visitor-token")
+	session = Session(Token.from_plaintext("visitor-token"))
 	session["_flash"] = {"message": "Signed out."}
 	auth = Authenticator(session, Sessions(memory.Driver(), MAXIMUM_AGE))
 
@@ -77,7 +77,7 @@ def test_keeps_other_session_values_on_sign_out():
 def test_returns_user_when_signed_in():
 	user = User(name="Alice")
 	auth = Authenticator(
-		Session("visitor-token"),
+		Session(Token.from_plaintext("visitor-token")),
 		Sessions(memory.Driver(), MAXIMUM_AGE),
 		user,
 	)
@@ -87,7 +87,7 @@ def test_returns_user_when_signed_in():
 
 def test_rejects_user_when_signed_out():
 	auth = Authenticator(
-		Session("visitor-token"),
+		Session(Token.from_plaintext("visitor-token")),
 		Sessions(memory.Driver(), MAXIMUM_AGE),
 	)
 

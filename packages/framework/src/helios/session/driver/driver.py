@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 from ..session import Session
+from ..token import Token
 
 
 class Driver(ABC):
@@ -12,14 +13,14 @@ class Driver(ABC):
 	"""
 
 	@abstractmethod
-	def read(self, token: str) -> Session | None: ...
+	def read(self, token: Token) -> Session | None: ...
 
 	@abstractmethod
 	def write(self, session: Session):
 		"""Insert the session, or replace its stored items and activity time."""
 
 	@abstractmethod
-	def destroy(self, token: str): ...
+	def destroy(self, token: Token): ...
 
 	@abstractmethod
 	def purge(self, cutoff: datetime):

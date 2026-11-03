@@ -7,10 +7,11 @@ from luna.test.assertion import (
 )
 
 from helios.session.session import Session
+from helios.session.token import Token
 
 
 def test_mapping_clear_and_delete():
-	session = Session("visitor-token")
+	session = Session(Token.from_plaintext("visitor-token"))
 	session["message"] = "Hello"
 	assert_eq(session["message"], "Hello")
 
@@ -22,7 +23,7 @@ def test_mapping_clear_and_delete():
 
 
 def test_closed_session_refuses_setting_items():
-	session = Session("visitor-token")
+	session = Session(Token.from_plaintext("visitor-token"))
 	session.close()
 
 	with assert_raises(RuntimeError) as raised:
@@ -31,7 +32,7 @@ def test_closed_session_refuses_setting_items():
 
 
 def test_closed_session_refuses_deleting_items():
-	session = Session("visitor-token", {"message": "Hello"})
+	session = Session(Token.from_plaintext("visitor-token"), {"message": "Hello"})
 	session.close()
 
 	with assert_raises(RuntimeError) as raised:
@@ -40,7 +41,7 @@ def test_closed_session_refuses_deleting_items():
 
 
 def test_closed_session_refuses_clearing():
-	session = Session("visitor-token", {"message": "Hello"})
+	session = Session(Token.from_plaintext("visitor-token"), {"message": "Hello"})
 	session.close()
 
 	with assert_raises(RuntimeError) as raised:
@@ -49,7 +50,7 @@ def test_closed_session_refuses_clearing():
 
 
 def test_closed_session_refuses_touching():
-	session = Session("visitor-token")
+	session = Session(Token.from_plaintext("visitor-token"))
 	session.close()
 
 	with assert_raises(RuntimeError) as raised:
@@ -58,7 +59,7 @@ def test_closed_session_refuses_touching():
 
 
 def test_closed_session_still_reads():
-	session = Session("visitor-token", {"message": "Hello"})
+	session = Session(Token.from_plaintext("visitor-token"), {"message": "Hello"})
 	session.close()
 
 	assert_eq(session["message"], "Hello")

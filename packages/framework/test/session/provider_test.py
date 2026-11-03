@@ -27,6 +27,7 @@ from helios.session import Flash
 from helios.session.driver import memory
 from helios.session.session import Session
 from helios.session.sessions import Sessions
+from helios.session.token import Token
 from helios.url import URL
 from helios.view import Component
 import helios.view.config
@@ -134,7 +135,7 @@ def test_sets_the_cookie_policy():
 		)
 
 	cookie = response.cookies["session_id"]
-	assert_eq(cookie.value, session.token)
+	assert_eq(cookie.value, session.token.plaintext)
 	assert_that(cookie.http_only)
 	assert_that(cookie.secure)
 	assert_eq(cookie.same_site, "Lax")
@@ -202,7 +203,7 @@ def test_rotates_a_session_to_a_new_token():
 def test_replaces_and_clears_an_unknown_cookie():
 	session, response = exercise(request("unknown-token"))
 
-	assert_not_eq(session.token, "unknown-token")
+	assert_not_eq(session.token, Token.from_plaintext("unknown-token"))
 	assert_eq(response.cookies["session_id"].value, "")
 	assert_eq(response.cookies["session_id"].expires, EPOCH)
 
@@ -578,7 +579,7 @@ def test_failed_request_closes_its_sessions():
 
 	sessions, session = captured
 	with assert_raises(RuntimeError) as save:
-		sessions.save(Session("other-token"))
+		sessions.save(Session(Token.from_plaintext("other-token")))
 	with assert_raises(RuntimeError) as write:
 		session["message"] = "Hello"
 	assert_is(type(save.exception), RuntimeError)

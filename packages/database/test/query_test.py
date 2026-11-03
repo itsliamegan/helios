@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 from luna.test.assertion import assert_eq, assert_raises
 
-from helios.database import DatabaseError, Model, ModelError, Store
+from helios.database import DatabaseError, Model, ModelError, Registry, Store
 from helios.database.sqlite import Connection
 
 
@@ -37,7 +37,9 @@ def open_store(path: Path):
 	raw.close()
 	connection = Connection.open(path)
 	connection.begin()
-	store = Store(connection, [Item])
+	registry = Registry()
+	registry.model(Item)
+	store = Store(connection, registry)
 	store.create(Item, name="Alpha", group="one", rank=2)
 	store.create(Item, name="Beta", group="one", rank=1)
 	store.create(Item, name="Gamma", group=None, rank=3)
@@ -401,7 +403,7 @@ def test_rejects_invalid_values():
 		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
 			cases = [
-				({"rank": True}, "'rank': expected an integer, got bool"),
+				({"rank": True}, "'rank': expected int, got bool"),
 				({"rank >": None}, "'rank >': cannot compare with None"),
 				({"name": None}, "'name': cannot be null"),
 				(
@@ -412,7 +414,7 @@ def test_rejects_invalid_values():
 					{"name in": "Alpha"},
 					"'name in': expected an iterable other than str or bytes, got str",
 				),
-				({"rank in": [True]}, "'rank in': expected an integer, got bool"),
+				({"rank in": [True]}, "'rank in': expected int, got bool"),
 				({"rank in": [None]}, "'rank in': cannot be null"),
 			]
 			for conditions, message in cases:

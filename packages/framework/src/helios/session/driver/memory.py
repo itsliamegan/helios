@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ..session import Session
+from ..token import Token
 from .driver import Driver
 
 
@@ -14,9 +15,9 @@ class Driver(Driver):
 	"""
 
 	def __init__(self):
-		self.sessions: dict[str, Session] = {}
+		self.sessions: dict[Token, Session] = {}
 
-	def read(self, token: str) -> Session | None:
+	def read(self, token: Token) -> Session | None:
 		session = self.sessions.get(token)
 		if session is None:
 			return None
@@ -35,7 +36,7 @@ class Driver(Driver):
 			session.last_active_at,
 		)
 
-	def destroy(self, token: str):
+	def destroy(self, token: Token):
 		self.sessions.pop(token, None)
 
 	def purge(self, cutoff: datetime):

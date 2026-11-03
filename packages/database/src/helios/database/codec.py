@@ -1,34 +1,29 @@
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
-from typing import Any
+import json
+from typing import Any, ClassVar, TypeAliasType
 import uuid
 
 from helios import url
 
 type Scalar = int | float | str | bytes
 
+type JSON[T] = T
+
 
 class Codec[T](ABC):
 	"""Converts one column's values between Python and SQLite.
 
-	A custom value type declares its codec as a nested class named `Codec`.
+	A codec converts the values of any attribute annotated with the type named
+	by `converts`. It matches this type exactly, so a subclass of the specified
+	type does not use the codec.
+
+	The model's column checks the type of an attribute before attempting to
+	encode it. After this check, a codec may raise a `ValueError` for a value
+	that it cannot store.
 	"""
 
-	@classmethod
-	def for_type(cls, annotation: object) -> Codec[Any] | None:
-		try:
-			found = CODECS.get(annotation)
-		except TypeError:
-			found = None
-
-		if found is None and isinstance(annotation, type):
-			declared = vars(annotation).get("Codec")
-			if isinstance(declared, type) and issubclass(declared, Codec):
-				return declared()
-		return found
-
-	@abstractmethod
-	def check(self, value: object): ...
+	converts: ClassVar[type[Any] | TypeAliasType]
 
 	@abstractmethod
 	def encode(self, value: T) -> Scalar: ...
@@ -55,12 +50,9 @@ class Text[T](Codec[T]):
 
 
 class Str(Text[str]):
-	def check(self, value: object):
-		if not isinstance(value, str):
-			raise TypeError(f"expected a string, got {type(value).__name__}")
+	converts = str
 
 	def encode(self, value: str) -> Scalar:
-		self.check(value)
 		return value
 
 	def decode(self, value: Scalar) -> str:
@@ -68,12 +60,9 @@ class Str(Text[str]):
 
 
 class Bool(Codec[bool]):
-	def check(self, value: object):
-		if not isinstance(value, bool):
-			raise TypeError(f"expected a boolean, got {type(value).__name__}")
+	converts = bool
 
 	def encode(self, value: bool) -> Scalar:
-		self.check(value)
 		return 1 if value else 0
 
 	def decode(self, value: Scalar) -> bool:
@@ -83,12 +72,9 @@ class Bool(Codec[bool]):
 
 
 class Int(Codec[int]):
-	def check(self, value: object):
-		if not isinstance(value, int) or isinstance(value, bool):
-			raise TypeError(f"expected an integer, got {type(value).__name__}")
+	converts = int
 
 	def encode(self, value: int) -> Scalar:
-		self.check(value)
 		return value
 
 	def decode(self, value: Scalar) -> int:
@@ -100,12 +86,9 @@ class Int(Codec[int]):
 class UUID(Text[uuid.UUID]):
 	"""Stores a UUID as canonical text, so equal UUIDs compare equal in SQL."""
 
-	def check(self, value: object):
-		if not isinstance(value, uuid.UUID):
-			raise TypeError(f"expected a UUID, got {type(value).__name__}")
+	converts = uuid.UUID
 
 	def encode(self, value: uuid.UUID) -> Scalar:
-		self.check(value)
 		return str(value)
 
 	def decode(self, value: Scalar) -> uuid.UUID:
@@ -119,18 +102,14 @@ class UUID(Text[uuid.UUID]):
 class Date(Text[datetime]):
 	"""Stores an aware datetime as canonical UTC text, so text order is time order."""
 
+	converts = datetime
+
 	FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
-	def check(self, value: object):
-		if (
-			not isinstance(value, datetime)
-			or value.tzinfo is None
-			or value.utcoffset() is None
-		):
-			raise TypeError(f"expected an aware datetime, got {type(value).__name__}")
-
 	def encode(self, value: datetime) -> Scalar:
-		self.check(value)
+		if value.tzinfo is None or value.utcoffset() is None:
+			raise ValueError("expected an aware datetime")
+
 		return value.astimezone(UTC).strftime(self.FORMAT)
 
 	def decode(self, value: Scalar) -> datetime:
@@ -142,23 +121,32 @@ class Date(Text[datetime]):
 
 
 class URL(Text[url.URL]):
-	def check(self, value: object):
-		if not isinstance(value, url.URL):
-			raise TypeError(f"expected a URL, got {type(value).__name__}")
+	converts = url.URL
 
 	def encode(self, value: url.URL) -> Scalar:
-		self.check(value)
 		return str(value)
 
 	def decode(self, value: Scalar) -> url.URL:
 		return url.URL.parse(self.text(value))
 
 
-CODECS: dict[object, Codec[Any]] = {
-	str: Str(),
-	bool: Bool(),
-	int: Int(),
-	uuid.UUID: UUID(),
-	datetime: Date(),
-	url.URL: URL(),
-}
+class JSONText(Text[Any]):
+	"""Encodes a JSON value as JSON text.
+
+	Follows Python's normal lossy rules of round-tripping values through JSON,
+	e.g. a tuple comes back as a list.
+	"""
+
+	converts = JSON
+
+	def encode(self, value: Any) -> Scalar:
+		try:
+			return json.dumps(value)
+		except TypeError as error:
+			raise ValueError(str(error)) from error
+
+	def decode(self, value: Scalar) -> Any:
+		return json.loads(self.text(value))
+
+
+CODECS: list[Codec[Any]] = [Str(), Bool(), Int(), UUID(), Date(), URL(), JSONText()]

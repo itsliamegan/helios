@@ -3,10 +3,9 @@ from datetime import datetime
 from helios.database import Store
 
 from ...session import Session
+from ...token import Token
 from ..driver import Driver
-from .items import Items
 from .record import Record
-from .token import Token
 
 
 class Driver(Driver):
@@ -19,14 +18,14 @@ class Driver(Driver):
 	def __init__(self, store: Store):
 		self.store = store
 
-	def read(self, token: str) -> Session | None:
+	def read(self, token: Token) -> Session | None:
 		record = self.find(token)
 		if record is None:
 			return None
 		else:
 			return Session(
 				token,
-				record.items.contents,
+				record.items,
 				record.last_active_at,
 				stored=True,
 			)
@@ -36,18 +35,18 @@ class Driver(Driver):
 		if record is None:
 			self.store.create(
 				Record,
-				token=Token.from_plaintext(session.token),
-				items=Items(session.items),
+				token=session.token,
+				items=session.items,
 				last_active_at=session.last_active_at,
 			)
 		else:
 			self.store.update(
 				record,
-				items=Items(session.items),
+				items=session.items,
 				last_active_at=session.last_active_at,
 			)
 
-	def destroy(self, token: str):
+	def destroy(self, token: Token):
 		record = self.find(token)
 		if record is not None:
 			self.store.delete(record)
@@ -57,9 +56,5 @@ class Driver(Driver):
 		for record in expired:
 			self.store.delete(record)
 
-	def find(self, token: str) -> Record | None:
-		return (
-			self.store.query(Record)
-			.where({"token": Token.from_plaintext(token)})
-			.first()
-		)
+	def find(self, token: Token) -> Record | None:
+		return self.store.query(Record).where({"token": token}).first()

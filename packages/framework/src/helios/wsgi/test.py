@@ -46,7 +46,7 @@ class TestClient:
 			if session.items:
 				sessions = context.get(Sessions)
 				sessions.save(session)
-				self.set_cookie("session_id", session.token)
+				self.set_cookie("session_id", session.token.plaintext)
 			elif session.stored:
 				sessions = context.get(Sessions)
 				sessions.destroy(session)

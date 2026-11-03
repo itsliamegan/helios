@@ -1,16 +1,18 @@
 from datetime import UTC, datetime
 
 from helios.app import Application, Container, Context, Handler, Provider
-from helios.database import Database, Store
+from helios.database import Registry, Store
 from helios.http import Cookie, Request, Response
 from helios.view import View
 from helios.view.composer import Composers
 
 from .config import Config
 from .driver import Driver, database, memory
+from .driver.database import token
 from .flash import Flash
 from .session import Session
 from .sessions import Sessions
+from .token import Token
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -43,8 +45,10 @@ class Provider(Provider):
 
 	def boot(self, application: Application):
 		if isinstance(self.config.driver, database.Config):
-			database_ = application.container.get(Database)
-			database_.registry.get(database.Record)
+			registry = application.container.get(Registry)
+			namespace = registry.namespace("session")
+			namespace.model(database.Record)
+			namespace.codec(token.Codec())
 		application.use(self.middleware)
 		if application.container.bound(Composers):
 			composers = application.container.get(Composers)
@@ -68,13 +72,13 @@ class Provider(Provider):
 	def session(self, context: Context) -> Session:
 		request = context.get(Request)
 		if "session_id" in request.cookies:
-			token = request.cookies["session_id"].value
+			plaintext = request.cookies["session_id"].value
 			sessions = context.get(Sessions)
-			session = sessions.find(token)
+			session = sessions.find(Token.from_plaintext(plaintext))
 			if session is not None:
 				session.touch()
 				return session
-		return Session(Session.generate_token())
+		return Session(Token.generate())
 
 	def flash(self, context: Context) -> Flash:
 		session = context.get(Session)
@@ -123,7 +127,10 @@ class Provider(Provider):
 			sessions.save(session)
 			sessions.purge()
 			expires = datetime.now(UTC) + self.config.maximum_age
-			response.cookies["session_id"] = self.cookie(session.token, expires)
+			response.cookies["session_id"] = self.cookie(
+				session.token.plaintext,
+				expires,
+			)
 		elif session.stored:
 			sessions = context.get(Sessions)
 			sessions.destroy(session)

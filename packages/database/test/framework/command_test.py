@@ -9,7 +9,7 @@ from luna.test.assertion import assert_eq, assert_not, assert_raises
 import helios.app
 from helios.app import Application
 from helios.console import Program
-from helios.database import Config
+from helios.database import Config, Registry
 from helios.database.provider import Provider
 from helios.routing import Router
 
@@ -18,7 +18,7 @@ def test_migrate_applies_migrations_from_the_default_directory():
 	app = Application(
 		helios.app.Config(),
 		Router([]),
-		[Provider(Config(Path("app.sqlite")), [])],
+		[Provider(Config(Path("app.sqlite")), Registry())],
 	)
 
 	with TemporaryDirectory() as directory, chdir(directory):
@@ -50,7 +50,7 @@ def test_migrate_dry_run_leaves_the_database_unchanged():
 		app = Application(
 			helios.app.Config(),
 			Router([]),
-			[Provider(Config(path, migrations=migrations), [])],
+			[Provider(Config(path, migrations=migrations), Registry())],
 		)
 
 		with redirect_stderr(StringIO()):
@@ -82,7 +82,7 @@ def test_status_refuses_a_missing_database():
 		app = Application(
 			helios.app.Config(),
 			Router([]),
-			[Provider(Config(path, migrations=migrations), [])],
+			[Provider(Config(path, migrations=migrations), Registry())],
 		)
 
 		with redirect_stderr(StringIO()), assert_raises(SystemExit) as raised:
