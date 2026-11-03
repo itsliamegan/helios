@@ -34,12 +34,7 @@ class Token:
 		self.value = value
 
 	class Codec(Codec):
-		def check(self, value: object):
-			if not isinstance(value, Token):
-				raise TypeError("expected a Token")
-
 		def encode(self, value: Token) -> Scalar:
-			self.check(value)
 			return value.value
 
 		def decode(self, value: Scalar) -> Token:
@@ -196,6 +191,20 @@ def test_failed_create_leaves_no_row():
 				store.create(Record, **record_values(name=""))
 
 			assert_eq(store.find_all(Record), [])
+		finally:
+			connection.close()
+
+
+def test_builds_a_model_with_a_naive_datetime_but_refuses_to_store_it():
+	values = record_values()
+	values["published_at"] = datetime(2025, 1, 2, 3, 4, 5)
+	with TemporaryDirectory() as directory:
+		connection, store = open_record_store(directory)
+		try:
+			Record(**values)
+
+			with assert_raises(ModelError):
+				store.create(Record, **values)
 		finally:
 			connection.close()
 
@@ -394,10 +403,6 @@ def test_round_trips_models_with_codecs_declared_later():
 			self.text = text
 
 		class Codec(Codec):
-			def check(self, value: object):
-				if not isinstance(value, Label):
-					raise TypeError("expected a Label")
-
 			def encode(self, value: Label) -> Scalar:
 				return value.text
 

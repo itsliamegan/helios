@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar, TypeAliasType
 import uuid
 
 from helios import url
@@ -9,10 +9,17 @@ type Scalar = int | float | str | bytes
 
 
 class Codec[T](ABC):
-	"""Converts one column's values between Python and SQLite.
+	"""Converts the values of the attributes its `converts` selects.
 
-	A custom value type declares its codec as a nested class named `Codec`.
+	A codec converts between Python and SQLite. `converts` selects every attribute whose annotation, without `| None`, has it
+	as its outer type: the annotation itself, or its origin when it has one. The
+	match is exact, so a subclass of a converted type does not select the codec.
+
+	The column checks a value's outer type before encoding it. A codec raises
+	`ValueError` for a value of that type that it cannot store.
 	"""
+
+	converts: ClassVar[type[Any] | TypeAliasType]
 
 	@classmethod
 	def for_type(cls, annotation: object) -> Codec[Any] | None:
@@ -26,9 +33,6 @@ class Codec[T](ABC):
 			if isinstance(declared, type) and issubclass(declared, Codec):
 				return declared()
 		return found
-
-	@abstractmethod
-	def check(self, value: object): ...
 
 	@abstractmethod
 	def encode(self, value: T) -> Scalar: ...
@@ -55,12 +59,9 @@ class Text[T](Codec[T]):
 
 
 class Str(Text[str]):
-	def check(self, value: object):
-		if not isinstance(value, str):
-			raise TypeError(f"expected a string, got {type(value).__name__}")
+	converts = str
 
 	def encode(self, value: str) -> Scalar:
-		self.check(value)
 		return value
 
 	def decode(self, value: Scalar) -> str:
@@ -68,12 +69,9 @@ class Str(Text[str]):
 
 
 class Bool(Codec[bool]):
-	def check(self, value: object):
-		if not isinstance(value, bool):
-			raise TypeError(f"expected a boolean, got {type(value).__name__}")
+	converts = bool
 
 	def encode(self, value: bool) -> Scalar:
-		self.check(value)
 		return 1 if value else 0
 
 	def decode(self, value: Scalar) -> bool:
@@ -83,12 +81,9 @@ class Bool(Codec[bool]):
 
 
 class Int(Codec[int]):
-	def check(self, value: object):
-		if not isinstance(value, int) or isinstance(value, bool):
-			raise TypeError(f"expected an integer, got {type(value).__name__}")
+	converts = int
 
 	def encode(self, value: int) -> Scalar:
-		self.check(value)
 		return value
 
 	def decode(self, value: Scalar) -> int:
@@ -100,12 +95,9 @@ class Int(Codec[int]):
 class UUID(Text[uuid.UUID]):
 	"""Stores a UUID as canonical text, so equal UUIDs compare equal in SQL."""
 
-	def check(self, value: object):
-		if not isinstance(value, uuid.UUID):
-			raise TypeError(f"expected a UUID, got {type(value).__name__}")
+	converts = uuid.UUID
 
 	def encode(self, value: uuid.UUID) -> Scalar:
-		self.check(value)
 		return str(value)
 
 	def decode(self, value: Scalar) -> uuid.UUID:
@@ -119,18 +111,14 @@ class UUID(Text[uuid.UUID]):
 class Date(Text[datetime]):
 	"""Stores an aware datetime as canonical UTC text, so text order is time order."""
 
+	converts = datetime
+
 	FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
-	def check(self, value: object):
-		if (
-			not isinstance(value, datetime)
-			or value.tzinfo is None
-			or value.utcoffset() is None
-		):
-			raise TypeError(f"expected an aware datetime, got {type(value).__name__}")
-
 	def encode(self, value: datetime) -> Scalar:
-		self.check(value)
+		if value.tzinfo is None or value.utcoffset() is None:
+			raise ValueError("expected an aware datetime")
+
 		return value.astimezone(UTC).strftime(self.FORMAT)
 
 	def decode(self, value: Scalar) -> datetime:
@@ -142,23 +130,15 @@ class Date(Text[datetime]):
 
 
 class URL(Text[url.URL]):
-	def check(self, value: object):
-		if not isinstance(value, url.URL):
-			raise TypeError(f"expected a URL, got {type(value).__name__}")
+	converts = url.URL
 
 	def encode(self, value: url.URL) -> Scalar:
-		self.check(value)
 		return str(value)
 
 	def decode(self, value: Scalar) -> url.URL:
 		return url.URL.parse(self.text(value))
 
 
-CODECS: dict[object, Codec[Any]] = {
-	str: Str(),
-	bool: Bool(),
-	int: Int(),
-	uuid.UUID: UUID(),
-	datetime: Date(),
-	url.URL: URL(),
-}
+CODECS: dict[object, Codec[Any]] = {}
+for codec in [Str(), Bool(), Int(), UUID(), Date(), URL()]:
+	CODECS[codec.converts] = codec

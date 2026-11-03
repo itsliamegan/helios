@@ -87,6 +87,14 @@ def test_requires_nullable_columns_without_defaults():
 	assert_eq(Post(summary=None).summary, None)
 
 
+def test_rejects_a_boolean_for_an_integer_column():
+	class Post(Model):
+		views: int
+
+	with assert_raises(ModelError):
+		Post(views=True)
+
+
 def test_declares_columns_only_from_instance_annotations():
 	class Post(Model):
 		table = "posts"
@@ -103,10 +111,6 @@ def test_resolves_codecs_nested_in_the_model():
 				self.text = text
 
 			class Codec(Codec):
-				def check(self, value: object):
-					if not isinstance(value, Post.Slug):
-						raise TypeError("expected a Slug")
-
 				def encode(self, value: Post.Slug) -> Scalar:
 					return value.text
 
@@ -129,10 +133,6 @@ def test_resolves_codecs_that_refer_to_the_model():
 				self.text = text
 
 			class Codec(Codec):
-				def check(self, value: object):
-					if not isinstance(value, Post.Slug):
-						raise TypeError("expected a Slug")
-
 				def encode(self, value: Post.Slug) -> Scalar:
 					return value.text
 
@@ -157,10 +157,6 @@ def test_resolves_codecs_declared_after_the_model():
 			self.text = text
 
 		class Codec(Codec):
-			def check(self, value: object):
-				if not isinstance(value, Slug):
-					raise TypeError("expected a Slug")
-
 			def encode(self, value: Slug) -> Scalar:
 				return value.text
 

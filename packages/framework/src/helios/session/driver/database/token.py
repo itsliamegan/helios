@@ -16,12 +16,7 @@ class Token:
 		return cls(hashlib.sha256(plaintext.encode()).hexdigest())
 
 	class Codec(Codec):
-		def check(self, value: object):
-			if not isinstance(value, Token):
-				raise TypeError(f"expected a Token, got {type(value).__name__}")
-
 		def encode(self, value: Token) -> Scalar:
-			self.check(value)
 			return value.digest
 
 		def decode(self, value: Scalar) -> Token:

@@ -22,12 +22,7 @@ class Password:
 		return "Password(<redacted>)"
 
 	class Codec(Codec):
-		def check(self, value: object):
-			if not isinstance(value, Password):
-				raise TypeError(f"expected a Password, got {type(value).__name__}")
-
 		def encode(self, value: Password) -> Scalar:
-			self.check(value)
 			return value.digest.encode()
 
 		def decode(self, value: Scalar) -> Password:

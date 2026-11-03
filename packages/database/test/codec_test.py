@@ -28,8 +28,6 @@ def test_distinguishes_integers_and_booleans():
 	assert_eq(Bool().decode(1), True)
 
 	with assert_raises(TypeError):
-		Int().check(True)
-	with assert_raises(TypeError):
 		Int().decode(False)
 	with assert_raises(TypeError):
 		Bool().decode(2)
@@ -54,7 +52,7 @@ def test_normalizes_datetimes_to_canonical_utc_text():
 
 	assert_eq(encoded, "2025-02-03T06:05:06.000007Z")
 	assert_eq(Date().decode(encoded), value)
-	with assert_raises(TypeError):
+	with assert_raises(ValueError):
 		Date().encode(value.replace(tzinfo=None))
 	with assert_raises(ValueError):
 		Date().decode("2025-02-03T06:05:06Z")
@@ -64,12 +62,7 @@ def test_normalizes_datetimes_to_canonical_utc_text():
 
 def test_supports_custom_codec():
 	class Uppercase(Codec[str]):
-		def check(self, value: object):
-			if not isinstance(value, str):
-				raise TypeError("expected a string")
-
 		def encode(self, value: str):
-			self.check(value)
 			return value.upper()
 
 		def decode(self, value: Scalar):
@@ -90,12 +83,7 @@ def test_finds_codecs_for_types():
 			self.text = text
 
 		class Codec(Codec):
-			def check(self, value: object):
-				if not isinstance(value, Slug):
-					raise TypeError("expected a Slug")
-
 			def encode(self, value: Slug) -> Scalar:
-				self.check(value)
 				return value.text
 
 			def decode(self, value: Scalar) -> Slug:
@@ -112,9 +100,6 @@ def test_finds_codecs_for_types():
 
 def test_rejects_non_scalar_custom_encoding():
 	class Invalid(Codec[str]):
-		def check(self, value: object):
-			pass
-
 		def encode(self, value: str):
 			return [value]
 

@@ -26,6 +26,7 @@ class Column:
 
 	name: str
 	declaration: Declaration
+	_annotation: type[Any]
 	_codec: Codec[object]
 	_nullable: bool
 
@@ -46,13 +47,14 @@ class Column:
 				self.declaration.resolve(),
 			)
 			codec = Codec.for_type(annotation)
-			if codec is None:
+			if codec is None or not isinstance(annotation, type):
 				raise DeclarationError(
 					self.name,
 					f"unsupported column type: {annotation!r}",
 				)
 		except DeclarationError as error:
 			raise self.declaration.reject(error) from error
+		self._annotation = annotation
 		self._codec = codec
 		self._nullable = nullable
 		self.resolved = True
@@ -67,6 +69,13 @@ class Column:
 	@property
 	def required(self) -> bool:
 		return self.default is MISSING
+
+	@property
+	def annotation(self) -> type[Any]:
+		"""Return the column's type, without `| None`."""
+
+		self.resolve()
+		return self._annotation
 
 	@property
 	def codec(self) -> Codec[object]:
@@ -94,16 +103,23 @@ class Column:
 				return
 			else:
 				raise ValueError("cannot be null")
-		self.codec.check(value)
+
+		expected = self.annotation
+		if not isinstance(value, expected):
+			raise TypeError(f"expected {expected.__name__}, got {type(value).__name__}")
+		elif isinstance(value, bool) and expected is int:
+			# `bool` subclasses `int`, but a boolean is not an integer.
+			raise TypeError("expected int, got bool")
 
 	def encode(self, value: object, model_type: type) -> Scalar | None:
 		try:
 			self.check(value)
+			if value is None:
+				return None
+			else:
+				return encode(self.codec, value)
 		except (TypeError, ValueError) as error:
 			raise ModelError(f"{model_type.__name__}.{self.name}: {error}") from error
-		if value is None:
-			return None
-		return encode(self.codec, value)
 
 	def decode(self, raw: Scalar | None) -> object:
 		value = None if raw is None else self.codec.decode(raw)

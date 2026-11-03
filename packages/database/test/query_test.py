@@ -401,7 +401,7 @@ def test_rejects_invalid_values():
 		connection, store = open_store(Path(directory, "app.sqlite"))
 		try:
 			cases = [
-				({"rank": True}, "'rank': expected an integer, got bool"),
+				({"rank": True}, "'rank': expected int, got bool"),
 				({"rank >": None}, "'rank >': cannot compare with None"),
 				({"name": None}, "'name': cannot be null"),
 				(
@@ -412,7 +412,7 @@ def test_rejects_invalid_values():
 					{"name in": "Alpha"},
 					"'name in': expected an iterable other than str or bytes, got str",
 				),
-				({"rank in": [True]}, "'rank in': expected an integer, got bool"),
+				({"rank in": [True]}, "'rank in': expected int, got bool"),
 				({"rank in": [None]}, "'rank in': cannot be null"),
 			]
 			for conditions, message in cases:

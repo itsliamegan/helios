@@ -12,12 +12,7 @@ class Items:
 	contents: dict[str, Any]
 
 	class Codec(Codec):
-		def check(self, value: object):
-			if not isinstance(value, Items):
-				raise TypeError(f"expected Items, got {type(value).__name__}")
-
 		def encode(self, value: Items) -> Scalar:
-			self.check(value)
 			return json.dumps(value.contents)
 
 		def decode(self, value: Scalar) -> Items:
