@@ -4,10 +4,10 @@ from typing import Self
 
 
 class Token:
-	"""A session token, identified by its SHA-256 digest.
+	"""A unique identifier for a session composed of 32 random bytes.
 
-	A token made from plaintext keeps the plaintext for the visitor's cookie. A
-	token read back from storage has only its digest.
+	The SHA-256 digest is always stored. The plaintext is not stored when the
+	token is loaded from the database.
 	"""
 
 	def __init__(self, digest: str, plaintext: str | None = None):
