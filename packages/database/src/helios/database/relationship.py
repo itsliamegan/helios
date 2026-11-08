@@ -1,10 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import Any, Literal, TYPE_CHECKING, TypeIs, cast, get_args, get_origin
+from collections.abc import Sequence
+from typing import (
+	Any,
+	Literal,
+	TYPE_CHECKING,
+	TypeIs,
+	Union,
+	cast,
+	get_args,
+	get_origin,
+)
 import uuid
 
 from luna.declarative import Declaration, DeclarationError, split_nullable
 
-from .error import ModelError
+from .error import DatabaseError, ModelError
 
 if TYPE_CHECKING:
 	from .columns import Columns
@@ -42,6 +52,23 @@ def has_one(id_name: str, *, init: Literal[False] = False) -> Any:
 	"""
 
 	return HasOne(id_name)
+
+
+def has_one_variant(
+	id_name: str,
+	*,
+	variant_name: str,
+	init: Literal[False] = False,
+) -> Any:
+	"""Declare the variant model that identifies this model in its `id_name` column.
+
+	Annotate it as a union of two or more models. This model's `variant_name`
+	column holds the table name of each row's variant. The schema must keep
+	`id_name` unique in each variant's table. Create a row and its variant in
+	one transaction, so that no reader sees the row without its variant.
+	"""
+
+	return HasOneVariant(id_name, variant_name)
 
 
 class Relationship(ABC):
@@ -85,6 +112,17 @@ class Relationship(ABC):
 		self.resolve()
 		return self._nullable
 
+	def by_target(
+		self,
+		models: Sequence[Model],
+	) -> list[tuple[type[Model], Sequence[Model]]]:
+		"""Split models into groups that each load this relationship from one model."""
+
+		return [(self.target, models)]
+
+	def check_columns(self, columns: Columns):
+		"""Check the owner's columns when the owner is declared."""
+
 	@abstractmethod
 	def check(self): ...
 
@@ -127,7 +165,7 @@ class BelongsTo(Relationship):
 		self._nullable = nullable
 		self.resolved = True
 
-	def check_id(self, columns: Columns):
+	def check_columns(self, columns: Columns):
 		column = columns.get(self.id_name)
 		if column is None:
 			detail = "is not a column"
@@ -158,11 +196,13 @@ class BelongsTo(Relationship):
 
 class Inverse(Relationship):
 	def check(self):
-		column = self.target.columns.get(self.id_name)
+		self.check_target(self.target)
+
+	def check_target(self, target: type[Model]):
+		column = target.columns.get(self.id_name)
 		if column is None or column.annotation is not uuid.UUID:
 			raise ModelError(
-				f"{self.label}: {self.target.__name__}.{self.id_name} "
-				"does not hold a UUID"
+				f"{self.label}: {target.__name__}.{self.id_name} does not hold a UUID"
 			)
 
 	@property
@@ -215,6 +255,95 @@ class HasOne(Inverse):
 		self._target = target
 		self._nullable = nullable
 		self.resolved = True
+
+
+class HasOneVariant(Inverse):
+	"""A relationship to one of several models, named by the owner's variant column.
+
+	Each variant is a model with a table of its own, and the variant column
+	holds that table's name.
+	"""
+
+	_variants: tuple[type[Model], ...]
+
+	def __init__(self, id_name: str, variant_name: str):
+		super().__init__(id_name)
+		self.variant_name = variant_name
+
+	def resolve(self):
+		if self.resolved:
+			return
+		annotation = self.declaration.resolve()
+		members = get_args(annotation) if get_origin(annotation) is Union else ()
+		variants = []
+		for member in members:
+			if is_model(member):
+				variants.append(member)
+		if len(members) < 2 or len(variants) != len(members):
+			raise self.declaration.reject(
+				DeclarationError(
+					self.name,
+					f"expected a union of models, got {annotation!r}",
+				)
+			)
+		self._variants = tuple(variants)
+		self._nullable = False
+		self.resolved = True
+
+	@property
+	def target(self) -> type[Model]:
+		raise ModelError(f"{self.label} has one target per variant")
+
+	@property
+	def variants(self) -> tuple[type[Model], ...]:
+		self.resolve()
+		return self._variants
+
+	def by_target(
+		self,
+		models: Sequence[Model],
+	) -> list[tuple[type[Model], Sequence[Model]]]:
+		variants: dict[str, type[Model]] = {}
+		for variant in self.variants:
+			variants[variant.table] = variant
+
+		groups: dict[str, list[Model]] = {}
+		for model in models:
+			table = model._values[self.variant_name]
+			if table not in variants:
+				raise DatabaseError(
+					f"{self.label} has unknown variant {table!r} "
+					f"for {self.owner.__name__} {model.id}"
+				)
+			groups.setdefault(table, []).append(model)
+
+		pairs: list[tuple[type[Model], Sequence[Model]]] = []
+		for table, group in groups.items():
+			pairs.append((variants[table], group))
+		return pairs
+
+	def check_columns(self, columns: Columns):
+		column = columns.get(self.variant_name)
+		if column is None:
+			detail = "is not a column"
+		elif column.annotation is not str:
+			detail = "does not hold a str"
+		else:
+			return
+		raise ModelError(
+			f"{self.label}: has_one_variant names {self.variant_name!r}, which {detail}"
+		)
+
+	def check(self):
+		tables: set[str] = set()
+		for variant in self.variants:
+			if variant.table in tables:
+				raise ModelError(
+					f"{self.label}: {variant.__name__} shares its table "
+					"with another variant"
+				)
+			tables.add(variant.table)
+			self.check_target(variant)
 
 
 def is_model(annotation: object) -> TypeIs[type[Model]]:

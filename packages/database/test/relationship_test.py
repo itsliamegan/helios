@@ -12,6 +12,7 @@ from luna.test.assertion import (
 	assert_eq,
 	assert_in,
 	assert_is,
+	assert_is_instance,
 	assert_raises,
 )
 
@@ -23,7 +24,9 @@ from helios.database import (
 	belongs_to,
 	has_many,
 	has_one,
+	has_one_variant,
 )
+from helios.database.relationship import HasOneVariant
 from helios.database.sqlite import Connection
 
 
@@ -32,6 +35,7 @@ class Author(Model):
 
 	name: str
 	profile: Profile | None = has_one("author_id")
+	activities: list[Activity] = has_many("author_id")
 
 
 class Post(Model):
@@ -85,7 +89,50 @@ class Draft(Model):
 	reviewer: Author | None = belongs_to("reviewer_id")
 
 
-MODELS: list[type[Model]] = [Author, Post, Tag, Tagging, Comment, Profile, Draft]
+class Activity(Model):
+	table = "activities"
+
+	author_id: UUID
+	author: Author = belongs_to("author_id")
+	position: int
+	subject_variant: str
+	subject: Publication | Remark = has_one_variant(
+		"activity_id",
+		variant_name="subject_variant",
+	)
+
+
+class Publication(Model):
+	table = "publications"
+
+	activity_id: UUID
+	activity: Activity = belongs_to("activity_id")
+	post_id: UUID
+	post: Post = belongs_to("post_id")
+
+
+class Remark(Model):
+	table = "remarks"
+
+	activity_id: UUID
+	activity: Activity = belongs_to("activity_id")
+	comment_id: UUID
+	comment: Comment = belongs_to("comment_id")
+	excerpt: str
+
+
+MODELS: list[type[Model]] = [
+	Author,
+	Post,
+	Tag,
+	Tagging,
+	Comment,
+	Profile,
+	Draft,
+	Activity,
+	Publication,
+	Remark,
+]
 
 SCHEMA = """
 CREATE TABLE authors (
@@ -127,6 +174,26 @@ CREATE TABLE drafts (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
 	reviewer_id TEXT REFERENCES authors (id)
+);
+CREATE TABLE activities (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	author_id TEXT NOT NULL REFERENCES authors (id),
+	position INTEGER NOT NULL,
+	subject_variant TEXT NOT NULL
+);
+CREATE TABLE publications (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	activity_id TEXT NOT NULL REFERENCES activities (id),
+	post_id TEXT NOT NULL REFERENCES posts (id)
+);
+CREATE TABLE remarks (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	activity_id TEXT NOT NULL REFERENCES activities (id),
+	comment_id TEXT NOT NULL REFERENCES comments (id),
+	excerpt TEXT NOT NULL
 );
 """
 
@@ -182,6 +249,13 @@ def test_relationships_are_not_constructor_parameters():
 		)
 	with assert_raises(TypeError):
 		Author(name="Ada", profile=None)  # ty: ignore[unknown-argument]
+	with assert_raises(TypeError):
+		Activity(
+			author_id=author.id,
+			position=0,
+			subject_variant="remarks",
+			subject=None,  # ty: ignore[unknown-argument]
+		)
 	assert_eq(post.author_id, author.id)
 	assert_eq(author.name, "Ada")
 
@@ -374,6 +448,134 @@ def test_rejects_a_target_column_that_is_missing_or_not_a_uuid():
 		with assert_raises(ModelError) as raised:
 			Mistargeted.relationships[name]
 		assert_eq(str(raised.exception), message)
+
+
+def test_resolves_variants_declared_after_the_model():
+	relationship = assert_is_instance(
+		Activity.relationships["subject"],
+		HasOneVariant,
+	)
+
+	assert_eq(relationship.variants, (Publication, Remark))
+
+
+def test_rejects_a_variant_name_naming_a_missing_or_non_str_column():
+	with assert_raises(ModelError) as missing:
+
+		class MissingVariant(Model):
+			subject: Publication | Remark = has_one_variant(
+				"activity_id",
+				variant_name="subject_kind",
+			)
+
+	with assert_raises(ModelError) as not_str:
+
+		class NumberedVariant(Model):
+			position: int
+			subject: Publication | Remark = has_one_variant(
+				"activity_id",
+				variant_name="position",
+			)
+
+	assert_eq(
+		str(missing.exception),
+		"MissingVariant.subject: has_one_variant names 'subject_kind', "
+		"which is not a column",
+	)
+	assert_eq(
+		str(not_str.exception),
+		"NumberedVariant.subject: has_one_variant names 'position', "
+		"which does not hold a str",
+	)
+
+
+def test_rejects_a_variant_annotation_that_is_not_a_union_of_models():
+	with assert_raises(ModelError) as single:
+
+		class SingleVariant(Model):
+			subject_variant: str
+			subject: Publication = has_one_variant(
+				"activity_id",
+				variant_name="subject_variant",
+			)
+
+	with assert_raises(ModelError) as nullable:
+
+		class NullableVariant(Model):
+			subject_variant: str
+			subject: Publication | Remark | None = has_one_variant(
+				"activity_id",
+				variant_name="subject_variant",
+			)
+
+	with assert_raises(ModelError) as not_a_model:
+
+		class TextVariant(Model):
+			subject_variant: str
+			subject: Publication | str = has_one_variant(
+				"activity_id",
+				variant_name="subject_variant",
+			)
+
+	assert_eq(
+		str(single.exception),
+		f"SingleVariant.subject: expected a union of models, got {Publication!r}",
+	)
+	assert_eq(
+		str(nullable.exception),
+		"NullableVariant.subject: expected a union of models, "
+		f"got {Publication | Remark | None!r}",
+	)
+	assert_eq(
+		str(not_a_model.exception),
+		f"TextVariant.subject: expected a union of models, got {Publication | str!r}",
+	)
+
+
+def test_rejects_variants_that_share_a_table_on_first_use():
+	class Quotation(Model):
+		table = "remarks"
+
+		activity_id: UUID
+
+	class Quoted(Model):
+		subject_variant: str
+		subject: Remark | Quotation = has_one_variant(
+			"activity_id",
+			variant_name="subject_variant",
+		)
+
+	with assert_raises(ModelError) as raised:
+		Quoted.relationships["subject"]
+
+	assert_eq(
+		str(raised.exception),
+		"Quoted.subject: Quotation shares its table with another variant",
+	)
+
+
+def test_rejects_a_variant_without_a_uuid_id_column_on_first_use():
+	class Unlinked(Model):
+		subject_variant: str
+		subject: Publication | Tag = has_one_variant(
+			"activity_id",
+			variant_name="subject_variant",
+		)
+
+	with assert_raises(ModelError) as raised:
+		Unlinked.relationships["subject"]
+
+	assert_eq(
+		str(raised.exception),
+		"Unlinked.subject: Tag.activity_id does not hold a UUID",
+	)
+
+
+def test_a_variant_relationship_has_no_single_target():
+	relationship = Activity.relationships["subject"]
+
+	with assert_raises(ModelError):
+		_ = relationship.target
 
 
 def test_reading_an_unloaded_relationship_raises():

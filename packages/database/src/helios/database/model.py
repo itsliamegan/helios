@@ -15,11 +15,11 @@ from .column import Column, generated
 from .columns import Columns
 from .error import ModelError
 from .relationship import (
-	BelongsTo,
 	Relationship,
 	belongs_to,
 	has_many,
 	has_one,
+	has_one_variant,
 )
 from .relationships import Relationships
 
@@ -27,16 +27,16 @@ from .relationships import Relationships
 @dataclass_transform(
 	kw_only_default=True,
 	eq_default=False,
-	field_specifiers=(generated, belongs_to, has_many, has_one),
+	field_specifiers=(generated, belongs_to, has_many, has_one, has_one_variant),
 )
 class Model:
 	"""A record in a database.
 
 	A subclass indicates the table that its rows come from with the `table`
 	attribute. A subclass declares each column as an annotated attribute and
-	each relationship with `belongs_to`, `has_many`, or `has_one`. An annotation
-	can name a type declared later, because each attribute resolves on first
-	use.
+	each relationship with `belongs_to`, `has_many`, `has_one`, or
+	`has_one_variant`. An annotation can name a type declared later, because
+	each attribute resolves on first use.
 
 	Attributes are read-only; writes must be performed through the `Store`. A
 	model built by its constructor is never stored and has no `created_at`.
@@ -164,8 +164,7 @@ def declare_attributes(model_type: type[Model]):
 	model_type.relationships = Relationships(relationships)
 
 	for relationship in relationships.values():
-		if isinstance(relationship, BelongsTo):
-			relationship.check_id(model_type.columns)
+		relationship.check_columns(model_type.columns)
 
 
 METADATA = {"columns", "relationships"}
