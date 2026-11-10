@@ -146,9 +146,9 @@ def declare_attributes(model_type: type[Model]):
 			column.bind(declaration)
 			columns[declaration.name] = column
 
-	for attribute in [*columns.values(), *relationships.values()]:
-		if not attribute.declaration.pending:
-			attribute.resolve()
+	for column in columns.values():
+		if not column.declaration.pending:
+			column.resolve()
 
 	for name, value in vars(model_type).items():
 		if (
@@ -163,8 +163,12 @@ def declare_attributes(model_type: type[Model]):
 	model_type.columns = Columns({**reserved, **columns})
 	model_type.relationships = Relationships(relationships)
 
+	# A relationship resolves only after the owner's columns are set, because
+	# resolving checks the annotation against them.
 	for relationship in relationships.values():
 		relationship.check_columns(model_type.columns)
+		if not relationship.declaration.pending:
+			relationship.resolve()
 
 
 METADATA = {"columns", "relationships"}

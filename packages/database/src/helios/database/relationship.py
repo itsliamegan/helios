@@ -140,17 +140,6 @@ class Relationship(ABC):
 	def check_columns(self, columns: Columns):
 		"""Check the owner's columns when the owner is declared."""
 
-	def check(self):
-		"""Check the target models when the relationship is first read."""
-
-		for target_type in self.target_types:
-			column = target_type.columns.get(self.target_column)
-			if column is None or column.annotation is not uuid.UUID:
-				raise ModelError(
-					f"{self.label}: {target_type.__name__}.{self.target_column} "
-					"does not hold a UUID"
-				)
-
 	@property
 	@abstractmethod
 	def owner_column(self) -> str: ...
@@ -192,6 +181,12 @@ class BelongsTo(Relationship):
 			raise self.declaration.reject(
 				DeclarationError(self.name, f"expected a model, got {annotation!r}")
 			)
+		elif nullable != self.owner.columns[self.id_name].nullable:
+			raise ModelError(
+				f"{self.label}: annotation must include None exactly when "
+				f"{self.owner.__name__}.{self.id_name} is nullable"
+			)
+
 		self._target_types = (target,)
 		self._nullable = nullable
 		self.resolved = True
@@ -207,16 +202,6 @@ class BelongsTo(Relationship):
 		raise ModelError(
 			f"{self.label}: belongs_to names {self.id_name!r}, which {detail}"
 		)
-
-	def check(self):
-		super().check()
-
-		column = self.owner.columns[self.id_name]
-		if self.nullable != column.nullable:
-			raise ModelError(
-				f"{self.label}: annotation must include None exactly when "
-				f"{self.owner.__name__}.{self.id_name} is nullable"
-			)
 
 	@property
 	def owner_column(self) -> str:
@@ -236,6 +221,14 @@ class Inverse(Relationship):
 	def target_column(self) -> str:
 		return self.id_name
 
+	def check_target(self, target_type: type[Model]):
+		column = target_type.columns.get(self.id_name)
+		if column is None or column.annotation is not uuid.UUID:
+			raise ModelError(
+				f"{self.label}: {target_type.__name__}.{self.id_name} "
+				"does not hold a UUID"
+			)
+
 
 class HasMany(Inverse):
 	plural = True
@@ -254,6 +247,8 @@ class HasMany(Inverse):
 					f"expected list[<model>], got {annotation!r}",
 				)
 			)
+		self.check_target(members[0])
+
 		self._target_types = (members[0],)
 		self._nullable = False
 		self.resolved = True
@@ -275,6 +270,8 @@ class HasOne(Inverse):
 					f"expected <model> | None, got {annotation!r}",
 				)
 			)
+		self.check_target(target)
+
 		self._target_types = (target,)
 		self._nullable = nullable
 		self.resolved = True
@@ -307,6 +304,17 @@ class HasOneVariant(Inverse):
 					f"expected a union of models, got {annotation!r}",
 				)
 			)
+
+		tables: set[str] = set()
+		for variant in variants:
+			if variant.table in tables:
+				raise ModelError(
+					f"{self.label}: {variant.__name__} shares its table "
+					"with another variant"
+				)
+			tables.add(variant.table)
+			self.check_target(variant)
+
 		self._target_types = tuple(variants)
 		self._nullable = False
 		self.resolved = True
@@ -336,18 +344,6 @@ class HasOneVariant(Inverse):
 		raise ModelError(
 			f"{self.label}: has_one_variant names {self.variant_name!r}, which {detail}"
 		)
-
-	def check(self):
-		tables: set[str] = set()
-		for target_type in self.target_types:
-			if target_type.table in tables:
-				raise ModelError(
-					f"{self.label}: {target_type.__name__} shares its table "
-					"with another variant"
-				)
-			tables.add(target_type.table)
-
-		super().check()
 
 
 def is_model(annotation: object) -> TypeIs[type[Model]]:

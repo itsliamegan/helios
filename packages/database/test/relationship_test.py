@@ -10,7 +10,6 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import (
 	assert_eq,
-	assert_in,
 	assert_raises,
 )
 
@@ -390,32 +389,18 @@ def test_resolves_targets_declared_after_the_model():
 	assert_eq(Author.relationships["profile"].target_types, (Profile,))
 
 
-def test_checks_each_relationship_when_it_is_read():
-	class Note(Model):
-		author_id: UUID
-		author: Author | None = belongs_to("author_id")
-		post_id: UUID
-		post: Post = belongs_to("post_id")
-
-	assert_in("author", Note.relationships)
-	assert_eq(Note.relationships["post"].target_types, (Post,))
-	with assert_raises(ModelError):
-		Note.relationships["author"]
-
-
-def test_rejects_a_nullability_mismatch_on_first_use():
-	class Loose(Model):
-		author_id: UUID
-		author: Author | None = belongs_to("author_id")
-
-	class Strict(Model):
-		author_id: UUID | None = None
-		author: Author = belongs_to("author_id")
-
+def test_rejects_a_nullability_mismatch():
 	with assert_raises(ModelError) as loose:
-		Loose.relationships["author"]
+
+		class Loose(Model):
+			author_id: UUID
+			author: Author | None = belongs_to("author_id")
+
 	with assert_raises(ModelError) as strict:
-		Strict.relationships["author"]
+
+		class Strict(Model):
+			author_id: UUID | None = None
+			author: Author = belongs_to("author_id")
 
 	assert_eq(
 		str(loose.exception),
@@ -431,20 +416,33 @@ def test_rejects_a_nullability_mismatch_on_first_use():
 
 
 def test_rejects_a_target_column_that_is_missing_or_not_a_uuid():
-	class Mistargeted(Model):
-		taggings: list[Tagging] = has_many("post_ide")
-		positioned: list[Tagging] = has_many("position")
-		profile: Profile | None = has_one("bio")
+	with assert_raises(ModelError) as missing:
 
-	cases = [
-		("taggings", "Mistargeted.taggings: Tagging.post_ide does not hold a UUID"),
-		("positioned", "Mistargeted.positioned: Tagging.position does not hold a UUID"),
-		("profile", "Mistargeted.profile: Profile.bio does not hold a UUID"),
-	]
-	for name, message in cases:
-		with assert_raises(ModelError) as raised:
-			Mistargeted.relationships[name]
-		assert_eq(str(raised.exception), message)
+		class Misspelled(Model):
+			taggings: list[Tagging] = has_many("post_ide")
+
+	with assert_raises(ModelError) as not_uuid:
+
+		class Positioned(Model):
+			taggings: list[Tagging] = has_many("position")
+
+	with assert_raises(ModelError) as one:
+
+		class Biographed(Model):
+			profile: Profile | None = has_one("bio")
+
+	assert_eq(
+		str(missing.exception),
+		"Misspelled.taggings: Tagging.post_ide does not hold a UUID",
+	)
+	assert_eq(
+		str(not_uuid.exception),
+		"Positioned.taggings: Tagging.position does not hold a UUID",
+	)
+	assert_eq(
+		str(one.exception),
+		"Biographed.profile: Profile.bio does not hold a UUID",
+	)
 
 
 def test_resolves_variants_declared_after_the_model():
@@ -527,21 +525,20 @@ def test_rejects_a_variant_annotation_that_is_not_a_union_of_models():
 	)
 
 
-def test_rejects_variants_that_share_a_table_on_first_use():
+def test_rejects_variants_that_share_a_table():
 	class Quotation(Model):
 		table = "remarks"
 
 		activity_id: UUID
 
-	class Quoted(Model):
-		subject_variant: str
-		subject: Remark | Quotation = has_one_variant(
-			"activity_id",
-			variant_name="subject_variant",
-		)
-
 	with assert_raises(ModelError) as raised:
-		Quoted.relationships["subject"]
+
+		class Quoted(Model):
+			subject_variant: str
+			subject: Remark | Quotation = has_one_variant(
+				"activity_id",
+				variant_name="subject_variant",
+			)
 
 	assert_eq(
 		str(raised.exception),
@@ -549,16 +546,15 @@ def test_rejects_variants_that_share_a_table_on_first_use():
 	)
 
 
-def test_rejects_a_variant_without_a_uuid_id_column_on_first_use():
-	class Unlinked(Model):
-		subject_variant: str
-		subject: Publication | Tag = has_one_variant(
-			"activity_id",
-			variant_name="subject_variant",
-		)
-
+def test_rejects_a_variant_without_a_uuid_id_column():
 	with assert_raises(ModelError) as raised:
-		Unlinked.relationships["subject"]
+
+		class Unlinked(Model):
+			subject_variant: str
+			subject: Publication | Tag = has_one_variant(
+				"activity_id",
+				variant_name="subject_variant",
+			)
 
 	assert_eq(
 		str(raised.exception),
