@@ -71,7 +71,7 @@ class Branch:
 		self.branches: dict[str, Branch] = {}
 
 	def load(self, store: Store, owners: Sequence[Model]):
-		"""Load the relationship onto the owners, then the branches beneath it."""
+		"""Load the relationship onto the owners, then each branch beneath it onto their targets."""
 
 		relationship = self.relationship
 		found = self.find_targets(store, owners)
@@ -93,9 +93,10 @@ class Branch:
 		store: Store,
 		owners: Sequence[Model],
 	) -> dict[UUID, list[Model]]:
-		"""Find the target rows for the owners, by the owner column value they match.
+		"""Find the owners' targets, grouped by owner column value.
 
-		Each row is found once, however many owners match it.
+		Each row is found once, however many owners match it. An owner with no
+		targets has no entry.
 		"""
 
 		owner_column = self.relationship.owner_column
