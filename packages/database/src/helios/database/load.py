@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING
 
 from .error import ModelError
@@ -14,9 +14,9 @@ class Load:
 
 	Each path segment runs one query per batch of IDs, and paths that share a
 	prefix query it once. A relationship with several targets runs those
-	queries once for each target present. Every segment is queried again even when it is
-	already loaded. Each row becomes one object, shared by every model that
-	refers to it.
+	queries once for each target present. Every segment is queried again even
+	when it is already loaded. Each row becomes one object, shared by every
+	model that refers to it.
 	"""
 
 	def __init__(self, store: Store, model_type: type[Model], paths: Iterable[str]):
@@ -58,55 +58,8 @@ class Load:
 			level = branch.branches
 
 	def load(self, models: Sequence[Model]):
-		self.load_branches(models, self.branches)
-
-	def load_branches(self, models: Sequence[Model], branches: Mapping[str, Branch]):
-		for name, branch in branches.items():
-			self.fill(branch.relationship, models)
-
-			children: dict[int, Model] = {}
-			for model in models:
-				loaded = model._loaded[name]
-				for child in loaded if isinstance(loaded, list) else [loaded]:
-					if isinstance(child, Model):
-						children[id(child)] = child
-			if branch.branches and children:
-				self.load_branches(list(children.values()), branch.branches)
-
-	def fill(self, relationship: Relationship, models: Sequence[Model]):
-		groups: dict[type[Model], list[Model]] = {}
-		for model in models:
-			groups.setdefault(relationship.target_type(model), []).append(model)
-		for target_type, group in groups.items():
-			self.fill_target(relationship, target_type, group)
-
-	def fill_target(
-		self,
-		relationship: Relationship,
-		target_type: type[Model],
-		models: Sequence[Model],
-	):
-		owner_column = relationship.owner_column
-		target_column = relationship.target_column
-		values = list(
-			dict.fromkeys(
-				model._values[owner_column]
-				for model in models
-				if model._values[owner_column] is not None
-			)
-		)
-
-		matches: dict[object, list[Model]] = {}
-		size = self.store.connection.parameter_limit
-		for start in range(0, len(values), size):
-			batch = values[start : start + size]
-			query = self.store.query(target_type)
-			for row in query.where({f"{target_column} in": batch}).all():
-				matches.setdefault(row._values[target_column], []).append(row)
-
-		for model in models:
-			found = matches.get(model._values[owner_column], [])
-			model._loaded[relationship.name] = relationship.target(model, found)
+		for branch in self.branches.values():
+			branch.load(self.store, models)
 
 
 class Branch:
@@ -115,3 +68,62 @@ class Branch:
 	def __init__(self, relationship: Relationship):
 		self.relationship = relationship
 		self.branches: dict[str, Branch] = {}
+
+	def load(self, store: Store, models: Sequence[Model]):
+		"""Load the relationship onto the models, then the branches beneath it."""
+
+		relationship = self.relationship
+		groups: dict[type[Model], list[Model]] = {}
+		for model in models:
+			groups.setdefault(relationship.target_type(model), []).append(model)
+
+		for target_type, group in groups.items():
+			rows = self.rows(store, target_type, group)
+			for model in group:
+				found = rows.get(model._values[relationship.owner_column], [])
+				model._loaded[relationship.name] = relationship.target(model, found)
+
+		if self.branches:
+			targets = self.targets(models)
+			for branch in self.branches.values():
+				branch.load(store, targets)
+
+	def rows(
+		self,
+		store: Store,
+		target_type: type[Model],
+		models: Sequence[Model],
+	) -> dict[object, list[Model]]:
+		"""Return the target rows for the models, by their target column value."""
+
+		owner_column = self.relationship.owner_column
+		target_column = self.relationship.target_column
+		values = list(
+			dict.fromkeys(
+				model._values[owner_column]
+				for model in models
+				if model._values[owner_column] is not None
+			)
+		)
+
+		rows: dict[object, list[Model]] = {}
+		size = store.connection.parameter_limit
+		for start in range(0, len(values), size):
+			batch = values[start : start + size]
+			query = store.query(target_type)
+			for row in query.where({f"{target_column} in": batch}).all():
+				rows.setdefault(row._values[target_column], []).append(row)
+		return rows
+
+	def targets(self, models: Sequence[Model]) -> list[Model]:
+		"""Return the models' loaded targets, each once."""
+
+		targets: dict[int, Model] = {}
+		for model in models:
+			loaded = model._loaded[self.relationship.name]
+			if isinstance(loaded, list):
+				for target in loaded:
+					targets[id(target)] = target
+			elif loaded is not None:
+				targets[id(loaded)] = loaded
+		return list(targets.values())
