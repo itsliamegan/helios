@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from .error import DatabaseError, ModelError
 from .model import Model
-from .relationship import HasOneVariant, Relationship
+from .relationship import Relationship
 
 if TYPE_CHECKING:
 	from .store import Store
@@ -13,8 +13,8 @@ class Load:
 	"""Loads relationship paths onto models of one type.
 
 	Each path segment runs one query per batch of IDs, and paths that share a
-	prefix query it once. A variant relationship runs those queries once for
-	each variant present. Every segment is queried again even when it is
+	prefix query it once. A relationship with several targets runs those
+	queries once for each target present. Every segment is queried again even when it is
 	already loaded. Each row becomes one object, shared by every model that
 	refers to it.
 	"""
@@ -37,24 +37,23 @@ class Load:
 		level = self.branches
 		current = self.model_type
 		for index, segment in enumerate(segments):
+			continues = index < len(segments) - 1
 			relationship = current.relationships.get(segment)
 			if relationship is None:
 				raise ModelError(
 					f"{subject} has {path!r}, "
 					f"where {current.__name__}.{segment} is not a relationship"
 				)
+			elif continues and len(relationship.target_types) > 1:
+				raise ModelError(
+					f"{subject} has {path!r}, "
+					f"where {current.__name__}.{segment} has several targets"
+				)
 
-			if isinstance(relationship, HasOneVariant):
-				if index < len(segments) - 1:
-					raise ModelError(
-						f"{subject} has {path!r}, "
-						f"where {current.__name__}.{segment} is a variant relationship"
-					)
-				for variant in relationship.variants:
-					self.store.namespace(variant)
-			else:
-				current = relationship.target
-				self.store.namespace(current)
+			for target_type in relationship.target_types:
+				self.store.namespace(target_type)
+			if continues:
+				(current,) = relationship.target_types
 			branch = level.setdefault(segment, Branch(relationship))
 			level = branch.branches
 
@@ -75,13 +74,16 @@ class Load:
 				self.load_branches(list(children.values()), branch.branches)
 
 	def fill(self, relationship: Relationship, models: Sequence[Model]):
-		for target, group in relationship.by_target(models):
-			self.fill_target(relationship, target, group)
+		groups: dict[type[Model], list[Model]] = {}
+		for model in models:
+			groups.setdefault(relationship.target_type(model), []).append(model)
+		for target_type, group in groups.items():
+			self.fill_target(relationship, target_type, group)
 
 	def fill_target(
 		self,
 		relationship: Relationship,
-		target: type[Model],
+		target_type: type[Model],
 		models: Sequence[Model],
 	):
 		owner_column = relationship.owner_column
@@ -98,7 +100,7 @@ class Load:
 		size = self.store.connection.parameter_limit
 		for start in range(0, len(values), size):
 			batch = values[start : start + size]
-			query = self.store.query(target)
+			query = self.store.query(target_type)
 			for row in query.where({f"{target_column} in": batch}).all():
 				matches.setdefault(row._values[target_column], []).append(row)
 
@@ -106,7 +108,7 @@ class Load:
 			found = matches.get(model._values[owner_column], [])
 			model._loaded[relationship.name] = self.loaded(
 				relationship,
-				target,
+				target_type,
 				model,
 				found,
 			)
@@ -114,7 +116,7 @@ class Load:
 	def loaded(
 		self,
 		relationship: Relationship,
-		target: type[Model],
+		target_type: type[Model],
 		model: Model,
 		found: list[Model],
 	):
@@ -123,7 +125,8 @@ class Load:
 			return found
 		elif len(found) > 1:
 			raise DatabaseError(
-				f"{relationship.label} has several {target.__name__} rows for {owner}"
+				f"{relationship.label} has several {target_type.__name__} rows "
+				f"for {owner}"
 			)
 		elif found:
 			return found[0]
@@ -131,7 +134,7 @@ class Load:
 			return None
 		else:
 			raise DatabaseError(
-				f"{relationship.label} has no {target.__name__} row for {owner}"
+				f"{relationship.label} has no {target_type.__name__} row for {owner}"
 			)
 
 

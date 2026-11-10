@@ -15,7 +15,6 @@ from .condition import (
 )
 from .error import ModelError
 from .model import Model
-from .relationship import HasOneVariant
 
 if TYPE_CHECKING:
 	from .store import Store
@@ -82,19 +81,19 @@ class ConditionParser:
 				f"{self.subject} has {first.text!r}, "
 				f"where {model_type.__name__}.{name} is not a relationship"
 			)
-		elif isinstance(relationship, HasOneVariant):
+		elif len(relationship.target_types) > 1:
 			raise ModelError(
 				f"{self.subject} has {first.text!r}, "
-				f"where {model_type.__name__}.{name} is a variant relationship"
+				f"where {model_type.__name__}.{name} has several targets"
 			)
 
-		target = relationship.target
-		self.store.namespace(target)
+		(target_type,) = relationship.target_types
+		self.store.namespace(target_type)
 		return Exists(
-			target.table,
+			target_type.table,
 			relationship.target_column,
 			relationship.owner_column,
-			self.build(target, terms, depth + 1),
+			self.build(target_type, terms, depth + 1),
 		)
 
 

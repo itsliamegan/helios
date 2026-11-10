@@ -423,7 +423,7 @@ def test_rejects_invalid_arguments_before_any_query():
 				lambda: store.load(fixture.ada, "activities.subject.post"),
 				(
 					"store.load on Author has 'activities.subject.post', "
-					"where Activity.subject is a variant relationship"
+					"where Activity.subject has several targets"
 				),
 			),
 			(

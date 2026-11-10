@@ -407,7 +407,7 @@ def test_rejects_a_path_through_a_variant_relationship():
 	assert_eq(
 		str(raised.exception),
 		"Query on Activity has 'subject.excerpt', "
-		"where Activity.subject is a variant relationship",
+		"where Activity.subject has several targets",
 	)
 
 

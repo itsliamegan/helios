@@ -11,8 +11,6 @@ from uuid import UUID, uuid4
 from luna.test.assertion import (
 	assert_eq,
 	assert_in,
-	assert_is,
-	assert_is_instance,
 	assert_raises,
 )
 
@@ -26,7 +24,6 @@ from helios.database import (
 	has_one,
 	has_one_variant,
 )
-from helios.database.relationship import HasOneVariant
 from helios.database.sqlite import Connection
 
 
@@ -376,21 +373,21 @@ def test_resolves_targets_imported_only_for_type_checking():
 		registry = Registry()
 		registry.model(memoirist)
 		registry.model(memoir)
-		memoirs = memoirist.relationships["memoirs"].target
-		author = memoir.relationships["memoirist"].target
+		memoirs = memoirist.relationships["memoirs"].target_types
+		author = memoir.relationships["memoirist"].target_types
 
 	assert_eq(
 		str(unregistered.exception),
 		"Memoir.memoirist: unresolved annotation: Memoirist",
 	)
-	assert_is(memoirs, memoir)
-	assert_is(author, memoirist)
+	assert_eq(memoirs, (memoir,))
+	assert_eq(author, (memoirist,))
 
 
 def test_resolves_targets_declared_after_the_model():
-	assert_eq(Post.relationships["taggings"].target, Tagging)
-	assert_eq(Post.relationships["comments"].target, Comment)
-	assert_eq(Author.relationships["profile"].target, Profile)
+	assert_eq(Post.relationships["taggings"].target_types, (Tagging,))
+	assert_eq(Post.relationships["comments"].target_types, (Comment,))
+	assert_eq(Author.relationships["profile"].target_types, (Profile,))
 
 
 def test_checks_each_relationship_when_it_is_read():
@@ -401,7 +398,7 @@ def test_checks_each_relationship_when_it_is_read():
 		post: Post = belongs_to("post_id")
 
 	assert_in("author", Note.relationships)
-	assert_eq(Note.relationships["post"].target, Post)
+	assert_eq(Note.relationships["post"].target_types, (Post,))
 	with assert_raises(ModelError):
 		Note.relationships["author"]
 
@@ -430,7 +427,7 @@ def test_rejects_a_nullability_mismatch_on_first_use():
 		"Strict.author: annotation must include None exactly when "
 		"Strict.author_id is nullable",
 	)
-	assert_eq(Draft.relationships["reviewer"].target, Author)
+	assert_eq(Draft.relationships["reviewer"].target_types, (Author,))
 
 
 def test_rejects_a_target_column_that_is_missing_or_not_a_uuid():
@@ -451,12 +448,10 @@ def test_rejects_a_target_column_that_is_missing_or_not_a_uuid():
 
 
 def test_resolves_variants_declared_after_the_model():
-	relationship = assert_is_instance(
-		Activity.relationships["subject"],
-		HasOneVariant,
+	assert_eq(
+		Activity.relationships["subject"].target_types,
+		(Publication, Remark),
 	)
-
-	assert_eq(relationship.variants, (Publication, Remark))
 
 
 def test_rejects_a_variant_name_naming_a_missing_or_non_str_column():
@@ -569,13 +564,6 @@ def test_rejects_a_variant_without_a_uuid_id_column_on_first_use():
 		str(raised.exception),
 		"Unlinked.subject: Tag.activity_id does not hold a UUID",
 	)
-
-
-def test_a_variant_relationship_has_no_single_target():
-	relationship = Activity.relationships["subject"]
-
-	with assert_raises(ModelError):
-		_ = relationship.target
 
 
 def test_reading_an_unloaded_relationship_raises():
