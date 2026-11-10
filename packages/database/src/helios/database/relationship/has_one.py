@@ -6,8 +6,6 @@ from .inverse import Inverse
 from .relationship import is_model
 
 
-# The `init` parameter tells type checkers that a relationship is not a
-# constructor parameter.
 def has_one(id_name: str, *, init: Literal[False] = False) -> Any:
 	"""Declare a model that identifies this model in its `id_name` column.
 

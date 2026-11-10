@@ -11,8 +11,6 @@ if TYPE_CHECKING:
 	from ..model import Model
 
 
-# The `init` parameter tells type checkers that a relationship is not a
-# constructor parameter.
 def has_one_variant(
 	id_name: str,
 	*,

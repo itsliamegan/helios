@@ -10,8 +10,6 @@ if TYPE_CHECKING:
 	from ..columns import Columns
 
 
-# The `init` parameter tells type checkers that a relationship is not a
-# constructor parameter.
 def belongs_to(id_name: str, *, init: Literal[False] = False) -> Any:
 	"""Declare the model that this model identifies in its `id_name` column.
 
