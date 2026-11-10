@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 from luna.test.assertion import (
 	assert_eq,
 	assert_is,
+	assert_is_instance,
 	assert_not_none,
 	assert_raises,
 	assert_that,
@@ -23,6 +24,7 @@ from helios.database import (
 	belongs_to,
 	has_many,
 	has_one,
+	has_one_variant,
 )
 from helios.database.sqlite import Connection
 
@@ -32,6 +34,7 @@ class Author(Model):
 
 	name: str
 	profile: Profile | None = has_one("author_id")
+	activities: list[Activity] = has_many("author_id")
 
 
 class Post(Model):
@@ -85,7 +88,50 @@ class Draft(Model):
 	reviewer: Author | None = belongs_to("reviewer_id")
 
 
-MODELS: list[type[Model]] = [Author, Post, Tag, Tagging, Comment, Profile, Draft]
+class Activity(Model):
+	table = "activities"
+
+	author_id: UUID
+	author: Author = belongs_to("author_id")
+	position: int
+	subject_variant: str
+	subject: Publication | Remark = has_one_variant(
+		"activity_id",
+		variant_name="subject_variant",
+	)
+
+
+class Publication(Model):
+	table = "publications"
+
+	activity_id: UUID
+	activity: Activity = belongs_to("activity_id")
+	post_id: UUID
+	post: Post = belongs_to("post_id")
+
+
+class Remark(Model):
+	table = "remarks"
+
+	activity_id: UUID
+	activity: Activity = belongs_to("activity_id")
+	comment_id: UUID
+	comment: Comment = belongs_to("comment_id")
+	excerpt: str
+
+
+MODELS: list[type[Model]] = [
+	Author,
+	Post,
+	Tag,
+	Tagging,
+	Comment,
+	Profile,
+	Draft,
+	Activity,
+	Publication,
+	Remark,
+]
 
 SCHEMA = """
 CREATE TABLE authors (
@@ -127,6 +173,26 @@ CREATE TABLE drafts (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
 	reviewer_id TEXT REFERENCES authors (id)
+);
+CREATE TABLE activities (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	author_id TEXT NOT NULL REFERENCES authors (id),
+	position INTEGER NOT NULL,
+	subject_variant TEXT NOT NULL
+);
+CREATE TABLE publications (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	activity_id TEXT NOT NULL REFERENCES activities (id),
+	post_id TEXT NOT NULL REFERENCES posts (id)
+);
+CREATE TABLE remarks (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	activity_id TEXT NOT NULL REFERENCES activities (id),
+	comment_id TEXT NOT NULL REFERENCES comments (id),
+	excerpt TEXT NOT NULL
 );
 """
 
@@ -324,6 +390,33 @@ def test_update_unloads_a_changed_belongs_to():
 		assert_eq(fixture.second.tag.name, "Rust")
 
 
+def test_update_unloads_a_changed_variant():
+	with open_store() as store:
+		fixture = Fixture(store)
+		moved = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=0,
+			subject_variant=Publication.table,
+		)
+		store.create(Publication, activity_id=moved.id, post_id=fixture.ideas.id)
+		kept = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=1,
+			subject_variant=Publication.table,
+		)
+		store.create(Publication, activity_id=kept.id, post_id=fixture.empty.id)
+		store.load([moved, kept], "subject")
+
+		store.update(moved, subject_variant=Remark.table)
+		store.update(kept, subject_variant=Publication.table, position=4)
+
+		with assert_raises(ModelError):
+			_ = moved.subject
+		assert_is_instance(kept.subject, Publication)
+
+
 def test_loaded_lists_are_snapshots():
 	with open_store() as store:
 		fixture = Fixture(store)
@@ -354,6 +447,13 @@ def test_rejects_invalid_arguments_before_any_query():
 				),
 			),
 			(
+				lambda: store.load(fixture.ada, "activities.subject.post"),
+				(
+					"store.load on Author has 'activities.subject.post', "
+					"where Activity.subject has several targets"
+				),
+			),
+			(
 				lambda: store.load(fixture.first, "tag."),
 				"store.load on Tagging has 'tag.', which is not a relationship path",
 			),
@@ -375,6 +475,184 @@ def test_rejects_invalid_arguments_before_any_query():
 			store.load([], "tag")
 
 		assert_eq(statements, [])
+
+
+def test_loads_each_variant_with_one_query():
+	with open_store() as store:
+		fixture = Fixture(store)
+		comment = store.create(
+			Comment, post_id=fixture.ideas.id, author_id=fixture.bo.id
+		)
+		published = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=0,
+			subject_variant=Publication.table,
+		)
+		store.create(Publication, activity_id=published.id, post_id=fixture.ideas.id)
+		republished = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=1,
+			subject_variant=Publication.table,
+		)
+		store.create(Publication, activity_id=republished.id, post_id=fixture.empty.id)
+		remarked = store.create(
+			Activity,
+			author_id=fixture.bo.id,
+			position=2,
+			subject_variant=Remark.table,
+		)
+		store.create(
+			Remark,
+			activity_id=remarked.id,
+			comment_id=comment.id,
+			excerpt="Agreed",
+		)
+
+		with recording(store) as statements:
+			store.load([published, republished, remarked], "subject")
+
+		assert_eq(selects(statements, "publications"), 1)
+		assert_eq(selects(statements, "remarks"), 1)
+		assert_eq(
+			assert_is_instance(published.subject, Publication).post_id,
+			fixture.ideas.id,
+		)
+		assert_eq(
+			assert_is_instance(republished.subject, Publication).post_id,
+			fixture.empty.id,
+		)
+		assert_eq(assert_is_instance(remarked.subject, Remark).excerpt, "Agreed")
+
+
+def test_queries_only_the_variants_present():
+	with open_store() as store:
+		fixture = Fixture(store)
+		activity = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=0,
+			subject_variant=Publication.table,
+		)
+		store.create(Publication, activity_id=activity.id, post_id=fixture.ideas.id)
+
+		with recording(store) as statements:
+			store.load(activity, "subject")
+
+		assert_eq(selects(statements, "publications"), 1)
+		assert_eq(selects(statements, "remarks"), 0)
+
+
+def test_splits_large_variant_id_sets_into_batches():
+	with open_store() as store:
+		fixture = Fixture(store)
+		activities = []
+		for position in range(5):
+			activity = store.create(
+				Activity,
+				author_id=fixture.ada.id,
+				position=position,
+				subject_variant=Publication.table,
+			)
+			store.create(Publication, activity_id=activity.id, post_id=fixture.ideas.id)
+			activities.append(activity)
+		cast(Connection, store.connection).connection.setlimit(
+			sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 2
+		)
+
+		with recording(store) as statements:
+			store.load(activities, "subject")
+
+		assert_eq(selects(statements, "publications"), 3)
+		assert_eq(
+			{
+				assert_is_instance(activity.subject, Publication).activity_id
+				for activity in activities
+			},
+			{activity.id for activity in activities},
+		)
+
+
+def test_loads_variants_through_a_path():
+	with open_store() as store:
+		fixture = Fixture(store)
+		activity = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=0,
+			subject_variant=Publication.table,
+		)
+		publication = store.create(
+			Publication,
+			activity_id=activity.id,
+			post_id=fixture.ideas.id,
+		)
+
+		store.load([fixture.ada, fixture.bo], "activities.subject")
+
+		assert_eq(len(fixture.ada.activities), 1)
+		assert_eq(fixture.ada.activities[0].subject.id, publication.id)
+		assert_eq(fixture.bo.activities, [])
+
+
+def test_rejects_an_unknown_variant():
+	with open_store() as store:
+		fixture = Fixture(store)
+		activity = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=0,
+			subject_variant=Tag.table,
+		)
+
+		with assert_raises(DatabaseError) as raised:
+			store.load(activity, "subject")
+
+		assert_eq(
+			str(raised.exception),
+			f"Activity.subject has unknown variant 'tags' for Activity {activity.id}",
+		)
+
+
+def test_rejects_a_missing_variant_row():
+	with open_store() as store:
+		fixture = Fixture(store)
+		activity = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=0,
+			subject_variant=Remark.table,
+		)
+
+		with assert_raises(DatabaseError) as raised:
+			store.load(activity, "subject")
+
+		assert_eq(
+			str(raised.exception),
+			f"Activity.subject has no Remark row for Activity {activity.id}",
+		)
+
+
+def test_rejects_several_variant_rows():
+	with open_store() as store:
+		fixture = Fixture(store)
+		activity = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=0,
+			subject_variant=Publication.table,
+		)
+		store.create(Publication, activity_id=activity.id, post_id=fixture.ideas.id)
+		store.create(Publication, activity_id=activity.id, post_id=fixture.empty.id)
+
+		with assert_raises(DatabaseError) as raised:
+			store.load(activity, "subject")
+
+		assert_eq(
+			str(raised.exception),
+			f"Activity.subject has several Publication rows for Activity {activity.id}",
+		)
 
 
 def test_rejects_several_has_one_rows():

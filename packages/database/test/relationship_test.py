@@ -10,8 +10,6 @@ from uuid import UUID, uuid4
 
 from luna.test.assertion import (
 	assert_eq,
-	assert_in,
-	assert_is,
 	assert_raises,
 )
 
@@ -23,6 +21,7 @@ from helios.database import (
 	belongs_to,
 	has_many,
 	has_one,
+	has_one_variant,
 )
 from helios.database.sqlite import Connection
 
@@ -32,6 +31,7 @@ class Author(Model):
 
 	name: str
 	profile: Profile | None = has_one("author_id")
+	activities: list[Activity] = has_many("author_id")
 
 
 class Post(Model):
@@ -85,7 +85,50 @@ class Draft(Model):
 	reviewer: Author | None = belongs_to("reviewer_id")
 
 
-MODELS: list[type[Model]] = [Author, Post, Tag, Tagging, Comment, Profile, Draft]
+class Activity(Model):
+	table = "activities"
+
+	author_id: UUID
+	author: Author = belongs_to("author_id")
+	position: int
+	subject_variant: str
+	subject: Publication | Remark = has_one_variant(
+		"activity_id",
+		variant_name="subject_variant",
+	)
+
+
+class Publication(Model):
+	table = "publications"
+
+	activity_id: UUID
+	activity: Activity = belongs_to("activity_id")
+	post_id: UUID
+	post: Post = belongs_to("post_id")
+
+
+class Remark(Model):
+	table = "remarks"
+
+	activity_id: UUID
+	activity: Activity = belongs_to("activity_id")
+	comment_id: UUID
+	comment: Comment = belongs_to("comment_id")
+	excerpt: str
+
+
+MODELS: list[type[Model]] = [
+	Author,
+	Post,
+	Tag,
+	Tagging,
+	Comment,
+	Profile,
+	Draft,
+	Activity,
+	Publication,
+	Remark,
+]
 
 SCHEMA = """
 CREATE TABLE authors (
@@ -127,6 +170,26 @@ CREATE TABLE drafts (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
 	reviewer_id TEXT REFERENCES authors (id)
+);
+CREATE TABLE activities (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	author_id TEXT NOT NULL REFERENCES authors (id),
+	position INTEGER NOT NULL,
+	subject_variant TEXT NOT NULL
+);
+CREATE TABLE publications (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	activity_id TEXT NOT NULL REFERENCES activities (id),
+	post_id TEXT NOT NULL REFERENCES posts (id)
+);
+CREATE TABLE remarks (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	activity_id TEXT NOT NULL REFERENCES activities (id),
+	comment_id TEXT NOT NULL REFERENCES comments (id),
+	excerpt TEXT NOT NULL
 );
 """
 
@@ -182,6 +245,13 @@ def test_relationships_are_not_constructor_parameters():
 		)
 	with assert_raises(TypeError):
 		Author(name="Ada", profile=None)  # ty: ignore[unknown-argument]
+	with assert_raises(TypeError):
+		Activity(
+			author_id=author.id,
+			position=0,
+			subject_variant="remarks",
+			subject=None,  # ty: ignore[unknown-argument]
+		)
 	assert_eq(post.author_id, author.id)
 	assert_eq(author.name, "Ada")
 
@@ -302,49 +372,35 @@ def test_resolves_targets_imported_only_for_type_checking():
 		registry = Registry()
 		registry.model(memoirist)
 		registry.model(memoir)
-		memoirs = memoirist.relationships["memoirs"].target
-		author = memoir.relationships["memoirist"].target
+		memoirs = memoirist.relationships["memoirs"].target_types
+		author = memoir.relationships["memoirist"].target_types
 
 	assert_eq(
 		str(unregistered.exception),
 		"Memoir.memoirist: unresolved annotation: Memoirist",
 	)
-	assert_is(memoirs, memoir)
-	assert_is(author, memoirist)
+	assert_eq(memoirs, (memoir,))
+	assert_eq(author, (memoirist,))
 
 
 def test_resolves_targets_declared_after_the_model():
-	assert_eq(Post.relationships["taggings"].target, Tagging)
-	assert_eq(Post.relationships["comments"].target, Comment)
-	assert_eq(Author.relationships["profile"].target, Profile)
+	assert_eq(Post.relationships["taggings"].target_types, (Tagging,))
+	assert_eq(Post.relationships["comments"].target_types, (Comment,))
+	assert_eq(Author.relationships["profile"].target_types, (Profile,))
 
 
-def test_checks_each_relationship_when_it_is_read():
-	class Note(Model):
-		author_id: UUID
-		author: Author | None = belongs_to("author_id")
-		post_id: UUID
-		post: Post = belongs_to("post_id")
-
-	assert_in("author", Note.relationships)
-	assert_eq(Note.relationships["post"].target, Post)
-	with assert_raises(ModelError):
-		Note.relationships["author"]
-
-
-def test_rejects_a_nullability_mismatch_on_first_use():
-	class Loose(Model):
-		author_id: UUID
-		author: Author | None = belongs_to("author_id")
-
-	class Strict(Model):
-		author_id: UUID | None = None
-		author: Author = belongs_to("author_id")
-
+def test_rejects_a_nullability_mismatch():
 	with assert_raises(ModelError) as loose:
-		Loose.relationships["author"]
+
+		class Loose(Model):
+			author_id: UUID
+			author: Author | None = belongs_to("author_id")
+
 	with assert_raises(ModelError) as strict:
-		Strict.relationships["author"]
+
+		class Strict(Model):
+			author_id: UUID | None = None
+			author: Author = belongs_to("author_id")
 
 	assert_eq(
 		str(loose.exception),
@@ -356,24 +412,154 @@ def test_rejects_a_nullability_mismatch_on_first_use():
 		"Strict.author: annotation must include None exactly when "
 		"Strict.author_id is nullable",
 	)
-	assert_eq(Draft.relationships["reviewer"].target, Author)
+	assert_eq(Draft.relationships["reviewer"].target_types, (Author,))
 
 
 def test_rejects_a_target_column_that_is_missing_or_not_a_uuid():
-	class Mistargeted(Model):
-		taggings: list[Tagging] = has_many("post_ide")
-		positioned: list[Tagging] = has_many("position")
-		profile: Profile | None = has_one("bio")
+	with assert_raises(ModelError) as missing:
 
-	cases = [
-		("taggings", "Mistargeted.taggings: Tagging.post_ide does not hold a UUID"),
-		("positioned", "Mistargeted.positioned: Tagging.position does not hold a UUID"),
-		("profile", "Mistargeted.profile: Profile.bio does not hold a UUID"),
-	]
-	for name, message in cases:
-		with assert_raises(ModelError) as raised:
-			Mistargeted.relationships[name]
-		assert_eq(str(raised.exception), message)
+		class Misspelled(Model):
+			taggings: list[Tagging] = has_many("post_ide")
+
+	with assert_raises(ModelError) as not_uuid:
+
+		class Positioned(Model):
+			taggings: list[Tagging] = has_many("position")
+
+	with assert_raises(ModelError) as one:
+
+		class Biographed(Model):
+			profile: Profile | None = has_one("bio")
+
+	assert_eq(
+		str(missing.exception),
+		"Misspelled.taggings: Tagging.post_ide does not hold a UUID",
+	)
+	assert_eq(
+		str(not_uuid.exception),
+		"Positioned.taggings: Tagging.position does not hold a UUID",
+	)
+	assert_eq(
+		str(one.exception),
+		"Biographed.profile: Profile.bio does not hold a UUID",
+	)
+
+
+def test_resolves_variants_declared_after_the_model():
+	assert_eq(
+		Activity.relationships["subject"].target_types,
+		(Publication, Remark),
+	)
+
+
+def test_rejects_a_variant_name_naming_a_missing_or_non_str_column():
+	with assert_raises(ModelError) as missing:
+
+		class MissingVariant(Model):
+			subject: Publication | Remark = has_one_variant(
+				"activity_id",
+				variant_name="subject_kind",
+			)
+
+	with assert_raises(ModelError) as not_str:
+
+		class NumberedVariant(Model):
+			position: int
+			subject: Publication | Remark = has_one_variant(
+				"activity_id",
+				variant_name="position",
+			)
+
+	assert_eq(
+		str(missing.exception),
+		"MissingVariant.subject: has_one_variant names 'subject_kind', "
+		"which is not a column",
+	)
+	assert_eq(
+		str(not_str.exception),
+		"NumberedVariant.subject: has_one_variant names 'position', "
+		"which does not hold a str",
+	)
+
+
+def test_rejects_a_variant_annotation_that_is_not_a_union_of_models():
+	with assert_raises(ModelError) as single:
+
+		class SingleVariant(Model):
+			subject_variant: str
+			subject: Publication = has_one_variant(
+				"activity_id",
+				variant_name="subject_variant",
+			)
+
+	with assert_raises(ModelError) as nullable:
+
+		class NullableVariant(Model):
+			subject_variant: str
+			subject: Publication | Remark | None = has_one_variant(
+				"activity_id",
+				variant_name="subject_variant",
+			)
+
+	with assert_raises(ModelError) as not_a_model:
+
+		class TextVariant(Model):
+			subject_variant: str
+			subject: Publication | str = has_one_variant(
+				"activity_id",
+				variant_name="subject_variant",
+			)
+
+	assert_eq(
+		str(single.exception),
+		f"SingleVariant.subject: expected a union of models, got {Publication!r}",
+	)
+	assert_eq(
+		str(nullable.exception),
+		"NullableVariant.subject: expected a union of models, "
+		f"got {Publication | Remark | None!r}",
+	)
+	assert_eq(
+		str(not_a_model.exception),
+		f"TextVariant.subject: expected a union of models, got {Publication | str!r}",
+	)
+
+
+def test_rejects_variants_that_share_a_table():
+	class Quotation(Model):
+		table = "remarks"
+
+		activity_id: UUID
+
+	with assert_raises(ModelError) as raised:
+
+		class Quoted(Model):
+			subject_variant: str
+			subject: Remark | Quotation = has_one_variant(
+				"activity_id",
+				variant_name="subject_variant",
+			)
+
+	assert_eq(
+		str(raised.exception),
+		"Quoted.subject: Quotation shares its table with another variant",
+	)
+
+
+def test_rejects_a_variant_without_a_uuid_id_column():
+	with assert_raises(ModelError) as raised:
+
+		class Unlinked(Model):
+			subject_variant: str
+			subject: Publication | Tag = has_one_variant(
+				"activity_id",
+				variant_name="subject_variant",
+			)
+
+	assert_eq(
+		str(raised.exception),
+		"Unlinked.subject: Tag.activity_id does not hold a UUID",
+	)
 
 
 def test_reading_an_unloaded_relationship_raises():

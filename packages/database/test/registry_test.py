@@ -175,7 +175,7 @@ def test_resolves_a_forward_reference_within_its_namespace():
 	blog.model(author)
 	blog.model(Post)
 
-	assert_is(Post.relationships["author"].target, author)
+	assert_eq(Post.relationships["author"].target_types, (author,))
 
 
 def test_resolves_a_forward_reference_from_a_namespace_in_the_root():
@@ -190,7 +190,7 @@ def test_resolves_a_forward_reference_from_a_namespace_in_the_root():
 	blog = registry.namespace("blog")
 	blog.model(Post)
 
-	assert_is(Post.relationships["author"].target, author)
+	assert_eq(Post.relationships["author"].target_types, (author,))
 
 
 def test_root_forward_reference_does_not_find_a_namespaced_model():

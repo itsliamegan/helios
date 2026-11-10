@@ -4,7 +4,7 @@ from .relationship import Relationship
 
 
 class Relationships(Mapping[str, Relationship]):
-	"""A model's relationships by name, each resolved and checked when first read.
+	"""A model's relationships by name, each resolved when first read.
 
 	Membership and iteration do not resolve relationships, so they work before
 	a forward-referenced model is declared.
@@ -12,14 +12,10 @@ class Relationships(Mapping[str, Relationship]):
 
 	def __init__(self, declared: Mapping[str, Relationship]):
 		self.declared = declared
-		self.checked: set[str] = set()
 
 	def __getitem__(self, name: str) -> Relationship:
 		relationship = self.declared[name]
 		relationship.resolve()
-		if name not in self.checked:
-			relationship.check()
-			self.checked.add(name)
 		return relationship
 
 	def __contains__(self, name: object) -> bool:
@@ -30,10 +26,3 @@ class Relationships(Mapping[str, Relationship]):
 
 	def __len__(self) -> int:
 		return len(self.declared)
-
-	def of_kind[R: Relationship](self, kind: type[R]) -> list[R]:
-		return [
-			relationship
-			for relationship in self.values()
-			if isinstance(relationship, kind)
-		]

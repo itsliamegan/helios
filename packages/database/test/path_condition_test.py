@@ -15,6 +15,7 @@ from helios.database import (
 	belongs_to,
 	has_many,
 	has_one,
+	has_one_variant,
 )
 from helios.database.sqlite import Connection
 
@@ -24,6 +25,7 @@ class Author(Model):
 
 	name: str
 	profile: Profile | None = has_one("author_id")
+	activities: list[Activity] = has_many("author_id")
 
 
 class Post(Model):
@@ -77,7 +79,50 @@ class Draft(Model):
 	reviewer: Author | None = belongs_to("reviewer_id")
 
 
-MODELS: list[type[Model]] = [Author, Post, Tag, Tagging, Comment, Profile, Draft]
+class Activity(Model):
+	table = "activities"
+
+	author_id: UUID
+	author: Author = belongs_to("author_id")
+	position: int
+	subject_variant: str
+	subject: Publication | Remark = has_one_variant(
+		"activity_id",
+		variant_name="subject_variant",
+	)
+
+
+class Publication(Model):
+	table = "publications"
+
+	activity_id: UUID
+	activity: Activity = belongs_to("activity_id")
+	post_id: UUID
+	post: Post = belongs_to("post_id")
+
+
+class Remark(Model):
+	table = "remarks"
+
+	activity_id: UUID
+	activity: Activity = belongs_to("activity_id")
+	comment_id: UUID
+	comment: Comment = belongs_to("comment_id")
+	excerpt: str
+
+
+MODELS: list[type[Model]] = [
+	Author,
+	Post,
+	Tag,
+	Tagging,
+	Comment,
+	Profile,
+	Draft,
+	Activity,
+	Publication,
+	Remark,
+]
 
 SCHEMA = """
 CREATE TABLE authors (
@@ -119,6 +164,26 @@ CREATE TABLE drafts (
 	id TEXT PRIMARY KEY,
 	created_at TEXT NOT NULL,
 	reviewer_id TEXT REFERENCES authors (id)
+);
+CREATE TABLE activities (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	author_id TEXT NOT NULL REFERENCES authors (id),
+	position INTEGER NOT NULL,
+	subject_variant TEXT NOT NULL
+);
+CREATE TABLE publications (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	activity_id TEXT NOT NULL REFERENCES activities (id),
+	post_id TEXT NOT NULL REFERENCES posts (id)
+);
+CREATE TABLE remarks (
+	id TEXT PRIMARY KEY,
+	created_at TEXT NOT NULL,
+	activity_id TEXT NOT NULL REFERENCES activities (id),
+	comment_id TEXT NOT NULL REFERENCES comments (id),
+	excerpt TEXT NOT NULL
 );
 """
 
@@ -333,6 +398,17 @@ def test_rejects_invalid_paths():
 			with assert_raises(ModelError) as raised:
 				store.query(Tagging).where({key: "Ideas"})
 			assert_eq(str(raised.exception), f"Query on Tagging has {key!r}, {detail}")
+
+
+def test_rejects_a_path_through_a_variant_relationship():
+	with open_store() as store, assert_raises(ModelError) as raised:
+		store.query(Activity).where({"subject.excerpt": "Agreed"})
+
+	assert_eq(
+		str(raised.exception),
+		"Query on Activity has 'subject.excerpt', "
+		"where Activity.subject has several targets",
+	)
 
 
 def test_checks_values_against_the_final_column():

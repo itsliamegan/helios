@@ -32,6 +32,8 @@ CI runs the tests, linter, and type checker on every pull request.
   inheriting the mapping API.
 - Collection parameters take `Mapping` or `Sequence`. Use `dict` or `list` only
   where appropriate.
-- Tests share one blog domain. Its models are `Post`, `Author`, `Comment`, and
-  `Tag`. Its services, for tests that bind them, are `Moderator` and
-  `Newsletter` for the application and `Reader` and `Visit` for a request.
+- Tests share one blog domain. Its core models are `Post`, `Author`,
+  `Comment`, and `Tag`. A test adds a blog model, such as `Tagging` or
+  `Draft`, when a case needs a shape the core models lack. Its services, for
+  tests that bind them, are `Moderator` and `Newsletter` for the application
+  and `Reader` and `Visit` for a request.

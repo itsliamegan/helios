@@ -6,7 +6,7 @@ from .error import DatabaseBusyError, DatabaseError, ModelError, NotFoundError
 from .model import Model
 from .query import Query
 from .registry import Registry
-from .relationship import belongs_to, has_many, has_one
+from .relationship import belongs_to, has_many, has_one, has_one_variant
 from .store import Store
 from .transaction import Transaction
 
@@ -27,4 +27,5 @@ __all__ = [
 	"generated",
 	"has_many",
 	"has_one",
+	"has_one_variant",
 ]
