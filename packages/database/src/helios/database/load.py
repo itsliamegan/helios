@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
-from .error import DatabaseError, ModelError
+from .error import ModelError
 from .model import Model
 from .relationship import Relationship
 
@@ -106,36 +106,7 @@ class Load:
 
 		for model in models:
 			found = matches.get(model._values[owner_column], [])
-			model._loaded[relationship.name] = self.loaded(
-				relationship,
-				target_type,
-				model,
-				found,
-			)
-
-	def loaded(
-		self,
-		relationship: Relationship,
-		target_type: type[Model],
-		model: Model,
-		found: list[Model],
-	):
-		owner = f"{relationship.owner.__name__} {model.id}"
-		if relationship.plural:
-			return found
-		elif len(found) > 1:
-			raise DatabaseError(
-				f"{relationship.label} has several {target_type.__name__} rows "
-				f"for {owner}"
-			)
-		elif found:
-			return found[0]
-		elif relationship.nullable:
-			return None
-		else:
-			raise DatabaseError(
-				f"{relationship.label} has no {target_type.__name__} row for {owner}"
-			)
+			model._loaded[relationship.name] = relationship.target(model, found)
 
 
 class Branch:

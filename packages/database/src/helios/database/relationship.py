@@ -71,7 +71,7 @@ def has_one_variant(
 
 
 class Relationship(ABC):
-	"""A model attribute that holds related models once they are loaded.
+	"""A model attribute that holds its target models once they are loaded.
 
 	A loaded relationship is a snapshot; later writes do not change it. Updating
 	a `belongs_to` ID unloads the associated relationship.
@@ -116,6 +116,27 @@ class Relationship(ABC):
 
 		(target_type,) = self.target_types
 		return target_type
+
+	def target(self, model: Model, found: list[Model]) -> Model | list[Model] | None:
+		"""Return the loaded target of `model` from the rows found for it."""
+
+		owner = f"{self.owner.__name__} {model.id}"
+		if self.plural:
+			return found
+		elif len(found) > 1:
+			raise DatabaseError(
+				f"{self.label} has several {self.target_type(model).__name__} rows "
+				f"for {owner}"
+			)
+		elif found:
+			return found[0]
+		elif self.nullable:
+			return None
+		else:
+			raise DatabaseError(
+				f"{self.label} has no {self.target_type(model).__name__} row "
+				f"for {owner}"
+			)
 
 	def check_columns(self, columns: Columns):
 		"""Check the owner's columns when the owner is declared."""
