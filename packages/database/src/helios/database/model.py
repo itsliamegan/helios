@@ -16,12 +16,12 @@ from .columns import Columns
 from .error import ModelError
 from .relationship import (
 	Relationship,
+	Relationships,
 	belongs_to,
 	has_many,
 	has_one,
 	has_one_variant,
 )
-from .relationships import Relationships
 
 
 @dataclass_transform(
