@@ -74,7 +74,7 @@ class Relationship(ABC):
 	"""A model attribute that holds its target models once they are loaded.
 
 	A loaded relationship is a snapshot; later writes do not change it. Updating
-	a `belongs_to` ID unloads the associated relationship.
+	one of its `owner_columns` unloads it.
 	"""
 
 	plural = False
@@ -155,6 +155,12 @@ class Relationship(ABC):
 	@property
 	@abstractmethod
 	def owner_column(self) -> str: ...
+
+	@property
+	def owner_columns(self) -> tuple[str, ...]:
+		"""The owner's columns that decide which rows this relationship loads."""
+
+		return (self.owner_column,)
 
 	@property
 	@abstractmethod
@@ -315,6 +321,10 @@ class HasOneVariant(Inverse):
 			f"{self.label} has unknown variant {table!r} "
 			f"for {self.owner.__name__} {model.id}"
 		)
+
+	@property
+	def owner_columns(self) -> tuple[str, ...]:
+		return (self.owner_column, self.variant_name)
 
 	def check_columns(self, columns: Columns):
 		column = columns.get(self.variant_name)

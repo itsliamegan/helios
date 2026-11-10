@@ -30,10 +30,3 @@ class Relationships(Mapping[str, Relationship]):
 
 	def __len__(self) -> int:
 		return len(self.declared)
-
-	def of_kind[R: Relationship](self, kind: type[R]) -> list[R]:
-		return [
-			relationship
-			for relationship in self.values()
-			if isinstance(relationship, kind)
-		]

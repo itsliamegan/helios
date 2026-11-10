@@ -390,6 +390,33 @@ def test_update_unloads_a_changed_belongs_to():
 		assert_eq(fixture.second.tag.name, "Rust")
 
 
+def test_update_unloads_a_changed_variant():
+	with open_store() as store:
+		fixture = Fixture(store)
+		moved = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=0,
+			subject_variant=Publication.table,
+		)
+		store.create(Publication, activity_id=moved.id, post_id=fixture.ideas.id)
+		kept = store.create(
+			Activity,
+			author_id=fixture.ada.id,
+			position=1,
+			subject_variant=Publication.table,
+		)
+		store.create(Publication, activity_id=kept.id, post_id=fixture.empty.id)
+		store.load([moved, kept], "subject")
+
+		store.update(moved, subject_variant=Remark.table)
+		store.update(kept, subject_variant=Publication.table, position=4)
+
+		with assert_raises(ModelError):
+			_ = moved.subject
+		assert_is_instance(kept.subject, Publication)
+
+
 def test_loaded_lists_are_snapshots():
 	with open_store() as store:
 		fixture = Fixture(store)

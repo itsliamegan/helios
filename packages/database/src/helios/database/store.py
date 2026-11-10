@@ -14,7 +14,6 @@ from .namespace import Namespace
 from .parser import ConditionParser
 from .query import Query
 from .registry import Registry
-from .relationship import BelongsTo
 from .sqlite import Connection
 from .statement import Delete, Insert, Raw, Select, Statement, Update
 from .transaction import Transaction
@@ -56,8 +55,8 @@ class Store:
 		"""Write values to the model's row, then set them on the model.
 
 		Raise `NotFoundError` when no row matches, such as for a model that was
-		deleted or never stored. Changing a `belongs_to` ID unloads that
-		relationship.
+		deleted or never stored. Changing one of a relationship's `owner_columns`
+		unloads that relationship.
 		"""
 
 		model_type = type(model)
@@ -70,12 +69,11 @@ class Store:
 			if not column.init:
 				raise ModelError(f"{model_type.__name__}.{name} is generated")
 			encoded[name] = column.encode(value, column.codec(namespace), model_type)
-		moved = [
-			relationship.name
-			for relationship in model_type.relationships.of_kind(BelongsTo)
-			if relationship.id_name in values
-			and values[relationship.id_name] != model._values[relationship.id_name]
-		]
+		moved: set[str] = set()
+		for relationship in model_type.relationships.values():
+			for name in relationship.owner_columns:
+				if name in values and values[name] != model._values[name]:
+					moved.add(relationship.name)
 		statement = Update(model_type.table, encoded, self.identifying(model))
 		if self.write(statement) == 0:
 			raise NotFoundError(model_type, model.id)
