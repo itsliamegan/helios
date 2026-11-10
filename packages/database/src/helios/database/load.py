@@ -1,5 +1,6 @@
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from .error import ModelError
 from .model import Model
@@ -69,61 +70,57 @@ class Branch:
 		self.relationship = relationship
 		self.branches: dict[str, Branch] = {}
 
-	def load(self, store: Store, models: Sequence[Model]):
-		"""Load the relationship onto the models, then the branches beneath it."""
+	def load(self, store: Store, owners: Sequence[Model]):
+		"""Load the relationship onto the owners, then the branches beneath it."""
 
 		relationship = self.relationship
-		groups: dict[type[Model], list[Model]] = {}
-		for model in models:
-			groups.setdefault(relationship.target_type(model), []).append(model)
+		found = self.find_targets(store, owners)
+		for owner in owners:
+			value = owner._values[relationship.owner_column]
+			owner._loaded[relationship.name] = relationship.target(
+				owner,
+				found.get(value, []),
+			)
 
-		for target_type, group in groups.items():
-			rows = self.rows(store, target_type, group)
-			for model in group:
-				found = rows.get(model._values[relationship.owner_column], [])
-				model._loaded[relationship.name] = relationship.target(model, found)
+		targets: list[Model] = []
+		for rows in found.values():
+			targets.extend(rows)
+		for branch in self.branches.values():
+			branch.load(store, targets)
 
-		if self.branches:
-			targets = self.targets(models)
-			for branch in self.branches.values():
-				branch.load(store, targets)
-
-	def rows(
+	def find_targets(
 		self,
 		store: Store,
-		target_type: type[Model],
-		models: Sequence[Model],
-	) -> dict[object, list[Model]]:
-		"""Return the target rows for the models, by their target column value."""
+		owners: Sequence[Model],
+	) -> dict[UUID, list[Model]]:
+		"""Find the target rows for the owners, by the owner column value they match.
+
+		Each row is found once, however many owners match it.
+		"""
 
 		owner_column = self.relationship.owner_column
 		target_column = self.relationship.target_column
-		values = list(
-			dict.fromkeys(
-				model._values[owner_column]
-				for model in models
-				if model._values[owner_column] is not None
-			)
-		)
+		groups: dict[type[Model], list[Model]] = {}
+		for owner in owners:
+			target_type = self.relationship.target_type(owner)
+			groups.setdefault(target_type, []).append(owner)
 
-		rows: dict[object, list[Model]] = {}
+		batches: list[tuple[type[Model], list[UUID]]] = []
 		size = store.connection.parameter_limit
-		for start in range(0, len(values), size):
-			batch = values[start : start + size]
-			query = store.query(target_type)
-			for row in query.where({f"{target_column} in": batch}).all():
-				rows.setdefault(row._values[target_column], []).append(row)
-		return rows
+		for target_type, group in groups.items():
+			values = list(
+				dict.fromkeys(
+					owner._values[owner_column]
+					for owner in group
+					if owner._values[owner_column] is not None
+				)
+			)
+			for start in range(0, len(values), size):
+				batches.append((target_type, values[start : start + size]))
 
-	def targets(self, models: Sequence[Model]) -> list[Model]:
-		"""Return the models' loaded targets, each once."""
-
-		targets: dict[int, Model] = {}
-		for model in models:
-			loaded = model._loaded[self.relationship.name]
-			if isinstance(loaded, list):
-				for target in loaded:
-					targets[id(target)] = target
-			elif loaded is not None:
-				targets[id(loaded)] = loaded
-		return list(targets.values())
+		found: dict[UUID, list[Model]] = {}
+		for target_type, batch in batches:
+			query = store.query(target_type).where({f"{target_column} in": batch})
+			for row in query.all():
+				found.setdefault(row._values[target_column], []).append(row)
+		return found
