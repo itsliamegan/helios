@@ -62,9 +62,8 @@ def has_one_variant(
 	"""Declare the variant model that identifies this model in its `id_name` column.
 
 	Annotate it as a union of two or more models. This model's `variant_name`
-	column holds the table name of each row's variant. The schema must keep
-	`id_name` unique in each variant's table. Create a row and its variant in
-	one transaction, so that no reader sees the row without its variant.
+	column holds the table name of each row's variant. The column named by
+	`id_name` must be unique.
 	"""
 
 	return HasOneVariant(id_name, variant_name)
@@ -112,7 +111,7 @@ class Relationship(ABC):
 		return self._nullable
 
 	def target_type(self, model: Model) -> type[Model]:
-		"""Return the model that `model` loads this relationship from."""
+		"""Return the model type that `model` loads this relationship from."""
 
 		(target_type,) = self.target_types
 		return target_type
