@@ -2,6 +2,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
 
+from werkzeug.datastructures import Headers as RequestHeaders
 from werkzeug.test import Client, Cookie, TestResponse
 
 from helios.app import Context
@@ -10,6 +11,8 @@ from helios.session import Session, Sessions
 from helios.url import URL
 
 from .application import Application
+
+NAVIGATION_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 
 
 class TestClient:
@@ -62,12 +65,14 @@ class TestClient:
 		redirect: bool = False,
 		**kwargs: Any,
 	) -> TestResponse:
+		request_headers = RequestHeaders(headers)
+		request_headers.setdefault("Accept", NAVIGATION_ACCEPT)
 		return self.client.open(
 			path,
 			method=method.value,
 			query_string=query,
 			data=form,
-			headers=headers,
+			headers=request_headers,
 			follow_redirects=redirect,
 			**kwargs,
 		)

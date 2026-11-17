@@ -85,6 +85,61 @@ def test_doesnt_get_empty_referrer():
 	assert_eq(request.referrer, None)
 
 
+def test_prefers_type_the_client_lists_exactly():
+	request = Request(
+		Method.POST,
+		URL("/posts"),
+		Headers(
+			{
+				"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+			}
+		),
+	)
+
+	preferred = request.prefers(["text/vnd.turbo-stream.html", "text/html"])
+
+	assert_eq(preferred, "text/html")
+
+
+def test_prefers_earlier_type_among_equally_accepted_types():
+	request = Request(
+		Method.POST,
+		URL("/posts"),
+		Headers(
+			{"Accept": "text/vnd.turbo-stream.html, text/html, application/xhtml+xml"}
+		),
+	)
+
+	assert_eq(
+		request.prefers(["text/vnd.turbo-stream.html", "text/html"]),
+		"text/vnd.turbo-stream.html",
+	)
+	assert_eq(
+		request.prefers(["text/html", "text/vnd.turbo-stream.html"]),
+		"text/html",
+	)
+
+
+def test_prefers_first_type_without_accept_header():
+	request = Request(Method.POST, URL("/posts"))
+
+	preferred = request.prefers(["text/vnd.turbo-stream.html", "text/html"])
+
+	assert_eq(preferred, "text/vnd.turbo-stream.html")
+
+
+def test_prefers_no_type_the_client_does_not_accept():
+	request = Request(
+		Method.POST,
+		URL("/posts"),
+		Headers({"Accept": "application/json"}),
+	)
+
+	preferred = request.prefers(["text/vnd.turbo-stream.html", "text/html"])
+
+	assert_eq(preferred, None)
+
+
 def test_queries_headers_without_case():
 	headers = Headers()
 	headers["content-type"] = "text/html"

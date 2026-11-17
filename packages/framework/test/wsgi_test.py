@@ -313,6 +313,31 @@ def test_client_sends_query_and_headers():
 	assert_eq(res.text, "Intro|recent")
 
 
+def test_client_accepts_like_a_browser_navigation():
+	def index(req, ctx):
+		return Response.text(str(req.headers["Accept"]))
+
+	client = make_client([Route.get("/", index)])
+
+	res = client.get("/")
+
+	assert_eq(
+		res.text,
+		"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+	)
+
+
+def test_client_sends_given_accept_header():
+	def index(req, ctx):
+		return Response.text(str(req.headers["Accept"]))
+
+	client = make_client([Route.get("/", index)])
+
+	res = client.get("/", headers={"accept": "application/json"})
+
+	assert_eq(res.text, "application/json")
+
+
 def test_client_sends_scalar_and_repeated_form_values():
 	def create(req, ctx):
 		tag_ids = req.input.all("tag_id")
