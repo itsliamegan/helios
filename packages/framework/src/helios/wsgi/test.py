@@ -12,16 +12,11 @@ from helios.url import URL
 
 from .application import Application
 
-# Firefox and Safari send this for a navigation.
 NAVIGATION_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 
 
 class TestClient:
-	"""Sends requests to an application in tests, keeping cookies between them.
-
-	A request carries a browser's `Accept` header for a navigation unless its
-	`headers` set one.
-	"""
+	"""Sends requests to an application in tests, keeping cookies between them."""
 
 	def __init__(self, app: Application):
 		self.application = app
